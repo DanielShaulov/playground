@@ -14,4 +14,10 @@ export const GAMES = [
     blurb: "Hit every target before the clock runs out.",
     icon: "🎯",
   },
+  {
+    id: "stack",
+    title: "Stack",
+    blurb: "Drop blocks to build a tower. Miss and it narrows.",
+    icon: "🧱",
+  },
 ];
