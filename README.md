@@ -36,6 +36,15 @@ npm run new -- flappy-thing "Flappy Thing" "🐦" "Tap to flap, don't hit stuff.
 That creates `games/flappy-thing/` from the template and registers it in
 `games.js`, so it shows up on the launcher. Then edit `games/flappy-thing/game.js`.
 
+### Conventions
+
+Commit straight to `main` — no branches or PRs — and keep the history linear:
+one commit per change, terse message, rebase rather than merge. Pushing to
+`main` is what deploys.
+
+`CLAUDE.md` has the full working notes, including the deploy failure modes
+worth knowing before you go debugging a red Actions run.
+
 ## Layout
 
 ```
