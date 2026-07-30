@@ -26,4 +26,10 @@ export const GAMES = [
     blurb: "Drag to fly, auto-fire, hold off the swarm.",
     icon: "👾",
   },
+  {
+    id: "firewall-mage",
+    title: "Firewall Mage",
+    blurb: "Turn-based duels with malware. Level up, loot, keep your save.",
+    icon: "🧙",
+  },
 ];
