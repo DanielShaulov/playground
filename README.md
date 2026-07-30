@@ -8,7 +8,7 @@ file, edit it, refresh — that's the whole loop.
 
 ## Playing on your phone
 
-The site deploys to GitHub Pages on every push to `main`
+The site deploys to GitHub Pages whenever something lands on `main`
 (`.github/workflows/deploy.yml`). One-time setup: **Settings → Pages → Source →
 GitHub Actions**. After that it's live at
 `https://<user>.github.io/playground/`.
@@ -38,9 +38,10 @@ That creates `games/flappy-thing/` from the template and registers it in
 
 ### Conventions
 
-Commit straight to `main` — no branches or PRs — and keep the history linear:
-one commit per change, terse message, rebase rather than merge. Pushing to
-`main` is what deploys.
+Work on a branch and land it via a squash-merged PR — that keeps `main` linear
+while still allowing fix-ups on the branch. One commit per change once it
+lands, terse messages, rebase rather than merge. Merging to `main` is what
+deploys.
 
 `CLAUDE.md` has the full working notes, including the deploy failure modes
 worth knowing before you go debugging a red Actions run.
