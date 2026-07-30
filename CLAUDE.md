@@ -43,32 +43,15 @@ storage, base CSS.
 
 ## Git
 
-Keep the history **linear and tidy** — `main` should read as one commit per
-change, with no merge commits anywhere in it.
+Keep the history **linear and tidy** — it should read as one commit per change.
 
-### Flow
-
-Work on a branch and land it through a PR — don't commit straight to `main`.
-
-1. Branch from the latest `main`. In an agent session, use the branch the
-   session was assigned (`claude/<something>`); otherwise any short name.
-2. Commit, push with `git push -u origin <branch>`, open a PR against `main`.
-3. **Squash-merge** it. That's what keeps `main` linear while leaving you free
-   to push fix-ups on the branch. Merging is what deploys the site.
-
-Sessions that skip the PR and push to `main` directly leave the task looking
-unfinished in the UI, because there's no PR lifecycle to close.
-
-A merged PR is finished — never stack follow-up work on its branch. Start
-again from the updated `main`, even if you reuse the branch name.
-
-### Commits
-
-- **One commit per change** by the time it lands. Amend or squash rather than
-  pushing a fix-up on top. No "wip" or "fix typo" commits in `main`.
+- **Commit directly to `main`.** No feature branches, no PRs, unless the user
+  asks for one. Pushing to `main` is what deploys the site.
+- **One commit per change.** Squash or amend before pushing rather than pushing
+  a fix-up commit on top. Never push a "wip" or "fix typo" commit.
 - **Terse messages.** Imperative subject under ~50 chars, then 1–3 lines on
   what and why if it isn't obvious. No bullet-point essays.
-- **Never a merge commit.** If `main` has moved under you, `git pull --rebase`.
+- **Never merge commits.** If `main` has moved, `git pull --rebase`.
 
 ```
 Add Stack game
@@ -79,8 +62,8 @@ flush landings keep full width. Camera follows the tower as it rises.
 
 ## Deploying
 
-Merging a PR to `main` → `.github/workflows/deploy.yml` → GitHub Pages.
-Nothing to run by hand; the site is the repo root, there's no build.
+Push to `main` → `.github/workflows/deploy.yml` → GitHub Pages. Nothing to run
+by hand; the site is the repo root, there's no build.
 
 Two things that have already broken this once each:
 
