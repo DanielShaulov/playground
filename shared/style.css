@@ -1,0 +1,171 @@
+/* Shared base styles for all games. Mobile-first, portrait, dark. */
+
+:root {
+  --bg: #10131a;
+  --bg-raised: #191e29;
+  --fg: #e8ecf4;
+  --fg-dim: #8d98ad;
+  --accent: #4ade80;
+  --accent-2: #60a5fa;
+  --danger: #f87171;
+  --radius: 14px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Games are single-screen: never scroll, never text-select, never pinch. */
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+/* Full-viewport app shell. dvh so the iOS URL bar doesn't clip the bottom. */
+.app {
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+
+/* --- Top bar (back link + score readouts) --- */
+
+.hud {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud .spacer {
+  flex: 1;
+}
+
+.hud-stat {
+  color: var(--fg-dim);
+}
+
+.hud-stat b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.back {
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-size: 20px;
+  line-height: 1;
+  padding: 6px 10px;
+  margin: -6px -4px;
+  border-radius: 10px;
+}
+
+.back:active {
+  background: var(--bg-raised);
+}
+
+/* --- Play area --- */
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Canvas games handle their own gestures. */
+  touch-action: none;
+}
+
+/* --- Overlays (start / game over / pause) --- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(6px);
+  z-index: 10;
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.overlay h1 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+}
+
+.overlay p {
+  margin: 0;
+  max-width: 22rem;
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+
+.overlay .big-score {
+  font-size: 56px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Thumb-sized by default: nothing here should be hard to hit one-handed. */
+.btn {
+  appearance: none;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #06210f;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 16px 32px;
+  min-height: 56px;
+  min-width: 180px;
+  cursor: pointer;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn.secondary {
+  background: var(--bg-raised);
+  color: var(--fg);
+}

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="theme-color" content="#10131a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Playground" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon-180.png" />
+    <link rel="stylesheet" href="shared/style.css" />
+    <title>Playground</title>
+    <style>
+      /* The launcher scrolls, unlike the games. */
+      body {
+        overflow-y: auto;
+      }
+
+      .app {
+        position: static;
+        height: auto;
+        min-height: 100dvh;
+      }
+
+      header {
+        padding: 28px 20px 16px;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 30px;
+        letter-spacing: -0.02em;
+      }
+
+      header p {
+        margin: 6px 0 0;
+        color: var(--fg-dim);
+        font-size: 15px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        padding: 4px 16px 32px;
+      }
+
+      .tile {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 16px 14px 18px;
+        min-height: 150px;
+        border-radius: var(--radius);
+        background: var(--bg-raised);
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .tile:active {
+        transform: scale(0.98);
+      }
+
+      .tile .icon {
+        font-size: 34px;
+        line-height: 1.1;
+      }
+
+      .tile .name {
+        font-size: 17px;
+        font-weight: 600;
+      }
+
+      .tile .blurb {
+        font-size: 13px;
+        line-height: 1.4;
+        color: var(--fg-dim);
+      }
+
+      .empty {
+        grid-column: 1 / -1;
+        padding: 32px 8px;
+        text-align: center;
+        color: var(--fg-dim);
+        line-height: 1.6;
+      }
+
+      footer {
+        padding: 0 20px 32px;
+        color: var(--fg-dim);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>Playground</h1>
+        <p>Small games, one thumb, portrait only.</p>
+      </header>
+      <main class="grid" id="grid"></main>
+      <footer>Add to Home Screen for fullscreen play.</footer>
+    </div>
+
+    <script type="module">
+      import { GAMES } from "./games.js";
+
+      const grid = document.getElementById("grid");
+
+      if (GAMES.length === 0) {
+        grid.innerHTML = `<div class="empty">No games yet.<br />Run <code>scripts/new-game.sh</code> to add one.</div>`;
+      } else {
+        for (const game of GAMES) {
+          const a = document.createElement("a");
+          a.className = "tile";
+          a.href = `games/${game.id}/index.html`;
+          a.innerHTML = `
+            <div class="icon">${game.icon ?? "🎮"}</div>
+            <div class="name"></div>
+            <div class="blurb"></div>`;
+          a.querySelector(".name").textContent = game.title;
+          a.querySelector(".blurb").textContent = game.blurb ?? "";
+          grid.appendChild(a);
+        }
+      }
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js").catch(() => {
+          /* offline support is a nice-to-have */
+        });
+      }
+    </script>
+  </body>
+</html>
