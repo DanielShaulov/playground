@@ -20,4 +20,10 @@ export const GAMES = [
     blurb: "Drop blocks to build a tower. Miss and it narrows.",
     icon: "🧱",
   },
+  {
+    id: "alien-siege",
+    title: "Alien Siege",
+    blurb: "Drag to fly, auto-fire, hold off the swarm.",
+    icon: "👾",
+  },
 ];
