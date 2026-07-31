@@ -1,3 +1,6 @@
 node_modules/
 .DS_Store
 *.log
+
+# Screenshots are for looking at, not for reviewing in a diff.
+tests/**/shots/

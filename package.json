@@ -8,9 +8,13 @@
     "start": "python3 -m http.server 8000 --bind 0.0.0.0",
     "new": "scripts/new-game.sh",
     "icons": "python3 scripts/make-icons.py",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:checkwiz": "node tests/checkwiz/rules.mjs",
+    "test:checkwiz:bot": "node tests/checkwiz/bot.mjs",
+    "test:checkwiz:shots": "node tests/checkwiz/shots.mjs"
   },
   "devDependencies": {
+    "playwright-core": "^1.56.1",
     "prettier": "^3.3.3"
   }
 }
