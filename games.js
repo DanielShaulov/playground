@@ -32,4 +32,10 @@ export const GAMES = [
     blurb: "Turn-based duels with malware. Level up, loot, keep your save.",
     icon: "🧙",
   },
+  {
+    id: "checkwiz",
+    title: "Checkwiz",
+    blurb: "Chess-blooded tactics: dismantle the guard, take the Sovereign.",
+    icon: "♞",
+  },
 ];
