@@ -22,10 +22,12 @@
  *      bishop, diagonal from a rook. A queen has no safe side at all, which
  *      makes her a spell problem rather than a walking problem.
  *
- * The Sovereign's ward is his court: while a single guard still stands he
- * cannot be touched — not by hand, not by beam, not by dispel. So a chamber is
- * always "dismantle the guard, *then* take the king", and there is no line that
- * skips to the throne. Pawns march while you work and promote to queens if you
+ * The Sovereign's ward is his court: while two or more guards stand he cannot
+ * be touched — not by hand, not by beam, not by dispel. So a chamber is always
+ * "dismantle the guard, *then* take the king", and there is no line that skips
+ * to the throne. Break the court down to its last man and the ward goes with
+ * it; one guard alone was never protecting anybody, and being made to chase him
+ * around an empty board was the dullest way this game could end. Pawns march while you work and promote to queens if you
  * dawdle, which is the clock — and a pawn you left alive comes back as the
  * hardest piece on the board.
  *
@@ -157,7 +159,7 @@ const KINDS = {
     hit: 1,
     steps: ALL8,
     move: "still",
-    tip: "Untouchable while any guard stands. His ward shields him, not them.",
+    tip: "His court is his ward — it fails at the last guard, and shields him, never them.",
   },
 };
 
@@ -444,23 +446,32 @@ function raysFrom(kind, r, c, ignore = null) {
 
 /**
  * The Sovereign's ward is the court itself, not the geometry around him. While
- * a single guard still stands he cannot be taken, beamed, dispelled or reached
- * by any other trick — and his own aura burns every square beside him. Take the
- * last guard and the ward fails: he stops striking, and he is yours.
+ * it holds he cannot be taken, beamed, dispelled or reached by any other trick,
+ * and his own aura burns every square beside him. Break the court and the ward
+ * fails: he stops striking, and he is yours.
  *
  * Tying it to the court rather than to whoever happens to defend his square is
  * what makes a chamber a chamber. Anything narrower has a shortcut — walk past
- * everything until nobody's line happens to cross the throne, or spend three
- * mana on a beam and never fight the guard at all — and a level whose whole
- * shape is "dismantle the guard" should not have a line that skips the guard.
+ * everything until nobody's line happens to cross the throne, or spend four mana
+ * on a beam and never fight the guard at all — and a level whose whole shape is
+ * "dismantle the guard" should not have a line that skips the guard.
  *
- * It is also why the aura switches off at the end. His aura covers every square
- * you would have to stand on to reach him, so while the court lives that aura
- * is a fence; if it outlived the court the last capture would always cost a
- * life, and at one life with no mana left there would be no move that wins.
+ * But a ward needs a *court*, and one man is not a court. That last guard is
+ * where the rule stopped being a rule and started being a chore: it is the piece
+ * with the whole board to run around in, and if it is a knight it cannot be
+ * caught at all — a knight is the one piece that never attacks a square touching
+ * it, so it never stands and fires, and it hops away the instant you close in.
+ * Demanding you catch it turned the end of a chamber into a lap of the board.
+ * Down to one guard the ward fails, which reads as well as it plays: the court
+ * is broken, and the man still running is not protecting anybody.
+ *
+ * It is also why the aura switches off with it. His aura covers every square you
+ * would have to stand on to reach him, so while the court holds that aura is a
+ * fence; if it outlived the court the last capture would always cost a life, and
+ * at one life with no mana left there would be no move that wins.
  */
 const guardsLeft = () => board.pieces.reduce((n, p) => n + (p.kind === "king" ? 0 : 1), 0);
-const wardStanding = () => guardsLeft() > 0;
+const wardStanding = () => guardsLeft() > 1;
 const untouchable = (p) => p.kind === "king" && wardStanding();
 
 const attacksOf = (p) =>
@@ -701,8 +712,8 @@ function readSquare(r, c) {
         c,
         piece,
         guards: board.pieces.filter((p) => p !== piece),
-        reason: `${n} ${n === 1 ? "guard" : "guards"} still standing`,
-        sub: "his ward holds while they do",
+        reason: `${n} guards hold his ward`,
+        sub: "his ward fails at the last of them",
       };
     }
     const guards = piece.stun > 0 ? [] : defendersOf(piece);
@@ -766,7 +777,7 @@ function capture(piece, { bySpell = false } = {}) {
   if (!bySpell) stepTo(piece.r, piece.c);
   refresh();
 
-  if (board.pieces.length === 1) announce("The last guard falls — his ward fails", ROYAL);
+  if (guardsLeft() === 1) announce("The court breaks — his ward fails", ROYAL);
 }
 
 /** Commit whatever a pending selection describes, then hand over the turn. */
@@ -1004,6 +1015,19 @@ function pickMove(p) {
   const w = board.wizard;
   const options = moveCandidates(p);
   if (!options.length) return null;
+
+  // A knight the wizard has walked up to holds its square.
+  //
+  // Everything else in the court can be caught by walking, because a piece that
+  // is attacking the wizard fires instead of moving — stand next to a rook and
+  // it stays there to shoot you, which is your turn to take it. A knight never
+  // attacks a square touching it, so it is never the piece standing and firing,
+  // and left to its own judgement it hops clear every single time the wizard
+  // closes. That is not evasion, it is immunity: a lone knight could not be
+  // taken by hand at any price, and the chamber it was in became a lap of the
+  // board. Its own geometry is why it cannot run from this one — it has nothing
+  // to threaten from where it stands, and no better square to be.
+  if (p.kind === "knight" && cheb(p, w) === 1) return null;
 
   // What handing this piece over is worth to him: the mana, plus never having
   // to deal with the piece again.
@@ -1758,7 +1782,9 @@ function hintText() {
   const guards = guardsLeft();
   // A Grandmaster keeps his distance, so saying "walk up and take him" would be
   // a lie in exactly the chambers where it matters.
-  if (guards === 0)
+  // One guard left is one too few to hold the ward, so the throne is already
+  // open — say so, or the player keeps hunting a piece they can safely ignore.
+  if (guards <= 1)
     return board.royal
       ? "His ward has failed — but he runs. Corner him, or beam him down."
       : "His ward has failed. Walk up and take him.";
@@ -1955,10 +1981,7 @@ const RULES = [
   ["2", "One tick per life it costs. A rook's line is worth two of a pawn's, a queen's three."],
   ["3", "You cannot take a defended piece. Clear its defenders first — that ordering is the game."],
   ["4", "Every piece has a safe side. Learn where, and you can walk through a court untouched."],
-  [
-    "5",
-    "The Sovereign's ward is his court. Every guard must fall before he can be touched at all.",
-  ],
+  ["5", "The Sovereign's ward is his court. Break it down to one guard and it fails with it."],
 ];
 
 const CODEX_PAGES = ["The Court", "Spells", "The Rules"];
@@ -2187,7 +2210,7 @@ function tapSquare(r, c) {
         c,
         piece: target.piece,
         guards: board.pieces.filter((p) => p !== target.piece),
-        reason: `${n} ${n === 1 ? "guard" : "guards"} still standing`,
+        reason: `${n} guards hold his ward`,
         sub: "his ward turns spells aside",
       };
       inspect = target.piece;
