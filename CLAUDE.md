@@ -87,7 +87,7 @@ Two things that have already broken this once each:
 - The `github-pages` **environment** carries a deployment branch rule pinned to
   whatever the default branch was when Pages was enabled. If a deploy fails in
   ~1 second with no step logs, that's it — the reason only appears in the
-  check-run *annotations*, not the job log. Fixed under Settings →
+  check-run _annotations_, not the job log. Fixed under Settings →
   Environments → `github-pages` → Deployment branches. Needs a human; the API
   is not reachable from an agent session.
 - **Ref deletion and repo-settings writes are blocked** for agent sessions
@@ -110,6 +110,13 @@ was actually drawn and tap those coordinates.
 
 Chromium is at `/opt/pw-browsers/chromium` — pass it as `executablePath`, and
 never run `playwright install`.
+
+A game with rules worth protecting can keep a harness next to it; `checkwiz` has
+one in `tests/checkwiz/` (`npm run test:checkwiz`) that is worth reading before
+writing another. Two tricks generalise: a game that persists its state is
+readable _and_ seedable through `localStorage`, so a test can resume any
+position instead of playing to it; and pointing the same suite at the previous
+commit is the only way to know a regression test would have caught anything.
 
 In remote agent sessions **browser egress is blocked**: Chromium cannot reach
 any external host, though `curl` can. To verify something already deployed,
