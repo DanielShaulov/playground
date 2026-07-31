@@ -42,47 +42,85 @@ const CLEAR_DELAY = 1600;
   check("boots and paints a title screen", shot.length > 5000, `${shot.length} bytes`);
 }
 
-// --- The ward is the whole court, not whoever covers his square --------------
+// --- The ward is the court, and one man is not a court ----------------------
 {
-  // Wizard standing right beside the throne with one guard alive across the
-  // board, and nothing defending the king's square. That used to be a free win.
+  // Wizard standing right beside the throne with the court still up. Nothing
+  // defends the king's square — that used to be a free win.
   await resume(
     makeRun({
       size: 7,
-      pieces: [piece(1, "king", 1, 5), piece(2, "pawn", 3, 4)],
+      pieces: [piece(1, "king", 1, 5), piece(2, "pawn", 3, 4), piece(3, "pawn", 3, 1)],
       wizard: { r: 2, c: 5 },
     }),
   );
 
   await tapCell(7, 1, 5); // select the throne
   await tapCell(7, 1, 5); // tapping a pending target again commits it
-  await settle(CLEAR_DELAY);
+  await settle(CLEAR_DELAY); // outwait the clear-chamber timeout before believing it
   let s = await read();
   check(
-    "an undefended Sovereign is untouchable while a guard stands",
-    s && s.chamber === 1 && s.board.pieces.length === 2,
+    "an undefended Sovereign is untouchable while the court holds",
+    s && s.chamber === 1 && s.board.pieces.length === 3,
     `chamber ${s?.chamber}, ${s?.board.pieces.length} pieces`,
   );
 
-  // Take the last guard from its blind side — a pawn never attacks backwards.
+  // Take one from its blind side — a pawn never attacks backwards.
   await tapCell(7, 3, 4);
   await tapConfirm(7);
   s = await read();
-  check(
-    "last guard falls to a capture from behind",
-    s.board.pieces.length === 1 && s.captures === 1,
-  );
+  check("a guard falls to a capture from behind", s.board.pieces.length === 2 && s.captures === 1);
 
-  // Ward broken: his aura goes out with his court, so walking in is free.
-  await tapCell(7, 2, 5);
+  // Down to one guard the ward fails with the court, and his aura goes out with
+  // it — so the walk in costs nothing even though a guard is still alive.
+  await tapCell(7, 2, 4);
   s = await read();
-  check("the aura dies with the court", s.hp === 6, `hp ${s.hp}`);
+  check("the aura dies with the ward", s.hp === 6, `hp ${s.hp}`);
 
   await tapCell(7, 1, 5);
   await tapCell(7, 1, 5);
   await settle(CLEAR_DELAY);
   s = await read();
-  check("chamber clears once the court is gone", s.chamber === 2, `chamber ${s.chamber}`);
+  check(
+    "one guard cannot hold the ward alone",
+    s.chamber === 2,
+    `chamber ${s.chamber} with a guard still standing`,
+  );
+}
+
+// --- The knight that could not be caught ------------------------------------
+{
+  // Every other piece can be run down, because a piece attacking the wizard
+  // fires instead of moving — stand beside a rook and it stays to shoot you.
+  // A knight never attacks what touches it, so it is never that piece, and left
+  // to its own judgement it hopped clear every time the wizard closed. A lone
+  // knight was untakeable by hand at any price.
+  await resume(
+    makeRun({
+      chamber: 3,
+      size: 8,
+      mana: 0,
+      pieces: [piece(1, "king", 0, 0), piece(2, "knight", 4, 4), piece(3, "pawn", 0, 7)],
+      wizard: { r: 4, c: 5 }, // beside it, and off every square it attacks
+    }),
+  );
+
+  await tapAside(8); // Hold — give it a full turn to run
+  let s = await read();
+  const knight = s?.board.pieces.find((p) => p.kind === "knight");
+  check(
+    "a knight the wizard has closed on holds its square",
+    knight && knight.r === 4 && knight.c === 4,
+    knight ? `knight at ${knight.r},${knight.c}` : "knight gone",
+  );
+
+  await tapCell(8, 4, 4);
+  await tapConfirm(8);
+  s = await read();
+  check(
+    "and can then be taken by hand",
+    !s?.board.pieces.some((p) => p.kind === "knight"),
+    `${s?.board.pieces.length} pieces left`,
+  );
 }
 
 // --- Cheese #2: spells do not reach the throne -------------------------------
@@ -93,7 +131,7 @@ const CLEAR_DELAY = 1600;
       mana: 10,
       size: 7,
       // The throne sits on the wizard's diagonal with a clear line to it.
-      pieces: [piece(1, "king", 2, 2), piece(2, "knight", 0, 6)],
+      pieces: [piece(1, "king", 2, 2), piece(2, "knight", 0, 6), piece(3, "pawn", 0, 1)],
       wizard: { r: 5, c: 5 },
     }),
   );
