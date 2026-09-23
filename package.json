@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "test:checkwiz": "node tests/checkwiz/rules.mjs",
     "test:checkwiz:bot": "node tests/checkwiz/bot.mjs",
+    "test:checkwiz:sim": "node tests/checkwiz/sim.mjs",
     "test:checkwiz:shots": "node tests/checkwiz/shots.mjs"
   },
   "devDependencies": {

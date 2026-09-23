@@ -5,14 +5,14 @@
  *     node tests/checkwiz/shots.mjs   # writes tests/checkwiz/shots/*.png
  *
  * Assertions cannot see a sentence running off the bottom of the screen. This
- * caught two real ones: the codex lost its last card behind the buttons on a
- * 320-wide phone, and the piece tips were being clipped mid-word by the two
- * line clamp in the action bar. Both looked completely fine on a big screen.
+ * is the check for that: codex pages that lose their last card behind the
+ * buttons on a 320-wide phone, tips clipped mid-word in the action bar. Both
+ * look completely fine on a big screen. Look at the pictures.
  */
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { openGame, makeRun, piece, KEY } from "./harness.mjs";
+import { openGame, makeRun, piece } from "./harness.mjs";
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "shots");
 await mkdir(OUT, { recursive: true });
@@ -20,57 +20,89 @@ await mkdir(OUT, { recursive: true });
 for (const device of ["iPhone 13", "iPhone SE"]) {
   const label = device.replace(/\s+/g, "-").toLowerCase();
   const game = await openGame({ device });
-  const { page, layout, tap, settle, tapCell, tapAside, resume } = game;
+  const { page, settle, tapRect, tapCell, tapAside, tapSlot, resume, codex } = game;
   const shot = (name) => page.screenshot({ path: join(OUT, `${name}-${label}.png`) });
 
-  // The codex, page by page. Each has to fit above the buttons on its own.
-  const L = layout(6);
-  const nextPage = () => tap(L.pad + (L.W - L.pad * 2 - 10) / 4, L.H - 44);
-  await tap(L.W / 2, L.H * 0.17 + 160 + 68 + 26); // "How to play"
-  await settle(300);
-  await shot("codex-court");
-  await nextPage();
-  await settle(300);
-  await shot("codex-spells");
-  await nextPage();
-  await settle(300);
-  await shot("codex-rules");
-  await tap(L.pad + (L.W - L.pad * 2 - 10) * 0.75 + 10, L.H - 44); // Back
-  await settle(300);
+  await shot("title");
 
-  // A board carrying every weight of threat at once: a queen's squares show
-  // three ticks, a rook's two, a pawn's one, and the throne rings as held.
-  await resume(
-    makeRun({
-      chamber: 4,
-      hp: 5,
-      maxHp: 6,
-      mana: 8,
-      captures: 3,
-      size: 7,
-      turn: 9,
-      wizard: { r: 5, c: 4 },
-      pieces: [
-        piece(1, "king", 1, 2),
-        piece(2, "queen", 3, 1),
-        piece(3, "rook", 2, 5),
-        piece(4, "pawn", 4, 3),
-      ],
-    }),
+  // The codex, page by page. Each has to fit above its buttons on its own.
+  await tapRect(
+    game.titleButtons(false).find((b) => b.id === "codex"),
+    300,
   );
+  await shot("codex-court");
+  await tapRect(codex.next, 300);
+  await shot("codex-souls");
+  await tapRect(codex.next, 300);
+  await shot("codex-rules");
+  await tapRect(codex.next, 300);
+  await shot("codex-relics");
+  await tapRect(codex.back, 300);
+
+  // The first chamber, as a new player meets it.
+  await game.newRun();
+  await settle(2400); // let the chamber banner clear
+  await shot("chamber-1");
+
+  // A deep board carrying everything at once: pillars, a stone, a guarded
+  // throne, a queen's three-point lines, a full hand and a row of relics.
+  const deep = makeRun({
+    chamber: 9,
+    hp: 5,
+    maxHp: 8,
+    slots: 4,
+    hand: ["knight", "bishop", "rook", "queen"],
+    relics: { outpost: 1, tempo: 1, stalemate: 1, pockets: 1 },
+    size: 8,
+    turn: 9,
+    wizard: { r: 6, c: 4 },
+    pillars: [
+      { r: 3, c: 2 },
+      { r: 4, c: 6 },
+    ],
+    stones: [{ r: 5, c: 1, life: 2 }],
+    pieces: [
+      piece(1, "king", 1, 3),
+      piece(2, "pawn", 0, 2, { guard: true }),
+      piece(3, "rook", 1, 6, { guard: true }),
+      piece(4, "queen", 3, 0),
+      piece(5, "bishop", 2, 5),
+      piece(6, "knight", 5, 5),
+      piece(7, "pawn", 2, 1),
+    ],
+  });
+  await resume(deep);
+  await settle(2400);
   await shot("board");
 
-  // Inspecting a piece — the tip has two lines and must not clip mid-word.
-  await tapCell(7, 3, 1);
+  await tapCell(8, 3, 0); // inspect the queen: her tip must not clip
   await shot("inspect-queen");
-  await tapAside(7);
+  await tapAside(8); // the whole row puts it away
 
-  // Aiming a beam with the throne on the diagonal: it draws barred, not absent.
-  await game.tapSpell(7, 2, 4);
-  await shot("aim-beam");
+  await tapSlot(8, 0, 4); // aim the Leap
+  await shot("aim-leap");
+  await tapAside(8);
+
+  await tapCell(8, 5, 5); // a held knight, selected: the confirm and its price
+  await shot("confirm-take");
+
+  // The draft, with a Sovereign just taken — three relic blurbs to fit.
+  await resume(
+    makeRun({
+      chamber: 7,
+      hp: 3,
+      relics: { tempo: 1 },
+      size: 7,
+      pieces: [piece(1, "king", 1, 2), piece(2, "knight", 6, 6)],
+      wizard: { r: 2, c: 3 },
+    }),
+  );
+  await tapCell(7, 1, 2);
+  await game.tapMain(7);
+  await settle(1800);
+  await shot("draft");
 
   await game.close();
-  void KEY;
 }
 
 console.log(`screenshots written to ${OUT}`);

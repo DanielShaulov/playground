@@ -6,23 +6,30 @@
  * test stops proving anything about the thing people actually play. So this
  * talks to it the way a thumb does, and reads it the way the game itself does:
  *
- *   - **Input** is real taps at real coordinates. `layout()` below mirrors
- *     `layout()` in game.js, which is the one piece of duplicated knowledge
- *     here. If the bar gets taller or the board moves, this is what to fix.
- *   - **Output** is `localStorage`. The game persists the whole run — board,
- *     pieces, life, mana — at the end of every turn, so the save file is a
- *     complete, honest state dump that costs the game nothing to provide.
+ *   - **Input** is real taps at real coordinates, from the game's own
+ *     layout.js. There is no second copy of where the buttons are to drift.
+ *   - **Output** is `localStorage`. The game persists the whole run at the end
+ *     of every turn, so the save is a complete, honest state dump that costs
+ *     the game nothing to provide.
  *   - **Setup** is also localStorage: write a save, reload, press Continue, and
- *     the game resumes any position you like. That is what makes it possible to
- *     ask "does a beam kill a warded king" without playing to chamber four.
+ *     the game resumes any position you like. That is what makes it possible
+ *     to ask "does a rook really cost two" without playing to chamber four.
  *
- * The one thing to know about timing: clearing a chamber does not persist
- * immediately. `clearChamber()` waits ~1.1s so the death burst can land before
- * the draft replaces the board, so a read taken straight after a killing blow
- * still shows the *old* chamber. Anything asserting that a chamber did **not**
- * clear has to outwait that, or it passes for the wrong reason. (It did, once.)
+ * Positions are written out by hand in the tests, and expected numbers are
+ * literals. rules.js is imported only to *plan* (which square is quiet, what
+ * a bot should do), never to compute what an assertion expects — a test that
+ * asks the rules what the rules should do proves nothing.
  */
 import { chromium, devices } from "playwright-core";
+import {
+  layout,
+  slotRect,
+  titleButtons,
+  draftCards,
+  codexButtons,
+  centre,
+} from "../../games/checkwiz/layout.js";
+import { SAVE_V as CURRENT_V } from "../../games/checkwiz/rules.js";
 
 export const URL = process.env.CHECKWIZ_URL ?? "http://localhost:8000/games/checkwiz/";
 export const KEY = "playground:checkwiz:run";
@@ -31,135 +38,78 @@ export const KEY = "playground:checkwiz:run";
 const CHROMIUM = process.env.CHECKWIZ_CHROMIUM ?? "/opt/pw-browsers/chromium";
 
 /**
- * Save-format version to seed. Bump it in game.js and this follows; set it back
- * to an older number to point the same suite at an older build, which is how
- * you check that a regression test would actually have caught the regression.
+ * Save-format version to seed. Follows the game; set it to an older number to
+ * point the same suite at an older build, which is how you check that a
+ * regression test would actually have caught the regression.
  */
-export const SAVE_V = Number(process.env.SAVE_V ?? 2);
+export const SAVE_V = Number(process.env.SAVE_V ?? CURRENT_V);
 
-// --- Board vocabulary, mirrored ---------------------------------------------
-// Enough of the rules to reason about a position from outside: what attacks
-// what, what it costs, and what is holding a piece up.
+// --- Save building -------------------------------------------------------------
 
-export const ORTH = [
-  [-1, 0],
-  [1, 0],
-  [0, -1],
-  [0, 1],
-];
-export const DIAG = [
-  [-1, -1],
-  [-1, 1],
-  [1, -1],
-  [1, 1],
-];
-export const ALL8 = [...ORTH, ...DIAG];
-const KNIGHT = [
-  [-2, -1],
-  [-2, 1],
-  [-1, -2],
-  [-1, 2],
-  [1, -2],
-  [1, 2],
-  [2, -1],
-  [2, 1],
-];
+export const piece = (id, kind, r, c, { guard = false, stun = 0 } = {}) => ({
+  id,
+  kind,
+  r,
+  c,
+  stun,
+  guard,
+});
 
-export const SHAPE = {
-  pawn: {
-    steps: [
-      [1, -1],
-      [1, 1],
-    ],
-    hit: 1,
-  },
-  knight: { steps: KNIGHT, hit: 1 },
-  bishop: { dirs: DIAG, hit: 1 },
-  rook: { dirs: ORTH, hit: 2 },
-  queen: { dirs: ALL8, hit: 3 },
-  king: { steps: ALL8, hit: 1 },
-};
-
-export const cheb = (a, b) => Math.max(Math.abs(a.r - b.r), Math.abs(a.c - b.c));
-export const guardsOf = (b) => b.pieces.filter((p) => p.kind !== "king");
-
-/** Every square a piece attacks. The wizard never blocks a line — game rule. */
-export function raysOf(b, p) {
-  if (p.stun > 0) return [];
-  // A Sovereign whose court has fallen projects nothing: his ward is his aura.
-  if (p.kind === "king" && !guardsOf(b).length) return [];
-  const on = (r, c) => r >= 0 && c >= 0 && r < b.size && c < b.size;
-  const busy = (r, c) =>
-    b.pieces.some((q) => q !== p && q.r === r && q.c === c) ||
-    b.walls.some((w) => w.r === r && w.c === c);
-  const shape = SHAPE[p.kind];
-  const out = [];
-  if (shape.dirs) {
-    for (const [dr, dc] of shape.dirs) {
-      let r = p.r + dr;
-      let c = p.c + dc;
-      while (on(r, c)) {
-        out.push({ r, c });
-        if (busy(r, c)) break;
-        r += dr;
-        c += dc;
-      }
-    }
-  } else {
-    for (const [dr, dc] of shape.steps) {
-      if (on(p.r + dr, p.c + dc)) out.push({ r: p.r + dr, c: p.c + dc });
-    }
-  }
-  return out;
-}
-
-/** Life a square would cost to stand on, which is what the red ticks count. */
-export function dangerMap(b) {
-  const d = Array.from({ length: b.size }, () => new Array(b.size).fill(0));
-  for (const p of b.pieces) for (const s of raysOf(b, p)) d[s.r][s.c] += SHAPE[p.kind].hit;
-  return d;
-}
-
-/** The Sovereign holds up nobody — his ward shields him, never his court. */
-export const defended = (b, piece) =>
-  b.pieces.some(
-    (p) =>
-      p !== piece &&
-      p.stun <= 0 &&
-      p.kind !== "king" &&
-      raysOf(b, p).some((s) => s.r === piece.r && s.c === piece.c),
-  );
-
-// --- Save building -----------------------------------------------------------
-
-export const piece = (id, kind, r, c, stun = 0) => ({ id, kind, r, c, stun, ax: c, ay: r });
-
+/** A whole run with one board in it, every field spelled out. */
 export function makeRun({
-  chamber = 1,
+  chamber = 3,
   hp = 6,
   maxHp = 6,
-  mana = 10,
+  slots = 3,
+  hand = [],
+  relics = {},
   size = 7,
-  captures = 0,
-  up = {},
   pieces,
   wizard,
-  royal = false,
+  pillars = [],
+  stones = [],
   turn = 1,
+  boss = false,
+  castle = boss ? 1 : 0,
+  pace = 99, // pawns hold still unless a test wants them marching
+  call = 999, // and no reinforcements arrive
 }) {
   return {
     v: SAVE_V,
     chamber,
     hp,
     maxHp,
-    mana,
-    captures,
-    up,
-    board: { size, pieces, walls: [], wizard, turn, royal },
+    slots,
+    hand,
+    relics,
+    spent: [],
+    captures: 0,
+    flawless: 0,
+    turns: 0,
+    phase: "play",
+    draft: null,
+    board: {
+      size,
+      pieces,
+      pillars,
+      stones,
+      wizard,
+      turn,
+      boss,
+      castle,
+      pace,
+      call,
+      due: turn + call,
+      need: 1,
+      hurt: 0,
+      sleep: 0,
+      check: false,
+      nextId: Math.max(0, ...pieces.map((p) => p.id)) + 1,
+    },
   };
 }
 
-// --- Driving -----------------------------------------------------------------
+// --- Driving -------------------------------------------------------------------
 
 /** Boot a portrait phone on the game and return everything needed to play it. */
 export async function openGame({ device = "iPhone 13", headless = true } = {}) {
@@ -180,42 +130,21 @@ export async function openGame({ device = "iPhone 13", headless = true } = {}) {
     return { left: r.left, top: r.top, width: r.width, height: r.height };
   });
 
-  /** Mirrors layout() in game.js. Board geometry lives here and nowhere else. */
-  const layout = (size) => {
-    const W = rect.width;
-    const H = rect.height;
-    const pad = 10;
-    const topH = 44;
-    const barH = Math.min(158, Math.max(132, H * 0.24));
-    const barY = H - barH;
-    const avail = barY - topH - pad;
-    const cell = Math.floor(Math.min((W - pad * 2) / size, avail / size));
-    const span = cell * size;
-    return {
-      W,
-      H,
-      pad,
-      topH,
-      barY,
-      barH,
-      cell,
-      span,
-      rowH: 54,
-      bx: Math.round((W - span) / 2),
-      by: Math.round(topH + (avail - span) / 2),
-    };
+  const L = (size) => layout(rect.width, rect.height, size);
+  const settle = (ms = 260) => page.waitForTimeout(ms);
+  const tap = (x, y) => page.touchscreen.tap(rect.left + x, rect.top + y);
+  const tapRect = async (r, ms) => {
+    const p = centre(r);
+    await tap(p.x, p.y);
+    await settle(ms);
   };
 
-  const settle = (ms = 240) => page.waitForTimeout(ms);
-  const tap = (x, y) => page.touchscreen.tap(rect.left + x, rect.top + y);
-
-  const api = {
+  return {
     page,
     browser,
-    context,
     rect,
     errors,
-    layout,
+    layout: L,
     settle,
     tap,
 
@@ -223,49 +152,33 @@ export async function openGame({ device = "iPhone 13", headless = true } = {}) {
     read: () => page.evaluate((k) => JSON.parse(localStorage.getItem(k)), KEY),
 
     async tapCell(size, r, c) {
-      const L = layout(size);
-      await tap(L.bx + (c + 0.5) * L.cell, L.by + (r + 0.5) * L.cell);
+      const l = L(size);
+      await tap(l.bx + (c + 0.5) * l.cell, l.by + (r + 0.5) * l.cell);
       await settle();
     },
 
-    /** Right-hand button of the action row: Hold, or Cancel / OK / Close. */
-    async tapAside(size) {
-      const L = layout(size);
-      await tap(L.W - L.pad - 45, L.barY + 10 + L.rowH / 2);
-      await settle();
-    },
+    /** The right-hand button of the action row: Wait, Cancel, Skip, Close. */
+    tapAside: (size) => tapRect(L(size).aside),
 
-    /**
-     * Left-hand action button — the confirm for a pending move or capture.
-     * Harmless when nothing is pending: the hint panel is not a button, and the
-     * tap lands below the board, so it neither selects nor spends a turn.
-     */
-    async tapConfirm(size) {
-      const L = layout(size);
-      await tap(L.pad + (L.W - L.pad * 2 - 100) / 2, L.barY + 10 + L.rowH / 2);
-      await settle();
-    },
+    /** The left-hand action button: confirms a pending move. Harmless when nothing is pending. */
+    tapMain: (size) => tapRect(L(size).main),
 
-    /** Spell `i` of `count` in the spellbook row (0 = Leap, 1 = Bulwark, ...). */
-    async tapSpell(size, i, count) {
-      const L = layout(size);
-      const width = L.W - L.pad * 2;
-      const gap = 8;
-      const bw = (width - gap * (count - 1)) / count;
-      const by = L.barY + 10 + L.rowH + 10;
-      const bh = Math.max(56, L.barH - L.rowH - 26);
-      await tap(L.pad + i * (bw + gap) + bw / 2, by + bh / 2);
-      await settle();
-    },
+    /** Soul slot `i` of `slots`. */
+    tapSlot: (size, i, slots = 3) => tapRect(slotRect(L(size), i, slots)),
+
+    /** One of the three relic cards on the draft screen. */
+    tapDraft: (i) => tapRect(draftCards(rect.width, rect.height, 3)[i], 500),
+
+    codex: codexButtons(rect.width, rect.height),
+    tapRect,
 
     /** Seed a position, reload, and press Continue run. */
     async resume(run) {
       await page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [KEY, run]);
       await page.reload({ waitUntil: "load" });
       await settle(400);
-      const L = layout(run.board.size);
-      await tap(L.W / 2, L.H * 0.17 + 160 + 29);
-      await settle(400);
+      const btn = titleButtons(rect.width, rect.height, true).find((b) => b.id === "continue");
+      await tapRect(btn, 400);
     },
 
     /** Wipe any save and start a fresh run from the title screen. */
@@ -273,27 +186,25 @@ export async function openGame({ device = "iPhone 13", headless = true } = {}) {
       await page.evaluate((k) => localStorage.removeItem(k), KEY);
       await page.reload({ waitUntil: "load" });
       await settle(400);
-      const L = layout(6);
-      await tap(L.W / 2, L.H * 0.17 + 160 + 29); // "Enter the first chamber"
-      await settle(500);
+      const btn = titleButtons(rect.width, rect.height, false).find((b) => b.id === "new");
+      await tapRect(btn, 500);
     },
+
+    /** The title screen's buttons, for whether a save exists. */
+    titleButtons: (saved) => titleButtons(rect.width, rect.height, saved),
 
     close: () => browser.close(),
   };
-  return api;
 }
 
-/** How many spells the book shows at a given depth — see SPELLS[].from. */
-export const bookSize = (chamber) => [1, 1, 2, 4, 6].filter((from) => chamber >= from).length;
-
-// --- Reporting ---------------------------------------------------------------
+// --- Reporting -------------------------------------------------------------------
 
 export function createReport() {
   const results = [];
   return {
     check(name, ok, detail = "") {
-      results.push({ name, ok });
-      console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  — ${detail}` : ""}`);
+      results.push({ name, ok: !!ok });
+      console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail !== "" ? `  — ${detail}` : ""}`);
       return ok;
     },
     finish() {
