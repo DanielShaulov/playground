@@ -113,10 +113,15 @@ never run `playwright install`.
 
 A game with rules worth protecting can keep a harness next to it; `checkwiz` has
 one in `tests/checkwiz/` (`npm run test:checkwiz`) that is worth reading before
-writing another. Two tricks generalise: a game that persists its state is
-readable _and_ seedable through `localStorage`, so a test can resume any
-position instead of playing to it; and pointing the same suite at the previous
-commit is the only way to know a regression test would have caught anything.
+writing another. Three tricks generalise:
+
+- A game that persists its state is readable _and_ seedable through
+  `localStorage`, so a test can resume any position instead of playing to it.
+- A turn-based game whose rules live in a pure module (no DOM) can be played
+  thousands of times in Node. That is the only honest way to tune difficulty;
+  `npm run test:checkwiz:sim` is the example.
+- A check you have never seen fail proves nothing. Break the rule it guards,
+  or point it at the previous commit, and watch it go red.
 
 In remote agent sessions **browser egress is blocked**: Chromium cannot reach
 any external host, though `curl` can. To verify something already deployed,

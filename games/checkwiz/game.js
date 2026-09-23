@@ -1,670 +1,157 @@
 /**
- * Checkwiz — a wizard alone on a board full of the enemy's chess pieces.
+ * Checkwiz — a wizard alone against a chess court.
  *
- * Not chess. There is one of you, you have no army, and nobody is trying to
- * mate you. What is borrowed is the part of chess that is actually interesting
- * on a phone: *geometry*. Every piece projects the threat it would project in
- * a real game — a rook owns its rank and file, a knight attacks only the eight
- * squares it can never stand next to — and the game is reading those lines and
- * walking between them.
+ * Not chess: there is one of you, you have no army, and nobody is trying to
+ * mate you. What is borrowed is the part of chess that is interesting on a
+ * phone — geometry. Every piece strikes the squares it would attack in a real
+ * game, and every piece you take gives you one move in its shape.
  *
- * Three rules carry everything:
+ * The rules live in rules.js and the screen geometry in layout.js, both pure,
+ * so the simulator and the tests can use them directly. This file is
+ * everything a person sees and touches: drawing, animation, input, saving.
  *
- *   1. A piece either strikes or moves, never both. The red squares you can
- *      see are exactly the damage you will take; nothing ever hits you from a
- *      square you weren't shown. What a strike costs depends on who threw it —
- *      a pawn grazes you, a queen takes three quarters of a fresh wizard.
- *   2. You cannot capture a defended piece. To take a guard you must first
- *      take whatever defends it — capture order *is* the puzzle, and it is the
- *      same skill as counting an exchange in a real game.
- *   3. Every piece is safe to stand beside *somewhere*, and where depends on
- *      what it is: behind a pawn, anywhere touching a knight, straight on at a
- *      bishop, diagonal from a rook. A queen has no safe side at all, which
- *      makes her a spell problem rather than a walking problem.
- *
- * The Sovereign's ward is his court: while two or more guards stand he cannot
- * be touched — not by hand, not by beam, not by dispel. So a chamber is always
- * "dismantle the guard, *then* take the king", and there is no line that skips
- * to the throne. Break the court down to its last man and the ward goes with
- * it; one guard alone was never protecting anybody, and being made to chase him
- * around an empty board was the dullest way this game could end. Pawns march while you work and promote to queens if you
- * dawdle, which is the clock — and a pawn you left alive comes back as the
- * hardest piece on the board.
- *
- * The court plays like a court, not like a swarm: it wants to line up on you,
- * but it will not hand you a free capture to do it. A guard steps into your
- * reach when something defends it, and otherwise threatens from a square your
- * arm cannot get to. Big pieces are the most careful of all, which is why the
- * queen has to be answered with a spell rather than an outstretched hand.
- *
- * Threat model: all threat is computed as if the wizard were not on the board.
- * He never blocks a line — not for danger, not for defence. One rule, no edge
- * cases about whether standing somewhere shields the thing behind you, and it
- * leaves interposition to Bulwark, which is a spell you pay for.
- *
- * Everything is canvas, menus included — this is a UI-heavy game and one
- * drawing path beats a canvas board wired to DOM chrome. The board floats up
- * top where it can be seen, and everything tapped every turn sits in the
- * bottom third under a thumb.
+ * Everything is canvas, menus included. The board floats up top where it can
+ * be seen; everything tapped every turn sits in the bottom band under a thumb.
+ * The rules resolve a whole turn at once and hand back a list of events, and
+ * the animation plays those back — so the state is always settled the moment
+ * you tap, and a slow animation can never make a fast thumb lose a move.
  */
 
-import { createLoop, createInput, vibrate, clamp, rand, randInt } from "../../shared/engine.js";
+import { createLoop, createInput, vibrate, rand, randInt } from "../../shared/engine.js";
 import { createShell } from "../../shared/ui.js";
 import { createStore } from "../../shared/storage.js";
+import * as R from "./rules.js";
+import {
+  layout,
+  slotRect,
+  cellCenter,
+  codexButton,
+  relicStrip,
+  titleButtons,
+  draftCards,
+  codexButtons,
+} from "./layout.js";
 
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-// Chess glyphs come from a different font on every platform; keep a deep
-// fallback chain so none of them ever render as tofu.
+// Relic glyphs come from whatever symbol font the platform has; keep a deep
+// fallback chain so none render as tofu. The pieces themselves are drawn.
 const GLYPH = '"Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", "DejaVu Sans", serif';
 
 const FG = "#e8ecf4";
 const DIM = "#8d98ad";
+const FAINT = "#4b5566";
 const CARD = "#1c2331";
 const RAISED = "#232b3c";
-const ACCENT = "#4ade80"; // the wizard
-const MANA = "#60a5fa";
+const ACCENT = "#4ade80"; // the wizard, and everything that is his
 const DANGER = "#f87171";
 const GOLD = "#fbbf24";
-const ROYAL = "#c084fc"; // the Sovereign
+const ROYAL = "#c084fc"; // the Sovereign and his guard
 
-// --- Board vocabulary -------------------------------------------------------
-
-const ORTH = [
-  [-1, 0],
-  [1, 0],
-  [0, -1],
-  [0, 1],
-];
-const DIAG = [
-  [-1, -1],
-  [-1, 1],
-  [1, -1],
-  [1, 1],
-];
-const ALL8 = [...ORTH, ...DIAG];
-const KNIGHT_STEPS = [
-  [-2, -1],
-  [-2, 1],
-  [-1, -2],
-  [-1, 2],
-  [1, -2],
-  [1, 2],
-  [2, -1],
-  [2, 1],
-];
-// The court marches down the board, so its pawns attack downward.
-const PAWN_ATTACK = [
-  [1, -1],
-  [1, 1],
-];
-
-/**
- * The court. `dirs` slides until something blocks; `steps` attacks a fixed set
- * of offsets. `mana` is what capturing it pays. `hit` is what standing on one
- * of its squares costs you, and it is the difference between a line you may
- * cross when you must and a line you may not cross at all: a pawn is a toll, a
- * queen is a wall. `tip` is the one thing worth knowing about approaching it —
- * shown in the codex and when inspecting.
- */
-const KINDS = {
-  pawn: {
-    name: "Pawn",
-    glyph: "♟",
-    mana: 1,
-    hit: 1,
-    steps: PAWN_ATTACK,
-    move: "pawn",
-    tip: "Attacks the two squares diagonally ahead — never in front. Walk up behind it.",
-  },
-  knight: {
-    name: "Knight",
-    glyph: "♞",
-    mana: 2,
-    hit: 1,
-    steps: KNIGHT_STEPS,
-    move: "knight",
-    tip: "Attacks in an L — the eight squares touching it are safe.",
-  },
-  bishop: {
-    name: "Bishop",
-    glyph: "♝",
-    mana: 2,
-    hit: 1,
-    dirs: DIAG,
-    move: "slide",
-    tip: "Rakes both diagonals until a body blocks it. Come at it straight on.",
-  },
-  rook: {
-    name: "Rook",
-    glyph: "♜",
-    mana: 3,
-    hit: 2,
-    dirs: ORTH,
-    move: "slide",
-    tip: "Owns its rank and file, and hits for two. Come at it on the diagonal.",
-  },
-  queen: {
-    name: "Queen",
-    glyph: "♛",
-    mana: 4,
-    hit: 3,
-    dirs: ALL8,
-    move: "slide",
-    tip: "Every line at once, three life a strike. Beam her down, or dispel her.",
-  },
-  king: {
-    name: "Sovereign",
-    glyph: "♚",
-    mana: 0,
-    hit: 1,
-    steps: ALL8,
-    move: "still",
-    tip: "His court is his ward — it fails at the last guard, and shields him, never them.",
-  },
-};
-
-/** Sliders cross at most this many squares a turn — they threaten far, travel slow. */
-const SLIDE_RANGE = 2;
-const MANA_CAP = 10;
-
-/**
- * The spellbook. Each spell answers a specific dead end the three rules
- * create: no way in (Leap), a line you cannot cross (Bulwark), a defended
- * piece (Beam), a queen (Dispel), being surrounded (Zugzwang). They unlock by
- * depth, so the first chamber is only ever about walking.
- */
-const SPELLS = [
-  {
-    id: "leap",
-    name: "Leap",
-    glyph: "♞",
-    cost: 2,
-    from: 1,
-    target: "knight",
-    blurb: "Jump an L-move away, straight through anything in between.",
-  },
-  {
-    id: "bulwark",
-    name: "Bulwark",
-    glyph: "▩",
-    cost: 2,
-    from: 1,
-    target: "near",
-    blurb:
-      "Raise a stone. It blocks movement and cuts lines — including the one defending a piece.",
-  },
-  {
-    id: "beam",
-    name: "Beam",
-    glyph: "♝",
-    cost: 4,
-    from: 2,
-    target: "diagonal",
-    blurb:
-      "Fire down a diagonal. Destroys the first guard it reaches, defended or not — the Sovereign's ward turns it aside.",
-  },
-  {
-    id: "dispel",
-    name: "Dispel",
-    glyph: "✦",
-    cost: 4,
-    from: 4,
-    target: "piece",
-    blurb:
-      "Snuff a guard out for two turns: no threat, no movement — and it can be taken even while defended. The crown is beyond it.",
-  },
-  {
-    id: "zugzwang",
-    name: "Zugzwang",
-    glyph: "⧗",
-    cost: 6,
-    from: 6,
-    target: "self",
-    blurb: "The whole court loses its next turn.",
-  },
-];
-
-const spellById = (id) => SPELLS.find((s) => s.id === id);
-
-/** What a spell costs right now, after upgrades. */
-function spellCost(spell) {
-  const discount = spell.id === "leap" ? (run.up.alacrity ?? 0) : 0;
-  return Math.max(1, spell.cost - discount);
-}
-
-/**
- * Between chambers you take one of three. Most are counters in `run.up` read
- * where they matter; a couple resolve on the spot.
- *
- * `restore` marks the ones that give life back. A draft never offers two of
- * them: patching up has to compete with getting stronger, or the whole run
- * collapses into walking through every line you like and mending it off
- * afterwards. For the same reason the flesh has a ceiling — HP_CEILING is as
- * big as a wizard gets, and past it the only way to take less damage is to
- * stand somewhere better.
- */
-const HP_CEILING = 9;
-
-const UPGRADES = [
-  {
-    id: "ward",
-    name: "Ward",
-    glyph: "✚",
-    blurb: "+1 max life, healed now.",
-    restore: true,
-    when: () => run.maxHp < HP_CEILING,
-    apply() {
-      run.maxHp++;
-      run.hp++;
-    },
-  },
-  {
-    id: "mend",
-    name: "Mend",
-    glyph: "❤",
-    blurb: "Heal 2 life.",
-    restore: true,
-    // Not worth a whole draft slot to top off a single point.
-    when: () => run.hp <= run.maxHp - 2,
-    apply() {
-      run.hp = Math.min(run.maxHp, run.hp + 2);
-    },
-  },
-  {
-    id: "leyline",
-    name: "Leyline",
-    glyph: "◈",
-    blurb: "Every capture pays +1 mana.",
-    apply() {
-      run.up.leyline = (run.up.leyline ?? 0) + 1;
-    },
-  },
-  {
-    id: "vigil",
-    name: "Vigil",
-    glyph: "◉",
-    blurb: "Begin each chamber with +2 mana.",
-    apply() {
-      run.up.vigil = (run.up.vigil ?? 0) + 1;
-      run.mana = clamp(run.mana + 2, 0, MANA_CAP);
-    },
-  },
-  {
-    id: "alacrity",
-    name: "Alacrity",
-    glyph: "♞",
-    blurb: "Leap costs 1 less.",
-    when: () => (run.up.alacrity ?? 0) < 1,
-    apply() {
-      run.up.alacrity = 1;
-    },
-  },
-  {
-    id: "masonry",
-    name: "Masonry",
-    glyph: "▩",
-    blurb: "Bulwarks stand 3 turns longer.",
-    apply() {
-      run.up.masonry = (run.up.masonry ?? 0) + 1;
-    },
-  },
-  {
-    id: "riposte",
-    name: "Riposte",
-    glyph: "⚔",
-    blurb: "A piece that strikes you is stunned for a turn.",
-    when: () => (run.up.riposte ?? 0) < 1,
-    apply() {
-      run.up.riposte = 1;
-    },
-  },
-  {
-    id: "harvest",
-    name: "Harvest",
-    glyph: "✧",
-    blurb: "Taking a rook or a queen heals 1 life.",
-    when: () => (run.up.harvest ?? 0) < 1,
-    apply() {
-      run.up.harvest = 1;
-    },
-  },
-];
-
-// --- Shell and persistence --------------------------------------------------
+// --- Shell and persistence ----------------------------------------------------
 
 const shell = createShell({ title: "Checkwiz", stats: ["Chamber", "Best"] });
 const { stage } = shell;
 const ctx = stage.ctx;
 const store = createStore("checkwiz");
 
-// Bumped when the rules move under a run: v2 is weighted strikes and a ward
-// that answers to the whole court, which a v1 board was not built against.
-const SAVE_V = 2;
-
-// Six, not the four it started at. A strike used to cost one whatever threw it;
-// now a rook takes two and a queen three, so four life was not four mistakes any
-// more — it was one bad step next to the wrong piece. Six keeps a queen lethal
-// in two and leaves room to trade a wound for a capture you need.
-const freshRun = () => ({
-  v: SAVE_V,
-  chamber: 1,
-  hp: 6,
-  maxHp: 6,
-  mana: 3,
-  captures: 0,
-  up: {},
-  board: null,
-});
-
-let run = freshRun();
+let run = null; // the live run, exactly as rules.js and the save file see it
+let demo = R.newRun(); // a board to glow behind the title screen
 let scene = "title"; // title | play | draft | codex | over
-let codexFrom = "title"; // where the codex's Back button goes
-let savedRun = null; // the run on disk, read once at boot rather than every frame
+let codexFrom = "title";
+let codexPage = 0;
+let savedRun = null;
 
 function loadRun() {
   const saved = store.get("run", null);
-  // A save from an older shape is not worth migrating for a game this size.
-  if (!saved || saved.v !== SAVE_V || !saved.board) return null;
+  // An older save is a different game; not worth migrating for a toy.
+  if (!saved || saved.v !== R.SAVE_V || !saved.board) return null;
+  if (saved.phase === "dead" || saved.phase === "won") return null;
   return saved;
 }
 
 function persist() {
-  run.board = board;
-  store.set("run", run);
+  if (run.phase === "dead" || run.phase === "won") store.clear("run");
+  else store.set("run", run);
 }
 
 const best = () => store.get("best", 0);
 
 function syncHud() {
-  shell.setStat("Chamber", run.chamber);
+  shell.setStat("Chamber", run ? Math.min(run.chamber, R.FINAL) : 1);
   shell.setStat("Best", best());
 }
 
-const unlocked = (spell) => run.chamber >= spell.from;
-const spellbook = () => SPELLS.filter(unlocked);
+// --- Derived view -------------------------------------------------------------
+// The danger map and the list of legal moves are recomputed only when the
+// board changes, not every frame.
 
-// --- Live state -------------------------------------------------------------
+let version = 0;
+let cached = null;
 
-let board = null; // { size, pieces, walls, wizard, turn, royal, cleared }
-let threat = null; // { danger, byPiece } — recomputed whenever a body moves
-let sel = null; // a board action awaiting confirmation
-let inspect = null; // piece whose lines are on show
-let aiming = null; // spell being targeted
-let draft = []; // the three upgrades on offer
-let codexPage = 0;
+function view() {
+  const r = run ?? demo;
+  if (!cached || cached.version !== version || cached.run !== r) {
+    const b = r.board;
+    const king = R.kingOf(b);
+    cached = {
+      version,
+      run: r,
+      danger: R.dangerMap(r),
+      opts: r.phase === "play" || r.phase === "bonus" ? R.options(r) : [],
+      throne: king
+        ? R.strikersAt(r, king.r, king.c, king).reduce((n, p) => n + R.KINDS[p.kind].hit, 0)
+        : 0,
+    };
+  }
+  return cached;
+}
 
-let floaters = [];
-let sparks = [];
-let beams = [];
-let wizAnim = null; // the wizard's drawn position, chasing his real square
+const touch = () => version++;
+
+// --- Interface state ------------------------------------------------------------
+
+let sel = null; // a move awaiting confirmation: an option from rules.options, or a costly wait
+let aim = null; // the soul slot being aimed
+let inspect = null; // id of the piece whose lines are on show
+
+function clearUi() {
+  sel = null;
+  aim = null;
+  inspect = null;
+}
+
+// --- Animation ------------------------------------------------------------------
+
+let elapsed = 0;
 let shake = 0;
 let banner = null;
-let elapsed = 0;
+let flash = 0; // red vignette when struck
+let sparks = [];
+let floaters = [];
+let beams = [];
+let ghosts = []; // pieces that have just died, fading where they stood
+let flights = []; // souls flying from a taken piece into the hand
+let timeline = []; // { at, fn } — effects waiting their turn
+let anim = new Map(); // piece id -> drawn position { x, y, delay, alpha }
+let wiz = null; // the wizard's drawn position and any move in flight
 let hits = []; // tappable rects, rebuilt every frame while drawing
 
-const inBoard = (r, c) => r >= 0 && c >= 0 && r < board.size && c < board.size;
-const pieceAt = (r, c) => board.pieces.find((p) => p.r === r && p.c === c) ?? null;
-const wallAt = (r, c) => board.walls.find((w) => w.r === r && w.c === c) ?? null;
-const same = (a, b) => !!a && !!b && a.r === b.r && a.c === b.c;
-const cheb = (a, b) => Math.max(Math.abs(a.r - b.r), Math.abs(a.c - b.c));
+const later = (delay, fn) => timeline.push({ at: elapsed + delay, fn });
 
-/** What stops a ray. Never the wizard — see the threat-model note up top. */
-function blocks(r, c, ignore) {
-  const p = pieceAt(r, c);
-  if (p && p !== ignore) return true;
-  return !!wallAt(r, c);
+function resetFx() {
+  sparks = [];
+  floaters = [];
+  beams = [];
+  ghosts = [];
+  flights = [];
+  timeline = [];
+  anim = new Map();
+  wiz = null;
+  banner = null;
 }
 
-/**
- * Every square a piece of `kind` at (r,c) would attack. `ignore` lets the AI
- * ask "what would I hit from over there" without its own body — still sitting
- * on its old square — blocking the answer.
- */
-function raysFrom(kind, r, c, ignore = null) {
-  const k = KINDS[kind];
-  const out = [];
-  if (k.dirs) {
-    for (const [dr, dc] of k.dirs) {
-      let rr = r + dr;
-      let cc = c + dc;
-      while (inBoard(rr, cc)) {
-        out.push({ r: rr, c: cc });
-        if (blocks(rr, cc, ignore)) break;
-        rr += dr;
-        cc += dc;
-      }
-    }
-  } else {
-    for (const [dr, dc] of k.steps) {
-      const rr = r + dr;
-      const cc = c + dc;
-      if (inBoard(rr, cc)) out.push({ r: rr, c: cc });
-    }
-  }
-  return out;
-}
-
-/**
- * The Sovereign's ward is the court itself, not the geometry around him. While
- * it holds he cannot be taken, beamed, dispelled or reached by any other trick,
- * and his own aura burns every square beside him. Break the court and the ward
- * fails: he stops striking, and he is yours.
- *
- * Tying it to the court rather than to whoever happens to defend his square is
- * what makes a chamber a chamber. Anything narrower has a shortcut — walk past
- * everything until nobody's line happens to cross the throne, or spend four mana
- * on a beam and never fight the guard at all — and a level whose whole shape is
- * "dismantle the guard" should not have a line that skips the guard.
- *
- * But a ward needs a *court*, and one man is not a court. That last guard is
- * where the rule stopped being a rule and started being a chore: it is the piece
- * with the whole board to run around in, and if it is a knight it cannot be
- * caught at all — a knight is the one piece that never attacks a square touching
- * it, so it never stands and fires, and it hops away the instant you close in.
- * Demanding you catch it turned the end of a chamber into a lap of the board.
- * Down to one guard the ward fails, which reads as well as it plays: the court
- * is broken, and the man still running is not protecting anybody.
- *
- * It is also why the aura switches off with it. His aura covers every square you
- * would have to stand on to reach him, so while the court holds that aura is a
- * fence; if it outlived the court the last capture would always cost a life, and
- * at one life with no mana left there would be no move that wins.
- */
-const guardsLeft = () => board.pieces.reduce((n, p) => n + (p.kind === "king" ? 0 : 1), 0);
-const wardStanding = () => guardsLeft() > 1;
-const untouchable = (p) => p.kind === "king" && wardStanding();
-
-const attacksOf = (p) =>
-  p.stun > 0 || (p.kind === "king" && !wardStanding()) ? [] : raysFrom(p.kind, p.r, p.c, p);
-
-/**
- * Recompute the threat map. Called after anything that moves a body. A square
- * holds the life it would cost, not the number of attackers: two pawns and one
- * rook both read as 2, because both take two hearts off you.
- */
-function refresh() {
-  const danger = Array.from({ length: board.size }, () => new Array(board.size).fill(0));
-  const byPiece = new Map();
-  for (const p of board.pieces) {
-    const squares = attacksOf(p);
-    byPiece.set(p.id, squares);
-    for (const s of squares) danger[s.r][s.c] += KINDS[p.kind].hit;
-  }
-  threat = { danger, byPiece };
-}
-
-const dangerAt = (r, c) => (inBoard(r, c) ? threat.danger[r][c] : 0);
-const attacksBy = (p) => threat.byPiece.get(p.id) ?? attacksOf(p);
-
-/**
- * Who is holding a piece up. Empty means you can take it.
- *
- * The Sovereign holds up nobody: his ward is his own, and it shields him rather
- * than his court. He still burns every square beside him, so working next to the
- * throne costs life — it just never costs you the capture outright.
- *
- * That exception is load-bearing. He never moves outside a royal chamber, and no
- * spell can cut a defence between two touching squares, so a guard standing
- * beside him would be untakeable for as long as it cared to stand there — and
- * since every guard has to fall before the ward does, a chamber could quietly
- * become a waiting room. It reads as well as it plays: a king who props up his
- * own guards is a king doing his guards' job.
- */
-function defendersOf(piece) {
-  const out = [];
-  for (const p of board.pieces) {
-    if (p === piece || p.stun > 0 || p.kind === "king") continue;
-    if (attacksBy(p).some((s) => same(s, piece))) out.push(p);
-  }
-  return out;
-}
-
-// --- Chamber generation -----------------------------------------------------
-
-const CHAMBER_NAMES = [
-  "the Pawn Gate",
-  "the Knight's Stair",
-  "the Bishop's Nave",
-  "the Long Rank",
-  "the Broken File",
-  "the Mirror Hall",
-  "the Rook's Vault",
-  "the Queen's Garden",
-  "the Endgame",
-];
-
-const chamberName = (n) => CHAMBER_NAMES[(n - 1) % CHAMBER_NAMES.length];
-const boardSize = (n) => (n <= 2 ? 6 : n <= 6 ? 7 : 8);
-
-/** What the court can field, and how deep you must be before it shows up. */
-const GUARD_POOL = [
-  { kind: "pawn", cost: 1, from: 1 },
-  { kind: "knight", cost: 3, from: 2 },
-  { kind: "bishop", cost: 3, from: 3 },
-  { kind: "rook", cost: 5, from: 5 },
-  { kind: "queen", cost: 8, from: 7 },
-];
-
-/**
- * Build a chamber. Generation is rejection-sampled rather than clever: lay the
- * court out, then insist on a defended Sovereign and a safe square to start
- * from. Anything failing those is thrown away and rerolled, which is cheap on
- * a board this small and much harder to get subtly wrong than a constructive
- * placement algorithm.
- */
-function genChamber(n) {
-  const size = boardSize(n);
-  const royal = n % 5 === 0; // the Grandmaster walks
-  // Every guard has to come off the board now, so a chamber is capped on head
-  // count and grows in quality instead: a court that gets meaner, not longer.
-  const maxPieces = Math.min(size, 4 + Math.floor(n / 2));
-
-  for (let attempt = 0; attempt < 80; attempt++) {
-    let nextId = 1;
-    const pieces = [];
-    const add = (kind, r, c) => pieces.push({ id: nextId++, kind, r, c, stun: 0, ax: c, ay: r });
-    const free = (r, c) =>
-      r >= 0 && c >= 0 && r < size && c < size && !pieces.some((p) => p.r === r && p.c === c);
-
-    // The Sovereign sits high, with room above him for a shield.
-    const kr = randInt(1, 2);
-    const kc = randInt(0, size - 1);
-    add("king", kr, kc);
-
-    // Pawns diagonally above him defend his square — the classic shield, and
-    // the reason no chamber is won by walking straight at the throne.
-    const wanted = n >= 6 ? 2 : 1;
-    const shields = [
-      [kr - 1, kc - 1],
-      [kr - 1, kc + 1],
-    ].filter(([r, c]) => free(r, c));
-    if (shields.length < wanted) continue;
-    for (let i = 0; i < wanted; i++) add("pawn", shields[i][0], shields[i][1]);
-
-    // Spend the rest of the budget on whatever the depth allows.
-    let budget = Math.round(n * 1.8);
-    const available = GUARD_POOL.filter((g) => n >= g.from);
-    for (let tries = 0; tries < 60 && budget > 0 && pieces.length < maxPieces; tries++) {
-      const affordable = available.filter((g) => g.cost <= budget);
-      if (!affordable.length) break;
-      // The pool runs cheapest-first, so taking the better of two rolls leans
-      // the court toward the top of what it can afford — deeper chambers field
-      // a rook rather than the three pawns that cost the same.
-      const pick =
-        affordable[Math.max(randInt(0, affordable.length - 1), randInt(0, affordable.length - 1))];
-      // Guards fill the top; the bottom two rows are the wizard's to arrive in.
-      // Pawns keep to the top half so promotion is always several turns away.
-      const deepest = pick.kind === "pawn" ? Math.floor(size / 2) - 1 : size - 3;
-      const r = randInt(0, deepest);
-      const c = randInt(0, size - 1);
-      if (!free(r, c)) continue;
-      add(pick.kind, r, c);
-      budget -= pick.cost;
-    }
-
-    const candidate = { size, pieces, walls: [], wizard: { r: size - 1, c: 0 }, turn: 1, royal };
-    const start = findStart(candidate);
-    if (!start) continue;
-    candidate.wizard = start;
-    return candidate;
-  }
-
-  // Fall back to something trivially safe rather than looping forever.
-  return {
-    size,
-    pieces: [
-      { id: 1, kind: "king", r: 1, c: 2, stun: 0, ax: 2, ay: 1 },
-      { id: 2, kind: "pawn", r: 0, c: 1, stun: 0, ax: 1, ay: 0 },
-    ],
-    walls: [],
-    wizard: { r: size - 1, c: size - 1 },
-    turn: 1,
-    royal,
-  };
-}
-
-/**
- * Pick a starting square on a freshly built board: unthreatened, with room to
- * move, as far from the court as the bottom rows allow. Returns null when the
- * layout left the wizard nowhere to stand, which rejects the whole chamber.
- */
-function findStart(candidate) {
-  const previous = board;
-  board = candidate;
-  refresh();
-
-  const king = candidate.pieces.find((p) => p.kind === "king");
-  let bestSquare = null;
-  let bestScore = -Infinity;
-
-  for (let r = candidate.size - 1; r >= candidate.size - 2; r--) {
-    for (let c = 0; c < candidate.size; c++) {
-      if (dangerAt(r, c) > 0 || pieceAt(r, c)) continue;
-      let escapes = 0;
-      for (const [dr, dc] of ALL8) {
-        const rr = r + dr;
-        const cc = c + dc;
-        if (inBoard(rr, cc) && !pieceAt(rr, cc) && dangerAt(rr, cc) === 0) escapes++;
-      }
-      if (escapes < 2) continue;
-      const score = escapes * 2 + cheb({ r, c }, king);
-      if (score > bestScore) {
-        bestScore = score;
-        bestSquare = { r, c };
-      }
-    }
-  }
-
-  board = previous;
-  if (board) refresh();
-  return bestSquare;
-}
-
-// --- Effects ----------------------------------------------------------------
-
-function say(text, color, at = null) {
-  const p = at ?? board.wizard;
-  floaters.push({ text, color, r: p.r, c: p.c, life: 1.2, max: 1.2 });
+function say(text, color, at) {
+  floaters.push({ text, color, r: at.r, c: at.c, life: 1.3, max: 1.3 });
 }
 
 function burst(r, c, color, count = 12, power = 1) {
@@ -684,584 +171,323 @@ function burst(r, c, color, count = 12, power = 1) {
   }
 }
 
-const announce = (text, color = FG) => (banner = { text, color, life: 2.4, max: 2.4 });
-
-// --- Reading a square -------------------------------------------------------
+const announce = (text, color = FG, life = 2) => (banner = { text, color, life, max: life });
 
 /**
- * What tapping (r,c) would do. Everything the action bar says about a move —
- * the damage number, the glyphs of the pieces defending your target — comes
- * from here, so what you are told is exactly what resolves.
+ * Turn a turn's events into things to watch. The order is the order they
+ * happened: the wizard moves and takes, the court strikes, then the court moves.
  */
-function readSquare(r, c) {
-  if (!inBoard(r, c)) return null;
-  const w = board.wizard;
-  const piece = pieceAt(r, c);
-  const adjacent = cheb(w, { r, c }) === 1;
+function playBack(ev, prior) {
+  const b = run.board;
+  const w = { ...b.wizard };
+  let strikeAt = 0.14;
+  let moveAt = 0.3;
+  let moves = 0;
 
-  if (!adjacent) return piece ? { kind: "inspect", r, c, piece } : null;
-  if (wallAt(r, c)) return { kind: "blocked", r, c, reason: "Your own stone is in the way." };
-
-  if (piece) {
-    // The crown is held up by the whole court, so point at all of it.
-    if (untouchable(piece)) {
-      const n = guardsLeft();
-      return {
-        kind: "blocked",
-        r,
-        c,
-        piece,
-        guards: board.pieces.filter((p) => p !== piece),
-        reason: `${n} guards hold his ward`,
-        sub: "his ward fails at the last of them",
-      };
-    }
-    const guards = piece.stun > 0 ? [] : defendersOf(piece);
-    if (guards.length) {
-      return {
-        kind: "blocked",
-        r,
-        c,
-        piece,
-        guards,
-        reason: `Defended by ${guards.map((g) => KINDS[g.kind].glyph).join(" ")}`,
-      };
-    }
-    return {
-      kind: "capture",
-      r,
-      c,
-      piece,
-      // You end up standing where it stood, and taking it cannot open a line
-      // onto that square: any slider whose ray reached this square would be
-      // attacking it, which is exactly what "defended" means — and a defended
-      // piece never gets this far. So the square's current danger is honest.
-      damage: dangerAt(r, c),
-      label: `Take ${KINDS[piece.kind].name}`,
-    };
-  }
-
-  return { kind: "move", r, c, damage: dangerAt(r, c), label: "Step here" };
-}
-
-// --- Player actions ---------------------------------------------------------
-
-function stepTo(r, c) {
-  board.wizard = { r, c };
-  vibrate(8);
-}
-
-function capture(piece, { bySpell = false } = {}) {
-  const kind = KINDS[piece.kind];
-  board.pieces = board.pieces.filter((p) => p !== piece);
-  const royalKill = piece.kind === "king";
-  burst(piece.r, piece.c, royalKill ? ROYAL : GOLD, royalKill ? 34 : 14, royalKill ? 1.6 : 1.2);
-  shake = Math.max(shake, royalKill ? 11 : 5);
-  vibrate(royalKill ? 40 : 16);
-
-  if (royalKill) {
-    refresh();
-    clearChamber();
-    return;
-  }
-
-  run.captures++;
-  const gain = kind.mana + (run.up.leyline ?? 0);
-  run.mana = clamp(run.mana + gain, 0, MANA_CAP);
-  say(`+${gain} mana`, MANA, piece);
-
-  if (run.up.harvest && (piece.kind === "rook" || piece.kind === "queen") && run.hp < run.maxHp) {
-    run.hp++;
-    say("+1 life", ACCENT);
-  }
-  if (!bySpell) stepTo(piece.r, piece.c);
-  refresh();
-
-  if (guardsLeft() === 1) announce("The court breaks — his ward fails", ROYAL);
-}
-
-/** Commit whatever a pending selection describes, then hand over the turn. */
-function commit(action) {
-  sel = null;
-  inspect = null;
-  if (action.kind === "move") {
-    stepTo(action.r, action.c);
-    refresh();
-    enemyTurn();
-  } else if (action.kind === "capture") {
-    capture(action.piece);
-    if (!board.cleared) enemyTurn();
-  }
-}
-
-/**
- * Standing still draws a mote of mana. It is the pressure valve: a court that
- * locks itself together — two knights defending each other, a guard tucked in
- * beside the throne — can only be broken with a spell, and without a way to
- * earn mana that costs no captures, a run could reach a position with no move
- * that makes progress. The price is a free turn for the court, which is a real
- * price: the pawns march, and everything closes one square.
- */
-function hold() {
-  sel = null;
-  inspect = null;
-  if (run.mana < MANA_CAP) {
-    run.mana++;
-    say("+1 mana", MANA);
-  } else {
-    say("hold", DIM);
-  }
-  enemyTurn();
-}
-
-// --- Spells -----------------------------------------------------------------
-
-/** Where a spell may be aimed, as {r, c, piece?} — also what gets highlighted. */
-function spellTargets(id) {
-  const w = board.wizard;
-  const { target } = spellById(id);
-  const out = [];
-
-  if (target === "knight") {
-    for (const [dr, dc] of KNIGHT_STEPS) {
-      const r = w.r + dr;
-      const c = w.c + dc;
-      if (inBoard(r, c) && !pieceAt(r, c) && !wallAt(r, c)) out.push({ r, c });
-    }
-  } else if (target === "near") {
-    for (let r = w.r - 2; r <= w.r + 2; r++) {
-      for (let c = w.c - 2; c <= w.c + 2; c++) {
-        if (!inBoard(r, c) || (r === w.r && c === w.c)) continue;
-        if (pieceAt(r, c) || wallAt(r, c)) continue;
-        out.push({ r, c });
+  for (const e of ev) {
+    switch (e.t) {
+      case "walk":
+      case "knight":
+      case "bishop":
+      case "rook":
+      case "queen":
+        wiz = {
+          x: e.from.c,
+          y: e.from.r,
+          from: e.from,
+          to: e.to,
+          t: 0,
+          dur: e.t === "walk" ? 0.12 : 0.26,
+          arc: e.t === "knight" ? 0.9 : 0,
+        };
+        if (e.t !== "walk") burst(e.from.r, e.from.c, ACCENT, 10);
+        vibrate(8);
+        break;
+      case "take": {
+        const was = prior.find((p) => p.id === e.id);
+        ghosts.push({ kind: e.kind, r: e.r, c: e.c, life: 0.5, max: 0.5, guard: was?.guard });
+        const royal = e.kind === "king";
+        later(0.08, () => {
+          burst(e.r, e.c, royal ? ROYAL : GOLD, royal ? 36 : 16, royal ? 1.7 : 1.2);
+          shake = Math.max(shake, royal ? 12 : 5);
+          vibrate(royal ? 40 : 16);
+        });
+        break;
       }
-    }
-  } else if (target === "diagonal") {
-    for (const [dr, dc] of DIAG) {
-      let r = w.r + dr;
-      let c = w.c + dc;
-      while (inBoard(r, c)) {
-        if (wallAt(r, c)) break;
-        const p = pieceAt(r, c);
-        if (p) {
-          // A warded Sovereign is shown and refused rather than skipped: the
-          // spell stops at him either way, and being told why beats a beam
-          // that quietly does nothing.
-          out.push({ r, c, piece: p, warded: untouchable(p) });
-          break;
+      case "soul": {
+        const i = run.hand.lastIndexOf(e.kind);
+        flights.push({ kind: e.kind, from: { ...w }, slot: Math.max(0, i), t: -0.1, dur: 0.5 });
+        later(0.1, () => say(`+${R.KINDS[e.kind].soul}`, ACCENT, w));
+        break;
+      }
+      case "full":
+        later(0.1, () => say("hand full", DIM, w));
+        break;
+      case "echo":
+        later(0.2, () => say("the soul returns", ACCENT, w));
+        break;
+      case "fuse":
+        later(0.3, () => announce("Three pawns crown a queen's soul", ACCENT));
+        break;
+      case "stone":
+        burst(e.r, e.c, "#94a3b8", 12);
+        vibrate(10);
+        break;
+      case "castle":
+        later(0.15, () => announce("He castles!", ROYAL));
+        break;
+      case "strike": {
+        const at = strikeAt;
+        strikeAt += 0.07;
+        later(at, () => {
+          beams.push({
+            r1: e.from.r,
+            c1: e.from.c,
+            r2: w.r,
+            c2: w.c,
+            life: 0.42,
+            max: 0.42,
+            color: DANGER,
+            hop: e.kind === "knight",
+          });
+          say(`−${e.dmg}`, DANGER, w);
+          burst(w.r, w.c, DANGER, 8 + e.dmg * 4, 1 + e.dmg * 0.2);
+          shake = Math.max(shake, 6 + e.dmg * 3);
+          flash = Math.min(1, flash + 0.35 + e.dmg * 0.1);
+          vibrate(20 + e.dmg * 12);
+        });
+        moveAt = Math.max(moveAt, at + 0.2);
+        break;
+      }
+      case "saved":
+        later(strikeAt + 0.1, () => announce("Stalemate — you cling to one life", ACCENT, 2.4));
+        break;
+      case "move": {
+        const a = anim.get(e.id);
+        if (a) a.delay = moveAt + moves * 0.05;
+        moves++;
+        break;
+      }
+      case "crown":
+        later(moveAt + 0.2, () => {
+          burst(e.r, e.c, ROYAL, 20, 1.3);
+          announce("A pawn is crowned", ROYAL);
+          vibrate(30);
+        });
+        break;
+      case "arrive":
+        anim.set(e.id, { x: e.c, y: -0.9, delay: moveAt + 0.1, alpha: 0 });
+        break;
+      case "check":
+        later(moveAt + 0.25, () => announce("Check", ROYAL, 1.4));
+        break;
+      case "stun":
+        later(0.15, () => burst(e.r, e.c, "#93c5fd", 10));
+        break;
+      case "blitz":
+        later(0.3, () => announce("Blitz — the court cannot answer", ACCENT, 1.4));
+        break;
+      case "sleep":
+        later(0.15, () => say("the court sleeps", DIM, w));
+        break;
+      case "bonus":
+        later(0.2, () => announce("Zwischenzug — a free step", ACCENT, 1.6));
+        break;
+      case "clear":
+        for (const p of prior) {
+          if (p.kind !== "king" && !ev.some((x) => x.t === "take" && x.id === p.id)) {
+            ghosts.push({
+              kind: p.kind,
+              r: p.r,
+              c: p.c,
+              life: 0.9,
+              max: 0.9,
+              guard: p.guard,
+              delay: 0.3,
+            });
+          }
         }
-        r += dr;
-        c += dc;
-      }
-    }
-  } else if (target === "piece") {
-    for (const p of board.pieces)
-      if (p.stun <= 0) out.push({ r: p.r, c: p.c, piece: p, warded: untouchable(p) });
-  }
-
-  return out;
-}
-
-function castSpell(id, target) {
-  const spell = spellById(id);
-  const cost = spellCost(spell);
-  if (run.mana < cost) return;
-
-  run.mana -= cost;
-  aiming = null;
-  sel = null;
-  inspect = null;
-
-  if (id === "leap") {
-    burst(board.wizard.r, board.wizard.c, ACCENT, 12);
-    stepTo(target.r, target.c);
-    burst(target.r, target.c, ACCENT, 12);
-  } else if (id === "bulwark") {
-    board.walls.push({ r: target.r, c: target.c, life: 4 + 3 * (run.up.masonry ?? 0) });
-    burst(target.r, target.c, "#94a3b8", 10);
-  } else if (id === "beam") {
-    const w = board.wizard;
-    beams.push({
-      r1: w.r,
-      c1: w.c,
-      r2: target.r,
-      c2: target.c,
-      life: 0.45,
-      max: 0.45,
-      color: "#a78bfa",
-    });
-    // A beam does not care what defends its target. That is the whole point.
-    capture(target.piece, { bySpell: true });
-    if (board.cleared) return;
-  } else if (id === "dispel") {
-    target.piece.stun = 2;
-    burst(target.r, target.c, MANA, 14);
-    say("dispelled", MANA, target);
-  } else if (id === "zugzwang") {
-    for (const p of board.pieces) p.stun = Math.max(p.stun, 1);
-    announce("Zugzwang — the court freezes", MANA);
-    burst(board.wizard.r, board.wizard.c, MANA, 22, 1.6);
-  }
-
-  vibrate(14);
-  refresh();
-
-  if (id === "zugzwang") {
-    // It already spends the court's turn; handing them one now would waste it.
-    board.turn++;
-    decayWalls();
-    refresh();
-    persist();
-  } else {
-    enemyTurn();
-  }
-}
-
-// --- The court's turn -------------------------------------------------------
-
-/**
- * Where a piece could go. Sliders cross at most SLIDE_RANGE squares; nobody
- * walks onto the wizard, because pieces strike from where they stand.
- */
-function moveCandidates(p) {
-  const out = [];
-  const k = KINDS[p.kind];
-  const open = (r, c) =>
-    inBoard(r, c) && !pieceAt(r, c) && !wallAt(r, c) && !same(board.wizard, { r, c });
-
-  if (k.move === "still") {
-    if (!board.royal) return out;
-    for (const [dr, dc] of ALL8) {
-      if (open(p.r + dr, p.c + dc)) out.push({ r: p.r + dr, c: p.c + dc });
-    }
-  } else if (k.move === "pawn") {
-    // Pawns march at a third speed, staggered by id so the rank never advances
-    // as one wall. Promotion is meant to be a slow clock you can hear ticking —
-    // at full speed on a six-square board it is an alarm going off.
-    //
-    // It used to be half speed, from back when a chamber could be won by
-    // walking past the pawns to the throne. Now that every guard has to come
-    // off the board the work has roughly doubled, and at half speed a chamber
-    // could hand you three queens by turn nine — not a clock, an avalanche.
-    if ((board.turn + p.id) % 3 === 0 && open(p.r + 1, p.c)) out.push({ r: p.r + 1, c: p.c });
-  } else if (k.move === "knight") {
-    for (const [dr, dc] of KNIGHT_STEPS) {
-      if (open(p.r + dr, p.c + dc)) out.push({ r: p.r + dr, c: p.c + dc });
-    }
-  } else {
-    for (const [dr, dc] of k.dirs) {
-      for (let step = 1; step <= SLIDE_RANGE; step++) {
-        const r = p.r + dr * step;
-        const c = p.c + dc * step;
-        if (!open(r, c)) break;
-        out.push({ r, c });
-      }
+        later(0.25, () =>
+          announce(
+            e.flawless ? "Untouched — the Sovereign falls" : "The Sovereign falls",
+            e.flawless ? ACCENT : ROYAL,
+            1.4,
+          ),
+        );
+        if (e.healed) later(0.5, () => say(`+${e.healed} life`, ACCENT, w));
+        if (!ev.some((x) => x.t === "won")) {
+          later(1.4, () => {
+            scene = "draft";
+            syncHud();
+          });
+        }
+        break;
+      case "dead":
+        later(0.9, gameOver);
+        break;
+      case "won":
+        store.set("wins", store.get("wins", 0) + 1);
+        later(1.6, victory);
+        break;
     }
   }
-  return out;
 }
 
-/**
- * Would anything hold `p` up if it stood at (r,c)? Asked about a square the
- * piece has not moved to yet, so its own body never blocks the answer — it is
- * on its way out of the square it is standing on.
- */
-function defendedAt(p, r, c) {
-  return board.pieces.some(
-    (q) =>
-      q !== p &&
-      q.stun <= 0 &&
-      q.kind !== "king" && // he props up nobody — see defendersOf
-      raysFrom(q.kind, q.r, q.c, p).some((s) => s.r === r && s.c === c),
-  );
-}
+// --- Playing a move ---------------------------------------------------------------
 
-/**
- * What the wizard would pay, in life, to take `p` off (r,c) on his next turn —
- * Infinity when he cannot take it at all. Out of arm's reach, defended, or
- * wearing the crown all count as out of the question; otherwise the bill is
- * whatever else covers the square he would end up standing on.
- */
-function tollToTake(p, r, c) {
-  if (cheb(board.wizard, { r, c }) !== 1) return Infinity;
-  if (p.kind === "king") return wardStanding() ? Infinity : 0;
-  if (defendedAt(p, r, c)) return Infinity;
-  // Its own lines die with it, so they are not part of what he pays.
-  const own = attacksBy(p).some((s) => s.r === r && s.c === c) ? KINDS[p.kind].hit : 0;
-  return Math.max(0, dangerAt(r, c) - own);
-}
-
-/**
- * Court AI. It wants to line up on the wizard — a piece that could attack his
- * square from a candidate square takes it, because next turn it fires from
- * there. That is the game's rhythm: you watch a rook swing onto your file, and
- * you have exactly one turn to be somewhere else.
- *
- * What it will not do is walk into his hands. A guard that ends its move beside
- * him with nothing defending it is a free capture and a lump of mana, and the
- * old court did this constantly: it beelined at him, and the whole queen problem
- * could be solved by standing still and waiting for her to arrive. So each
- * candidate is also priced by what losing the piece there would hand him. A pawn
- * will still trade itself for a hit — that is what pawns are for — but a rook
- * wants a square his arm cannot reach, and a queen will give up a great deal of
- * position rather than come within one square of him undefended.
- *
- * Cover flips it: a guard that steps in close *with* something defending it is
- * making a threat he cannot answer by taking it, and the court likes that.
- * Pieces still move every turn they are not firing, so nothing camps forever on
- * a square that would lock a chamber shut.
- */
-function pickMove(p) {
-  const w = board.wizard;
-  const options = moveCandidates(p);
-  if (!options.length) return null;
-
-  // A knight the wizard has walked up to holds its square.
-  //
-  // Everything else in the court can be caught by walking, because a piece that
-  // is attacking the wizard fires instead of moving — stand next to a rook and
-  // it stays there to shoot you, which is your turn to take it. A knight never
-  // attacks a square touching it, so it is never the piece standing and firing,
-  // and left to its own judgement it hops clear every single time the wizard
-  // closes. That is not evasion, it is immunity: a lone knight could not be
-  // taken by hand at any price, and the chamber it was in became a lap of the
-  // board. Its own geometry is why it cannot run from this one — it has nothing
-  // to threaten from where it stands, and no better square to be.
-  if (p.kind === "knight" && cheb(p, w) === 1) return null;
-
-  // What handing this piece over is worth to him: the mana, plus never having
-  // to deal with the piece again.
-  const worth = KINDS[p.kind].mana + 1;
-
-  let choice = null;
-  let bestScore = -Infinity;
-  for (const m of options) {
-    const aims = raysFrom(p.kind, m.r, m.c, p).some((s) => same(s, w));
-    const travel = cheb(m, p);
-    const toll = tollToTake(p, m.r, m.c);
-    const beside = cheb(m, w) === 1;
-    // Priced against the toll: a capture that costs him two life is one he may
-    // well decline, and a square he pays nothing for is the one to avoid.
-    const hangs = toll === Infinity ? 0 : Math.max(0, worth * 26 - toll * 30);
-    const covered = beside && toll === Infinity ? 18 : 0;
-    let score = (aims ? 100 : 0) + covered - hangs - cheb(m, w) * 6 - travel + rand(0, 1.5);
-    // The Sovereign does not brawl. He keeps a square between himself and the
-    // wizard — near enough that his aura is a moving fence, never near enough
-    // to be grabbed the moment his ward fails.
-    if (p.kind === "king" && beside) score -= 400;
-    if (score > bestScore) {
-      bestScore = score;
-      choice = m;
-    }
-  }
-
-  return choice;
-}
-
-function strikeWizard(p) {
-  const hit = KINDS[p.kind].hit;
-  beams.push({
-    r1: p.r,
-    c1: p.c,
-    r2: board.wizard.r,
-    c2: board.wizard.c,
-    life: 0.4,
-    max: 0.4,
-    color: DANGER,
-    hop: p.kind === "knight",
-  });
-  run.hp -= hit;
-  shake = Math.max(shake, 7 + hit * 3);
-  vibrate(20 + hit * 12);
-  say(`−${hit}`, DANGER);
-  burst(board.wizard.r, board.wizard.c, DANGER, 8 + hit * 4, 1 + hit * 0.2);
-  if (run.up.riposte) p.stun = Math.max(p.stun, 1);
-}
-
-function decayWalls() {
-  for (const wall of board.walls) wall.life--;
-  board.walls = board.walls.filter((wall) => wall.life > 0);
-}
-
-function enemyTurn() {
-  board.turn++;
-
-  // Who fires is decided from the map the player was just looking at. A piece
-  // that moves this turn never also strikes, so the red squares were the truth.
-  const firing = board.pieces.filter(
-    (p) => p.stun <= 0 && attacksBy(p).some((s) => same(s, board.wizard)),
-  );
-
-  for (const p of board.pieces) {
-    if (p.stun > 0) {
-      p.stun--;
-      continue;
-    }
-    if (firing.includes(p)) continue;
-
-    const move = pickMove(p);
-    if (move) {
-      p.r = move.r;
-      p.c = move.c;
-    }
-    // A pawn reaching the far rank comes back as a queen. This is the clock.
-    if (p.kind === "pawn" && p.r === board.size - 1) {
-      p.kind = "queen";
-      burst(p.r, p.c, ROYAL, 18, 1.3);
-      announce("A pawn promotes!", ROYAL);
-      vibrate(30);
-    }
-  }
-
-  decayWalls();
-  refresh();
-
-  for (const p of firing) strikeWizard(p);
-
-  if (run.hp <= 0) {
-    gameOver();
+function play(action) {
+  if (!run || (run.phase !== "play" && run.phase !== "bonus")) return;
+  const prior = run.board.pieces.map((p) => ({ ...p }));
+  const chamber = run.chamber;
+  const ev = R.act(run, action);
+  if (!ev) {
+    vibrate(4);
     return;
   }
+  clearUi();
+  touch();
+  if (run.chamber > chamber) store.setBest("best", chamber);
+  playBack(ev, prior);
   persist();
+  syncHud();
 }
 
-// --- Run flow ---------------------------------------------------------------
+/** Tapping a square: select, confirm, aim, or read, depending on what is going on. */
+function tapSquare(r, c) {
+  const { opts } = view();
+  const b = run.board;
 
-function startChamber() {
-  board = genChamber(run.chamber);
-  run.mana = clamp(run.mana + 2 * (run.up.vigil ?? 0), 0, MANA_CAP);
+  if (aim !== null) {
+    const o = opts.find((x) => x.type === "soul" && x.slot === aim && x.r === r && x.c === c);
+    if (!o) {
+      // Aiming at the throne is the one mistake worth explaining on the spot.
+      if (R.pieceAt(b, r, c)?.kind === "king") {
+        say("only by hand", ROYAL, { r, c });
+        vibrate(4);
+      }
+      aim = null;
+      sel = null;
+      return;
+    }
+    if (sel && sel.r === r && sel.c === c) return play(sel);
+    // A free move is just made; anything that costs life waits for a yes.
+    if (o.cost === 0 && !o.target) return play(o);
+    sel = o;
+    return;
+  }
+
+  if (sel && sel.type !== "wait" && sel.r === r && sel.c === c) return play(sel);
+
+  const step = opts.find((x) => x.type === "step" && x.r === r && x.c === c);
+  if (step) {
+    if (step.cost === 0 && !step.target) return play(step);
+    sel = step;
+    inspect = null;
+    vibrate(4);
+    return;
+  }
+
+  const p = R.pieceAt(b, r, c);
   sel = null;
-  inspect = null;
-  aiming = null;
-  // Effects are addressed in board coordinates, so they cannot outlive a board.
-  beams = [];
-  sparks = [];
-  floaters = [];
-  wizAnim = null;
-  refresh();
+  inspect = p && inspect !== p.id ? p.id : null;
+}
+
+function tapWait() {
+  if (sel?.type === "wait") return play({ type: "wait" });
+  const { danger } = view();
+  const w = run.board.wizard;
+  const cost = run.phase === "bonus" ? 0 : danger[w.r][w.c];
+  if (cost === 0) return play({ type: "wait" });
+  sel = { type: "wait", r: w.r, c: w.c, cost, strikers: R.strikersAt(run, w.r, w.c) };
+  aim = null;
+}
+
+// --- Run flow -----------------------------------------------------------------------
+
+function enterChamber() {
+  clearUi();
+  resetFx();
+  touch();
   scene = "play";
   syncHud();
-  announce(`Chamber ${run.chamber} — ${chamberName(run.chamber)}`, board.royal ? ROYAL : FG);
-
-  const queue = [];
-  if (board.royal) queue.push(["The Grandmaster walks.", ROYAL]);
-  const fresh = SPELLS.find((s) => s.from === run.chamber);
-  if (fresh && run.chamber > 1) queue.push([`${fresh.name} unlocked`, MANA]);
-  queue.forEach(([text, color], i) => setTimeout(() => announce(text, color), 1500 * (i + 1)));
-
-  persist();
-}
-
-function clearChamber() {
-  board.cleared = true;
-  const record = store.setBest("best", run.chamber);
-  announce(record ? "The Sovereign falls — deepest yet" : "The Sovereign falls", ROYAL);
-  run.chamber++;
-  syncHud();
-  // Let the death burst land before the board is swapped out from under it.
-  setTimeout(() => {
-    draft = rollDraft();
-    scene = "draft";
-    persist();
-  }, 1100);
-}
-
-function rollDraft() {
-  const pool = UPGRADES.filter((u) => !u.when || u.when());
-  const picks = [];
-  while (picks.length < 3 && pool.length) {
-    const [taken] = pool.splice(randInt(0, pool.length - 1), 1);
-    picks.push(taken);
-    // One way back to full health per draft, never two — see UPGRADES.
-    if (taken.restore) {
-      for (let i = pool.length - 1; i >= 0; i--) if (pool[i].restore) pool.splice(i, 1);
-    }
-  }
-  return picks;
-}
-
-function gameOver() {
-  scene = "over";
-  const reached = run.chamber;
-  const cleared = reached - 1;
-  store.clear("run");
-  savedRun = null;
-  syncHud();
-  shell.overlay.show({
-    heading: "The court closes in",
-    // The score is what you got through, not the chamber you died in.
-    score: cleared,
-    body:
-      `Cut down in chamber ${reached}, ${chamberName(reached)}, with ` +
-      `${run.captures} ${run.captures === 1 ? "piece" : "pieces"} taken. ` +
-      `Chambers cleared: ${cleared}. Deepest run: ${best()}.`,
-    button: "New run",
-    onButton: newRun,
-  });
+  const n = run.chamber;
+  announce(`Chamber ${n} — ${R.chamberName(n)}`, run.board.boss ? ROYAL : FG, 2.2);
+  if (n === R.FINAL)
+    later(1.6, () => announce("The last Sovereign — he castles twice", ROYAL, 2.4));
+  else if (run.board.boss)
+    later(1.6, () => announce("A castle: his rook takes the first blow", ROYAL, 2.2));
 }
 
 function newRun() {
   shell.overlay.hide();
   savedRun = null;
-  run = freshRun();
-  startChamber();
+  run = R.newRun();
+  enterChamber();
+  persist();
 }
 
 function resumeRun(saved) {
   run = saved;
-  board = run.board;
-  // A save holds plain data; give the pieces their animation state back.
-  for (const p of board.pieces) {
-    p.ax = p.c;
-    p.ay = p.r;
-  }
-  refresh();
-  scene = "play";
-  syncHud();
+  savedRun = null;
   shell.overlay.hide();
-  announce(`Chamber ${run.chamber} — ${chamberName(run.chamber)}`);
+  if (run.phase === "draft") {
+    resetFx();
+    touch();
+    scene = "draft";
+    syncHud();
+    return;
+  }
+  enterChamber();
 }
 
-// --- Layout -----------------------------------------------------------------
-
-/**
- * Everything is measured off the stage every frame, so a rotation or the iOS
- * URL bar collapsing just re-lays-out. Nothing about the game state is stored
- * in pixels: the board is rows and columns, and only the draw step knows where
- * that lands on glass.
- */
-function layout() {
-  const W = stage.width;
-  const H = stage.height;
-  const pad = 10;
-  const topH = 44;
-  // The action row plus the spell row, kept in the bottom third under a thumb.
-  const barH = Math.min(158, Math.max(132, H * 0.24));
-  const barY = H - barH;
-  const avail = barY - topH - pad;
-  const size = board ? board.size : 8;
-  const cell = Math.floor(Math.min((W - pad * 2) / size, avail / size));
-  const span = cell * size;
-  return {
-    W,
-    H,
-    pad,
-    topH,
-    barY,
-    barH,
-    cell,
-    span,
-    bx: Math.round((W - span) / 2),
-    by: Math.round(topH + (avail - span) / 2),
-  };
+function takeRelic(id) {
+  if (!R.choose(run, id)) return;
+  vibrate(20);
+  enterChamber();
+  persist();
 }
 
-const cellX = (L, c) => L.bx + c * L.cell;
-const cellY = (L, r) => L.by + r * L.cell;
-const midX = (L, c) => L.bx + (c + 0.5) * L.cell;
-const midY = (L, r) => L.by + (r + 0.5) * L.cell;
+function gameOver() {
+  scene = "over";
+  const cleared = run.chamber - 1;
+  savedRun = null;
+  syncHud();
+  shell.overlay.show({
+    heading: "The court closes in",
+    score: cleared,
+    body:
+      `Cut down in chamber ${run.chamber}, ${R.chamberName(run.chamber)}. ` +
+      `${run.captures} ${run.captures === 1 ? "piece" : "pieces"} taken, ` +
+      `${run.flawless} ${run.flawless === 1 ? "chamber" : "chambers"} untouched. ` +
+      `Deepest run: ${best()}.`,
+    button: "New run",
+    onButton: newRun,
+  });
+}
 
-// --- Drawing helpers --------------------------------------------------------
+function victory() {
+  scene = "over";
+  savedRun = null;
+  syncHud();
+  shell.overlay.show({
+    heading: "The Keep is yours",
+    score: R.FINAL,
+    body:
+      `Fifteen Sovereigns taken, ${run.captures} pieces with them, ` +
+      `${run.flawless} ${run.flawless === 1 ? "chamber" : "chambers"} untouched, ` +
+      `${run.hp} life to spare. Keeps taken: ${store.get("wins", 0)}.`,
+    button: "New run",
+    onButton: newRun,
+  });
+}
+
+function openCodex(from, page = 0) {
+  codexFrom = from;
+  codexPage = page;
+  scene = "codex";
+}
+
+// --- Drawing primitives --------------------------------------------------------------
 
 function text(str, x, y, opts = {}) {
   const {
@@ -1274,7 +500,7 @@ function text(str, x, y, opts = {}) {
     alpha = 1,
   } = opts;
   ctx.save();
-  ctx.globalAlpha = alpha;
+  ctx.globalAlpha *= alpha;
   ctx.font = `${weight} ${size}px ${font}`;
   ctx.fillStyle = color;
   ctx.textAlign = align;
@@ -1284,7 +510,7 @@ function text(str, x, y, opts = {}) {
 }
 
 function roundRect(x, y, w, h, r) {
-  const rad = Math.min(r, w / 2, h / 2);
+  const rad = Math.max(0, Math.min(r, w / 2, h / 2));
   ctx.beginPath();
   ctx.moveTo(x + rad, y);
   ctx.arcTo(x + w, y, x + w, y + h, rad);
@@ -1305,13 +531,11 @@ function panel(x, y, w, h, { fill = CARD, stroke = "rgba(255,255,255,0.07)", rad
   }
 }
 
-/** Wrap `str` to `width`, returning the lines. */
 function wrap(str, width, size, weight = 400) {
   ctx.font = `${weight} ${size}px ${FONT}`;
-  const words = str.split(" ");
   const lines = [];
   let line = "";
-  for (const word of words) {
+  for (const word of str.split(" ")) {
     const next = line ? `${line} ${word}` : word;
     if (ctx.measureText(next).width > width && line) {
       lines.push(line);
@@ -1324,19 +548,17 @@ function wrap(str, width, size, weight = 400) {
   return lines;
 }
 
-/** Nothing tappable is ever shorter than a thumb; disabled buttons don't register. */
-function button(x, y, w, h, label, { sub, tone = "accent", disabled = false, action, glyph } = {}) {
-  const bg = disabled
-    ? "#171d29"
-    : tone === "accent"
-      ? ACCENT
-      : tone === "danger"
-        ? DANGER
-        : tone === "mana"
-          ? MANA
-          : RAISED;
-  const fg = disabled ? "#4b5566" : tone === "plain" ? FG : "#06210f";
+const TONES = {
+  accent: [ACCENT, "#06210f"],
+  danger: [DANGER, "#2a0808"],
+  royal: [ROYAL, "#1e0b2e"],
+  plain: [RAISED, FG],
+};
 
+/** Nothing tappable is ever shorter than a thumb; a disabled button does not register. */
+function button(rect, label, { sub, tone = "accent", disabled = false, action } = {}) {
+  const { x, y, w, h } = rect;
+  const [bg, fg] = disabled ? ["#171d29", FAINT] : TONES[tone];
   roundRect(x, y, w, h, 13);
   ctx.fillStyle = bg;
   ctx.fill();
@@ -1345,81 +567,167 @@ function button(x, y, w, h, label, { sub, tone = "accent", disabled = false, act
     ctx.lineWidth = 1;
     ctx.stroke();
   }
-
   const cx = x + w / 2;
-  if (glyph) {
-    text(glyph, cx, y + h / 2 - 12, { size: 22, font: GLYPH, color: fg });
-    text(label, cx, y + h / 2 + 14, { size: 11, weight: 600, color: fg });
-  } else {
-    text(label, cx, y + h / 2 + (sub ? -8 : 0), { size: 16, weight: 600, color: fg });
-    if (sub) text(sub, cx, y + h / 2 + 12, { size: 11, color: fg, alpha: 0.8 });
-  }
-
-  if (!disabled && action) hits.push({ x, y, w, h, action });
+  text(label, cx, y + h / 2 + (sub ? -8 : 0), { size: 15.5, weight: 650, color: fg });
+  if (sub) text(sub, cx, y + h / 2 + 12, { size: 11, color: fg, alpha: 0.82 });
+  if (!disabled && action) hits.push({ ...rect, action });
 }
 
-// --- Board -----------------------------------------------------------------
+// --- The pieces --------------------------------------------------------------------------
+// Drawn, not typed: chess glyphs come from a different font on every phone, and
+// a board is only readable if a rook looks like a rook at 36 pixels.
+// Coordinates are a 100-unit box centred on the square, base at +40.
 
-/** A faint drift of chess glyphs behind everything, so the board isn't floating in a void. */
-const MOTES = Array.from({ length: 14 }, () => ({
+const PLINTH = "M-30 40 L30 40 L30 33 Q30 26 23 26 L-23 26 Q-30 26 -30 33 Z";
+const ball = (x, y, r) =>
+  `M${x - r} ${y} A${r} ${r} 0 1 0 ${x + r} ${y} A${r} ${r} 0 1 0 ${x - r} ${y} Z`;
+
+const SHAPES = {
+  pawn: [
+    PLINTH,
+    "M-17 26 Q-11 12 -8 0 L-14 -2 Q-17 -8 -10 -10 L10 -10 Q17 -8 14 -2 L8 0 Q11 12 17 26 Z",
+    ball(0, -24, 14),
+  ].join(" "),
+  rook: [
+    PLINTH,
+    "M-19 26 L-15 -10 L15 -10 L19 26 Z",
+    "M-24 -8 L-24 -38 L-15 -38 L-15 -30 L-5 -30 L-5 -38 L5 -38 L5 -30 L15 -30 L15 -38 L24 -38 L24 -8 Z",
+  ].join(" "),
+  bishop: [
+    PLINTH,
+    "M-17 26 Q-10 12 -8 2 L-14 0 Q-16 -5 -10 -7 L10 -7 Q16 -5 14 0 L8 2 Q10 12 17 26 Z",
+    "M0 -40 Q-18 -24 -12 -10 Q0 -4 12 -10 Q18 -24 0 -40 Z",
+    ball(0, -43, 5),
+  ].join(" "),
+  knight: [
+    PLINTH,
+    "M-18 26 Q-21 8 -7 -3 Q-17 -1 -25 -5 Q-33 -10 -28 -17 L-12 -33 Q-9 -41 -3 -45 L1 -36 Q15 -36 21 -21 Q28 -3 21 26 Z",
+  ].join(" "),
+  queen: [
+    PLINTH,
+    "M-18 26 L-27 -20 L-16 -5 L-13 -30 L-5 -8 L0 -34 L5 -8 L13 -30 L16 -5 L27 -20 L18 26 Z",
+    ball(-27, -21, 4.5),
+    ball(-13, -31, 4.5),
+    ball(0, -36, 4.5),
+    ball(13, -31, 4.5),
+    ball(27, -21, 4.5),
+  ].join(" "),
+  king: [
+    PLINTH,
+    "M-18 26 L-25 -12 Q0 -24 25 -12 L18 26 Z",
+    "M-4 -46 L4 -46 L4 -38 L11 -38 L11 -31 L4 -31 L4 -19 L-4 -19 L-4 -31 L-11 -31 L-11 -38 L-4 -38 Z",
+  ].join(" "),
+};
+const PATHS = Object.fromEntries(Object.entries(SHAPES).map(([k, d]) => [k, new Path2D(d)]));
+
+const PALETTES = {
+  court: ["#fbf3e1", "#c7b089", "#1b140d"],
+  royal: ["#ffe9a3", "#d19a1c", "#2a1a04"],
+  soul: ["#d9fbe5", "#34c26b", "#05230f"],
+  stunned: ["#9aa3b3", "#5f6b80", "#151a24"],
+  dim: ["#3a4458", "#2a3242", "#10141c"],
+};
+
+/**
+ * One piece, centred on (x, y) and `size` pixels tall. The outline is a thick
+ * stroke laid under the fill, so overlapping parts read as one silhouette.
+ */
+function drawShape(kind, x, y, size, palette = "court", alpha = 1) {
+  const [top, bottom, edge] = PALETTES[palette];
+  const s = size / 100;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  const path = PATHS[kind];
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = 9;
+  ctx.stroke(path);
+  const grad = ctx.createLinearGradient(0, -45, 0, 40);
+  grad.addColorStop(0, top);
+  grad.addColorStop(1, bottom);
+  ctx.fillStyle = grad;
+  ctx.fill(path);
+  // A little detail that survives being small: the knight's eye, the mitre's slit.
+  ctx.fillStyle = edge;
+  if (kind === "knight") {
+    ctx.beginPath();
+    ctx.arc(-11, -24, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === "bishop") {
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(4, -30);
+    ctx.lineTo(-5, -17);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// --- Board ------------------------------------------------------------------------------
+
+const MOTES = Array.from({ length: 12 }, () => ({
   x: Math.random(),
   y: Math.random(),
-  glyph: "♜♞♝♛♚♟"[randInt(0, 5)],
-  size: rand(26, 70),
-  speed: rand(0.004, 0.016),
+  kind: ["pawn", "knight", "bishop", "rook", "queen", "king"][randInt(0, 5)],
+  size: rand(40, 110),
+  speed: rand(0.004, 0.014),
 }));
 
 function drawBackdrop(L) {
   const grad = ctx.createRadialGradient(L.W / 2, L.H * 0.34, 20, L.W / 2, L.H * 0.34, L.H * 0.8);
   grad.addColorStop(0, "#161d2b");
-  grad.addColorStop(1, "#0c0f16");
+  grad.addColorStop(1, "#0b0e15");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, L.W, L.H);
-
   for (const m of MOTES) {
-    const y = ((m.y - elapsed * m.speed) % 1.2) * L.H;
-    text(m.glyph, m.x * L.W, y, { size: m.size, font: GLYPH, color: "#ffffff", alpha: 0.022 });
+    const y = ((((m.y - elapsed * m.speed) % 1.2) + 1.2) % 1.2) * L.H;
+    drawShape(m.kind, m.x * L.W, y, m.size, "dim", 0.35);
   }
 }
 
-function drawSquares(L) {
-  panel(L.bx - 6, L.by - 6, L.span + 12, L.span + 12, {
-    fill: "#141a26",
+function drawSquares(L, b, danger) {
+  panel(L.bx - 7, L.by - 7, L.span + 14, L.span + 14, {
+    fill: "#121824",
     stroke: "rgba(255,255,255,0.06)",
     radius: 16,
   });
-
   const pulse = 0.5 + 0.5 * Math.sin(elapsed * 2.4);
 
-  for (let r = 0; r < board.size; r++) {
-    for (let c = 0; c < board.size; c++) {
-      const x = cellX(L, c);
-      const y = cellY(L, r);
-      ctx.fillStyle = (r + c) % 2 === 0 ? "#1b2231" : "#151a26";
+  for (let r = 0; r < b.size; r++) {
+    for (let c = 0; c < b.size; c++) {
+      const x = L.bx + c * L.cell;
+      const y = L.by + r * L.cell;
+      ctx.fillStyle = (r + c) % 2 === 0 ? "#1d2434" : "#161b27";
       ctx.fillRect(x, y, L.cell, L.cell);
 
-      const d = dangerAt(r, c);
-      if (d > 0) {
+      const d = danger[r][c];
+      if (d > 0 && !R.solidAt(b, r, c)) {
         // Light and dark squares take the same wash differently, so lift the
-        // light ones — a threatened square has to read as threatened on both.
+        // light ones — a threatened square has to read as one on both.
         const lift = (r + c) % 2 === 0 ? 0.04 : 0;
-        ctx.fillStyle = `rgba(248,113,113,${0.15 + lift + Math.min(d, 3) * 0.08 + pulse * 0.04})`;
+        ctx.fillStyle = `rgba(248,113,113,${0.14 + lift + Math.min(d, 4) * 0.07 + pulse * 0.04})`;
         ctx.fillRect(x, y, L.cell, L.cell);
-        // A tick per point of life it would cost: a queen's square carries
-        // three, and you can count the bill without tapping anything.
-        for (let i = 0; i < Math.min(d, 4); i++) {
-          ctx.fillStyle = "rgba(252,165,165,0.9)";
-          ctx.fillRect(x + 4 + i * 6, y + 4, 4, 4);
+        // The bill, readable without tapping anything: a pip per life up to
+        // three, a number past that.
+        if (d <= 3) {
+          for (let i = 0; i < d; i++) {
+            ctx.fillStyle = "rgba(254,202,202,0.95)";
+            ctx.fillRect(x + 4 + i * 6, y + 4, 4, 4);
+          }
+        } else {
+          text(String(d), x + 8, y + 9, { size: 10, weight: 800, color: "#fecaca" });
         }
       }
     }
   }
 
-  // Grid lines last, so they sit over the tints.
-  ctx.strokeStyle = "rgba(255,255,255,0.045)";
+  ctx.strokeStyle = "rgba(255,255,255,0.04)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  for (let i = 1; i < board.size; i++) {
+  for (let i = 1; i < b.size; i++) {
     ctx.moveTo(L.bx + i * L.cell, L.by);
     ctx.lineTo(L.bx + i * L.cell, L.by + L.span);
     ctx.moveTo(L.bx, L.by + i * L.cell);
@@ -1428,111 +736,39 @@ function drawSquares(L) {
   ctx.stroke();
 }
 
-/** The squares you may step to right now — the quiet ones outlined, the costly ones not. */
-function drawMoveHints(L) {
-  if (aiming || sel) return;
-  const w = board.wizard;
-  for (const [dr, dc] of ALL8) {
-    const r = w.r + dr;
-    const c = w.c + dc;
-    if (!inBoard(r, c) || pieceAt(r, c) || wallAt(r, c) || dangerAt(r, c) > 0) continue;
-    ctx.strokeStyle = "rgba(74,222,128,0.28)";
-    ctx.lineWidth = 2;
-    roundRect(cellX(L, c) + 4, cellY(L, r) + 4, L.cell - 8, L.cell - 8, 8);
-    ctx.stroke();
-  }
-}
-
-/** The lines of the piece being inspected — this is the game's teaching tool. */
-function drawInspection(L) {
-  if (!inspect || !board.pieces.includes(inspect)) return;
-  const squares = attacksBy(inspect);
-  const pulse = 0.55 + 0.45 * Math.sin(elapsed * 4);
-
-  ctx.save();
-  ctx.strokeStyle = `rgba(251,191,36,${0.25 + pulse * 0.3})`;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  for (const s of squares) {
-    ctx.moveTo(midX(L, inspect.c), midY(L, inspect.r));
-    ctx.lineTo(midX(L, s.c), midY(L, s.r));
-  }
-  ctx.stroke();
-
-  for (const s of squares) {
-    roundRect(cellX(L, s.c) + 3, cellY(L, s.r) + 3, L.cell - 6, L.cell - 6, 8);
-    ctx.strokeStyle = `rgba(251,191,36,${0.4 + pulse * 0.35})`;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawSpellTargets(L) {
-  if (!aiming) return;
-  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 5);
-  for (const t of spellTargets(aiming)) {
-    ctx.save();
-    roundRect(cellX(L, t.c) + 3, cellY(L, t.r) + 3, L.cell - 6, L.cell - 6, 9);
-    // The warded Sovereign is drawn barred rather than left out, so a spell
-    // aimed at the throne reads as refused instead of simply not offered.
-    if (t.warded) ctx.setLineDash([5, 4]);
-    ctx.fillStyle = t.warded
-      ? `rgba(248,113,113,${0.08 + pulse * 0.06})`
-      : `rgba(96,165,250,${0.12 + pulse * 0.1})`;
+function drawTerrain(L, b) {
+  for (const p of b.pillars) {
+    const x = L.bx + p.c * L.cell;
+    const y = L.by + p.r * L.cell;
+    const s = L.cell;
+    const g = ctx.createLinearGradient(x, y, x + s, y + s);
+    g.addColorStop(0, "#39414f");
+    g.addColorStop(1, "#20252f");
+    roundRect(x + 3, y + 3, s - 6, s - 6, 7);
+    ctx.fillStyle = g;
     ctx.fill();
-    ctx.strokeStyle = t.warded
-      ? `rgba(248,113,113,${0.5 + pulse * 0.3})`
-      : `rgba(96,165,250,${0.55 + pulse * 0.35})`;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
-function drawSelection(L) {
-  if (!sel) return;
-  const bad = sel.kind === "blocked";
-  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 6);
-  roundRect(cellX(L, sel.c) + 2, cellY(L, sel.r) + 2, L.cell - 4, L.cell - 4, 9);
-  ctx.strokeStyle = bad ? DANGER : sel.damage > 0 ? GOLD : ACCENT;
-  ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.55 + pulse * 0.45;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-
-  // Point at whatever is stopping you, rather than just refusing.
-  if (bad && sel.guards) {
-    ctx.save();
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = "rgba(248,113,113,0.8)";
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (const g of sel.guards) {
-      ctx.moveTo(midX(L, g.c), midY(L, g.r));
-      ctx.lineTo(midX(L, sel.c), midY(L, sel.r));
-    }
     ctx.stroke();
-    ctx.restore();
+    ctx.beginPath();
+    ctx.ellipse(x + s / 2, y + s * 0.34, s * 0.3, s * 0.13, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.07)";
+    ctx.fill();
   }
-}
-
-function drawWalls(L) {
-  for (const wall of board.walls) {
-    const x = cellX(L, wall.c) + 4;
-    const y = cellY(L, wall.r) + 4;
-    const s = L.cell - 8;
+  for (const st of b.stones) {
+    const x = L.bx + st.c * L.cell + 5;
+    const y = L.by + st.r * L.cell + 5;
+    const s = L.cell - 10;
     roundRect(x, y, s, s, 6);
-    ctx.fillStyle = "#3d4759";
+    ctx.fillStyle = "#56627a";
     ctx.fill();
-    ctx.strokeStyle = "#5a6779";
+    ctx.strokeStyle = "#8391ab";
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.save();
-    ctx.beginPath();
     roundRect(x, y, s, s, 6);
     ctx.clip();
-    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.strokeStyle = "rgba(0,0,0,0.3)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(x, y + s / 2);
@@ -1543,80 +779,236 @@ function drawWalls(L) {
     ctx.lineTo(x + s * 0.25, y + s);
     ctx.stroke();
     ctx.restore();
-    text(String(wall.life), x + s - 7, y + s - 7, { size: 9, color: "#9aa6b8" });
+    if (st.life < 50) text(String(st.life), x + s - 6, y + s - 7, { size: 9, color: "#dbe4f3" });
   }
 }
 
-function drawPieces(L) {
-  const w = board.wizard;
-  for (const p of board.pieces) {
-    const x = L.bx + (p.ax + 0.5) * L.cell;
-    const y = L.by + (p.ay + 0.5) * L.cell;
-    const royal = p.kind === "king";
-    const stunned = p.stun > 0;
-    const color = stunned ? "#5f6b80" : royal ? ROYAL : GOLD;
+/** Squares you could step to for nothing: outlined, so a safe walk is a glance. */
+function drawStepHints(L, opts) {
+  if (aim !== null || sel) return;
+  for (const o of opts) {
+    if (o.type !== "step" || o.target || o.cost > 0) continue;
+    ctx.strokeStyle = "rgba(74,222,128,0.3)";
+    ctx.lineWidth = 2;
+    roundRect(L.bx + o.c * L.cell + 4, L.by + o.r * L.cell + 4, L.cell - 8, L.cell - 8, 8);
+    ctx.stroke();
+  }
+}
 
-    // Ring language: slate = held up by something, green = you can take it now.
-    // The Sovereign is held up by the court, everyone else by their defenders.
-    const adjacent = cheb(w, p) === 1;
-    const held = royal ? wardStanding() : !stunned && defendersOf(p).length > 0;
-    if (held || adjacent) {
-      const takeable = adjacent && !held;
+/** Where the soul being aimed can go, each tagged with its price. */
+function drawSoulTargets(L, opts) {
+  if (aim === null) return;
+  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 5);
+  for (const o of opts) {
+    if (o.type !== "soul" || o.slot !== aim) continue;
+    const x = L.bx + o.c * L.cell;
+    const y = L.by + o.r * L.cell;
+    roundRect(x + 3, y + 3, L.cell - 6, L.cell - 6, 9);
+    ctx.fillStyle = `rgba(74,222,128,${0.1 + pulse * 0.08})`;
+    ctx.fill();
+    ctx.strokeStyle =
+      o.cost > 0
+        ? `rgba(251,191,36,${0.6 + pulse * 0.3})`
+        : `rgba(74,222,128,${0.6 + pulse * 0.3})`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    if (o.cost > 0) {
+      text(`−${o.cost}`, x + L.cell - 10, y + L.cell - 10, { size: 11, weight: 800, color: GOLD });
+    }
+  }
+}
+
+/** The lines of the piece being inspected — the game's teaching tool. */
+function drawInspection(L, b) {
+  const p = inspect !== null ? b.pieces.find((x) => x.id === inspect) : null;
+  if (!p) return;
+  const squares = R.attacksOf(run ?? demo, p);
+  const pulse = 0.55 + 0.45 * Math.sin(elapsed * 4);
+  const from = cellCenter(L, p.r, p.c);
+  ctx.save();
+  ctx.strokeStyle = `rgba(251,191,36,${0.25 + pulse * 0.3})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (const s of squares) {
+    const to = cellCenter(L, s.r, s.c);
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+  }
+  ctx.stroke();
+  for (const s of squares) {
+    roundRect(L.bx + s.c * L.cell + 3, L.by + s.r * L.cell + 3, L.cell - 6, L.cell - 6, 8);
+    ctx.strokeStyle = `rgba(251,191,36,${0.4 + pulse * 0.35})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** A pending move, and a dashed line from everyone who will strike you for it. */
+function drawSelection(L) {
+  if (!sel) return;
+  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 6);
+  const x = L.bx + sel.c * L.cell;
+  const y = L.by + sel.r * L.cell;
+  roundRect(x + 2, y + 2, L.cell - 4, L.cell - 4, 9);
+  ctx.strokeStyle = sel.cost > 0 ? DANGER : ACCENT;
+  ctx.lineWidth = 3;
+  ctx.globalAlpha = 0.55 + pulse * 0.45;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  if (!sel.strikers?.length) return;
+  const to = sel.stone
+    ? cellCenter(L, run.board.wizard.r, run.board.wizard.c)
+    : cellCenter(L, sel.r, sel.c);
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = "rgba(248,113,113,0.85)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (const p of sel.strikers) {
+    const from = cellCenter(L, p.r, p.c);
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function piecePos(L, p) {
+  let a = anim.get(p.id);
+  if (!a) {
+    a = { x: p.c, y: p.r, delay: 0, alpha: 1 };
+    anim.set(p.id, a);
+  }
+  return { x: L.bx + (a.x + 0.5) * L.cell, y: L.by + (a.y + 0.5) * L.cell, alpha: a.alpha };
+}
+
+function drawPieces(L, b, live) {
+  const w = b.wizard;
+  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3);
+  const { danger } = view();
+
+  for (const p of b.pieces) {
+    const { x, y, alpha } = piecePos(L, p);
+    const royal = p.kind === "king";
+    const held = live && R.cheb(w, p) === 1;
+
+    // Shadow first, so everything stands on the board rather than floats.
+    ctx.beginPath();
+    ctx.ellipse(x, y + L.cell * 0.33, L.cell * 0.27, L.cell * 0.07, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,0,0,${0.35 * alpha})`;
+    ctx.fill();
+
+    if (royal) {
+      const checked = live && b.check;
       ctx.beginPath();
-      ctx.arc(x, y, L.cell * 0.42, 0, Math.PI * 2);
-      ctx.strokeStyle = takeable ? ACCENT : "rgba(148,163,184,0.5)";
-      ctx.lineWidth = takeable ? 2.5 : 1.5;
-      if (!takeable) ctx.setLineDash([3, 4]);
+      ctx.arc(x, y, L.cell * 0.46, 0, Math.PI * 2);
+      ctx.strokeStyle = checked
+        ? `rgba(248,113,113,${0.5 + pulse * 0.5})`
+        : `rgba(192,132,252,${0.2 + pulse * 0.25})`;
+      ctx.lineWidth = checked ? 3 : 2;
+      ctx.stroke();
+    }
+
+    // Held: the ring says what taking it would cost — green free, gold not.
+    if (held) {
+      const cost = danger[p.r][p.c];
+      ctx.beginPath();
+      ctx.arc(x, y, L.cell * 0.44, 0, Math.PI * 2);
+      ctx.strokeStyle = cost === 0 ? ACCENT : GOLD;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 3]);
+      ctx.lineDashOffset = -elapsed * 12;
       ctx.stroke();
       ctx.setLineDash([]);
     }
 
+    const palette = p.stun > 0 ? "stunned" : royal ? "royal" : "court";
     ctx.save();
-    ctx.shadowColor = color;
-    ctx.shadowBlur = royal ? 18 : 10;
-    text(KINDS[p.kind].glyph, x, y + 1, {
-      size: L.cell * (royal ? 0.66 : 0.6),
-      font: GLYPH,
-      color,
-      alpha: stunned ? 0.45 : 1,
-    });
+    if (royal) {
+      ctx.shadowColor = ROYAL;
+      ctx.shadowBlur = 14;
+    }
+    drawShape(p.kind, x, y + L.cell * 0.02, L.cell * (royal ? 0.84 : 0.78), palette, alpha);
     ctx.restore();
 
-    if (stunned) {
-      text("✦", x + L.cell * 0.28, y - L.cell * 0.28, { size: 12, font: GLYPH, color: MANA });
-    }
-    if (royal) {
-      // The aura goes quiet with his court: the board should show the moment
-      // he stops being dangerous, not just the tooltip.
-      const pulse = 0.5 + 0.5 * Math.sin(elapsed * 2);
+    // The palace guard wears his colour: a gem at the foot.
+    if (p.guard && !royal) {
+      const gx = x;
+      const gy = y + L.cell * 0.34;
+      const g = L.cell * 0.07;
       ctx.beginPath();
-      ctx.arc(x, y, L.cell * 0.46, 0, Math.PI * 2);
-      ctx.strokeStyle = wardStanding()
-        ? `rgba(192,132,252,${0.2 + pulse * 0.3})`
-        : "rgba(148,163,184,0.22)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      ctx.moveTo(gx, gy - g);
+      ctx.lineTo(gx + g, gy);
+      ctx.lineTo(gx, gy + g);
+      ctx.lineTo(gx - g, gy);
+      ctx.closePath();
+      ctx.fillStyle = ROYAL;
+      ctx.globalAlpha = alpha;
+      ctx.fill();
+      ctx.globalAlpha = 1;
     }
+    if (p.stun > 0) {
+      text("✦", x + L.cell * 0.3, y - L.cell * 0.3, { size: 12, font: GLYPH, color: "#93c5fd" });
+    }
+    if (royal && live && b.check) {
+      text("CHECK", x, y - L.cell * 0.56, { size: 9, weight: 800, color: DANGER });
+    }
+  }
+
+  for (const g of ghosts) {
+    if (g.delay > 0) {
+      const p = cellCenter(L, g.r, g.c);
+      drawShape(g.kind, p.x, p.y, L.cell * 0.78, "court");
+      continue;
+    }
+    const t = g.life / g.max;
+    const p = cellCenter(L, g.r, g.c);
+    drawShape(g.kind, p.x, p.y - (1 - t) * 8, L.cell * (0.78 + (1 - t) * 0.25), "court", t);
   }
 }
 
-function drawWizard(L) {
-  const x = L.bx + (wizAnim.x + 0.5) * L.cell;
-  const y = L.by + (wizAnim.y + 0.5) * L.cell;
-  const s = L.cell / 44; // sprite is drawn at 44px and scaled to the square
+function drawWizard(L, b) {
+  if (!wiz) wiz = { x: b.wizard.c, y: b.wizard.r };
+  let wx = wiz.x;
+  let wy = wiz.y;
+  if (wiz.to) {
+    const t = Math.min(1, wiz.t / wiz.dur);
+    const e = t * t * (3 - 2 * t);
+    wx = wiz.from.c + (wiz.to.c - wiz.from.c) * e;
+    wy = wiz.from.r + (wiz.to.r - wiz.from.r) * e - Math.sin(Math.PI * t) * wiz.arc;
+  }
+  const x = L.bx + (wx + 0.5) * L.cell;
+  const y = L.by + (wy + 0.5) * L.cell;
+  const s = L.cell / 44;
   const bob = Math.sin(elapsed * 2.5) * 1.2;
+
+  // Tethers: the pieces he is holding, so "held" is something you can see.
+  for (const p of b.pieces) {
+    if (R.cheb(b.wizard, p) !== 1 || wiz.to) continue;
+    const to = cellCenter(L, p.r, p.c);
+    ctx.save();
+    ctx.strokeStyle = "rgba(74,222,128,0.35)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([2, 4]);
+    ctx.lineDashOffset = elapsed * 10;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   ctx.save();
   ctx.translate(x, y + bob);
   ctx.scale(s, s);
 
   const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 26);
-  glow.addColorStop(0, "rgba(74,222,128,0.30)");
+  glow.addColorStop(0, "rgba(74,222,128,0.32)");
   glow.addColorStop(1, "rgba(74,222,128,0)");
   ctx.fillStyle = glow;
   ctx.fillRect(-26, -26, 52, 52);
 
-  // Robe.
   ctx.beginPath();
   ctx.moveTo(0, -13);
   ctx.quadraticCurveTo(11, -2, 13, 17);
@@ -1625,11 +1017,10 @@ function drawWizard(L) {
   ctx.closePath();
   ctx.fillStyle = "#1f6f45";
   ctx.fill();
-  ctx.strokeStyle = "#4ade80";
+  ctx.strokeStyle = ACCENT;
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Hood and the dark under it.
   ctx.beginPath();
   ctx.arc(0, -13, 7.5, Math.PI, 0);
   ctx.lineTo(6, -7);
@@ -1641,38 +1032,33 @@ function drawWizard(L) {
   ctx.ellipse(0, -10.5, 4.6, 4, 0, 0, Math.PI * 2);
   ctx.fillStyle = "#0b1a12";
   ctx.fill();
-
-  // Two green eyes in the dark.
   ctx.fillStyle = "#9dffc4";
   ctx.fillRect(-2.6, -11.4, 1.7, 2.2);
   ctx.fillRect(1, -11.4, 1.7, 2.2);
 
-  // Staff, with the orb pulsing on the mana you have.
+  // The staff's orb brightens with every soul he carries.
   ctx.strokeStyle = "#8a6a45";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(11, 17);
   ctx.lineTo(9, -17);
   ctx.stroke();
-  const orb = 2.6 + (run.mana / MANA_CAP) * 1.6 + Math.sin(elapsed * 4) * 0.35;
+  const held = run ? run.hand.length : 0;
+  const orb = 2.4 + held * 0.7 + Math.sin(elapsed * 4) * 0.35;
   ctx.beginPath();
   ctx.arc(9, -18, orb, 0, Math.PI * 2);
-  ctx.fillStyle = MANA;
-  ctx.shadowColor = MANA;
-  ctx.shadowBlur = 10;
+  ctx.fillStyle = "#86efac";
+  ctx.shadowColor = ACCENT;
+  ctx.shadowBlur = 8 + held * 3;
   ctx.fill();
   ctx.restore();
 }
 
-// --- Effects ----------------------------------------------------------------
-
 function drawEffects(L) {
   for (const b of beams) {
     const t = b.life / b.max;
-    const x1 = midX(L, b.c1);
-    const y1 = midY(L, b.r1);
-    const x2 = midX(L, b.c2);
-    const y2 = midY(L, b.r2);
+    const a = cellCenter(L, b.r1, b.c1);
+    const z = cellCenter(L, b.r2, b.c2);
     ctx.save();
     ctx.globalAlpha = t;
     ctx.strokeStyle = b.color;
@@ -1680,457 +1066,487 @@ function drawEffects(L) {
     ctx.shadowBlur = 12;
     ctx.lineWidth = 2 + t * 4;
     ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
     if (b.hop) {
       // A knight's strike arcs, because a knight's move is not a line.
-      const mx = (x1 + x2) / 2 + (y2 - y1) * 0.28;
-      const my = (y1 + y2) / 2 - (x2 - x1) * 0.28;
-      ctx.moveTo(x1, y1);
-      ctx.quadraticCurveTo(mx, my, x2, y2);
+      ctx.quadraticCurveTo(
+        (a.x + z.x) / 2 + (z.y - a.y) * 0.3,
+        (a.y + z.y) / 2 - (z.x - a.x) * 0.3,
+        z.x,
+        z.y,
+      );
     } else {
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
+      ctx.lineTo(z.x, z.y);
     }
     ctx.stroke();
     ctx.restore();
   }
 
   for (const s of sparks) {
+    const p = cellCenter(L, s.r, s.c);
     ctx.globalAlpha = Math.max(0, s.life / s.max);
     ctx.fillStyle = s.color;
     ctx.beginPath();
-    ctx.arc(midX(L, s.c), midY(L, s.r), s.size, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, s.size, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 
   for (const f of floaters) {
     const t = f.life / f.max;
-    text(f.text, midX(L, f.c), midY(L, f.r) - (1 - t) * 26, {
+    const p = cellCenter(L, f.r, f.c);
+    text(f.text, p.x, p.y - L.cell * 0.4 - (1 - t) * 26, {
       size: 15,
-      weight: 700,
+      weight: 800,
       color: f.color,
       alpha: Math.min(1, t * 1.6),
     });
   }
 }
 
+/** Souls in flight from a taken piece to their slot in the hand. */
+function drawFlights(L) {
+  if (!run) return;
+  for (const f of flights) {
+    if (f.t < 0) continue;
+    const t = Math.min(1, f.t / f.dur);
+    const e = 1 - (1 - t) * (1 - t);
+    const a = cellCenter(L, f.from.r, f.from.c);
+    const slot = slotRect(L, Math.min(f.slot, run.slots - 1), run.slots);
+    const zx = slot.x + slot.w / 2;
+    const zy = slot.y + slot.h / 2;
+    const x = a.x + (zx - a.x) * e;
+    const y = a.y + (zy - a.y) * e - Math.sin(Math.PI * e) * 60;
+    ctx.save();
+    ctx.shadowColor = ACCENT;
+    ctx.shadowBlur = 16;
+    drawShape(f.kind, x, y, 26 + (1 - t) * 10, "soul", 1 - t * 0.3);
+    ctx.restore();
+  }
+}
+
+function drawFlash(L) {
+  if (flash <= 0) return;
+  const g = ctx.createRadialGradient(L.W / 2, L.H / 2, L.H * 0.25, L.W / 2, L.H / 2, L.H * 0.75);
+  g.addColorStop(0, "rgba(248,113,113,0)");
+  g.addColorStop(1, `rgba(248,113,113,${flash * 0.35})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, L.W, L.H);
+}
+
 function drawBanner(L) {
   if (!banner) return;
   const t = banner.life / banner.max;
-  const alpha = Math.min(1, t * 3);
+  const alpha = Math.min(1, t * 3, (1 - t) * 8 + 0.2);
   const y = L.by + L.span / 2;
   ctx.font = `700 18px ${FONT}`;
-  const width = Math.min(L.W - 32, ctx.measureText(banner.text).width + 44);
+  const width = Math.min(L.W - 24, ctx.measureText(banner.text).width + 44);
   ctx.save();
-  ctx.globalAlpha = alpha * 0.85;
+  ctx.globalAlpha = alpha * 0.9;
   panel(L.W / 2 - width / 2, y - 26, width, 52, {
-    fill: "rgba(12,15,22,0.86)",
+    fill: "rgba(10,13,20,0.9)",
     stroke: "rgba(255,255,255,0.08)",
   });
   ctx.restore();
   text(banner.text, L.W / 2, y, { size: 18, weight: 700, color: banner.color, alpha });
 }
 
-// --- Top strip and action bar ----------------------------------------------
+// --- Top strip and bar -----------------------------------------------------------------
 
 function drawTop(L) {
   const y = L.topH / 2;
-
   for (let i = 0; i < run.maxHp; i++) {
     const filled = i < run.hp;
     text("♥", 16 + i * 19, y, {
       size: 17,
       font: GLYPH,
       color: filled ? "#fb7185" : "#333c4d",
-      alpha: filled ? 1 : 0.9,
     });
   }
 
-  // Mana as pips, so "can I afford this" is a glance and not a subtraction.
-  const pipR = 3.5;
-  const gap = 10;
-  const manaW = MANA_CAP * gap;
-  const startX = L.W - 52 - manaW;
-  for (let i = 0; i < MANA_CAP; i++) {
-    const x = startX + i * gap + pipR;
-    ctx.beginPath();
-    ctx.arc(x, y, pipR, 0, Math.PI * 2);
-    if (i < run.mana) {
-      ctx.fillStyle = MANA;
-      ctx.shadowColor = MANA;
-      ctx.shadowBlur = 6;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    } else {
-      ctx.strokeStyle = "rgba(96,165,250,0.3)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-  }
-
-  button(L.W - 44, 4, 36, 36, "?", {
-    tone: "plain",
-    action: () => openCodex("play"),
+  // Relics as a row of glyphs; tap them to read what they do.
+  const owned = Object.keys(run.relics);
+  const strip = relicStrip(L, run.maxHp);
+  const fit = Math.max(0, Math.floor(strip.w / 20));
+  owned.slice(0, fit).forEach((id, i) => {
+    text(R.relicById(id).glyph, strip.x + 10 + i * 20, y, { size: 15, font: GLYPH, color: ACCENT });
   });
+  if (owned.length) hits.push({ ...strip, action: () => openCodex("play", 3) });
+
+  button(codexButton(L), "?", { tone: "plain", action: () => openCodex("play") });
 }
 
-/** The line under the bar when nothing is selected — teaching early, status later. */
-function hintText() {
-  if (board.turn <= 2 && run.chamber === 1) return "Tap any piece to see what it attacks.";
-  if (run.chamber === 1 && board.turn <= 5)
-    return "Green outline: a quiet square. Red: it strikes.";
-  const guards = guardsLeft();
-  // A Grandmaster keeps his distance, so saying "walk up and take him" would be
-  // a lie in exactly the chambers where it matters.
-  // One guard left is one too few to hold the ward, so the throne is already
-  // open — say so, or the player keeps hunting a piece they can safely ignore.
-  if (guards <= 1)
-    return board.royal
-      ? "His ward has failed — but he runs. Corner him, or beam him down."
-      : "His ward has failed. Walk up and take him.";
-  return `Turn ${board.turn} · ${guards} ${guards === 1 ? "guard" : "guards"} still standing`;
+function hintText(b) {
+  const { throne } = view();
+  if (run.chamber === 1 && b.turn <= 2) return "Tap a piece to see which squares it strikes.";
+  if (run.chamber === 1 && run.captures === 0)
+    return "Walk up beside a piece and it is held. Take it from a quiet side.";
+  if (run.hand.length && run.chamber <= 2 && !run.board.check)
+    return "Tap a soul below to spend it: one move in that piece's shape.";
+  if (b.check)
+    return throne
+      ? `Check. Taking him costs ${throne}.`
+      : "Check — and his square is bare. Take him.";
+  if (throne === 0) return "His square is bare. Walk up beside him, then take him.";
+  return `Turn ${b.turn} · his square costs ${throne}`;
+}
+
+function describe(o) {
+  if (o.type === "wait") return "Wait";
+  if (o.stone) return "Raise a stone";
+  if (o.target) return `Take the ${R.KINDS[o.target.kind].name}`;
+  if (o.type === "soul") return `${R.KINDS[o.kind].soul} here`;
+  return "Step here";
 }
 
 function drawBar(L) {
   panel(0, L.barY, L.W, L.barH + 40, {
-    fill: "rgba(16,20,29,0.94)",
+    fill: "rgba(15,19,28,0.95)",
     stroke: "rgba(255,255,255,0.06)",
     radius: 20,
   });
+  const b = run.board;
+  const live = run.phase === "play" || run.phase === "bonus";
 
-  const pad = 10;
-  const rowY = L.barY + 10;
-  const rowH = 54;
-  const width = L.W - pad * 2;
-
-  if (aiming) {
-    const spell = spellById(aiming);
-    if (spell.target === "self") {
-      // Nothing to point at: the bar itself is the confirmation.
-      button(pad, rowY, width - 100, rowH, `Cast ${spell.name}`, {
-        sub: "the court loses its next turn",
-        tone: "mana",
-        action: () => castSpell(spell.id, null),
-      });
-    } else {
-      // A barred throne is drawn on the board but does not count as somewhere
-      // the spell can go.
-      const targets = spellTargets(aiming).filter((t) => !t.warded);
-      panel(pad, rowY, width - 100, rowH, { fill: "rgba(29,58,95,0.7)" });
-      text(targets.length ? `Aim ${spell.name}` : `${spell.name}: no target`, pad + 16, rowY + 20, {
-        size: 15,
-        weight: 700,
-        align: "left",
-        color: targets.length ? MANA : DIM,
-      });
-      text(
-        targets.length ? "tap a highlighted square" : "nowhere to put it from here",
-        pad + 16,
-        rowY + 38,
-        {
-          size: 11,
-          align: "left",
-          color: DIM,
-        },
-      );
-    }
-    button(L.W - pad - 90, rowY, 90, rowH, "Cancel", {
-      tone: "plain",
-      action: () => (aiming = null),
+  if (sel) {
+    const kills = sel.cost >= run.hp;
+    const sub =
+      sel.cost > 0
+        ? `${sel.cost} damage — ${kills ? "this kills you" : "confirm"}`
+        : sel.type === "wait"
+          ? "pass the turn"
+          : "free";
+    button(L.main, describe(sel), {
+      sub,
+      tone: sel.cost > 0 ? "danger" : sel.target?.kind === "king" ? "royal" : "accent",
+      action: () => (sel.type === "wait" ? play({ type: "wait" }) : play(sel)),
     });
-  } else if (sel && sel.kind === "blocked") {
-    button(pad, rowY, width - 100, rowH, sel.reason, {
-      sub: sel.sub ?? "take its defenders first",
-      tone: "plain",
-    });
-    button(L.W - pad - 90, rowY, 90, rowH, "OK", { tone: "plain", action: () => (sel = null) });
-  } else if (sel) {
-    const cost =
-      sel.damage > 0
-        ? `${sel.damage} damage — ${sel.damage >= run.hp ? "this kills you" : "confirm"}`
-        : "clear square";
-    button(pad, rowY, width - 100, rowH, sel.label, {
-      sub: cost,
-      tone: sel.damage > 0 ? "danger" : "accent",
-      action: () => commit(sel),
-    });
-    button(L.W - pad - 90, rowY, 90, rowH, "Cancel", { tone: "plain", action: () => (sel = null) });
-  } else if (inspect && board.pieces.includes(inspect)) {
-    const kind = KINDS[inspect.kind];
-    panel(pad, rowY, width - 100, rowH, { fill: RAISED });
-    text(kind.glyph, pad + 26, rowY + rowH / 2, {
-      size: 24,
-      font: GLYPH,
-      color: inspect.kind === "king" ? ROYAL : GOLD,
-    });
-    text(`${kind.name} · hits for ${kind.hit}`, pad + 48, rowY + 15, {
-      size: 13,
+    button(L.aside, "Cancel", { tone: "plain", action: () => (sel = null) });
+  } else if (aim !== null && run.hand[aim]) {
+    const kind = run.hand[aim];
+    panel(L.main.x, L.main.y, L.main.w, L.main.h, { fill: "rgba(20,70,42,0.55)" });
+    text(`${R.KINDS[kind].soul}`, L.main.x + 14, L.main.y + 15, {
+      size: 14,
       weight: 700,
       align: "left",
+      color: ACCENT,
     });
-    const lines = wrap(kind.tip, width - 100 - 56, 11);
-    lines.slice(0, 2).forEach((line, i) => {
-      text(line, pad + 48, rowY + 32 + i * 13, { size: 11, color: DIM, align: "left" });
+    wrap(R.KINDS[kind].soulTip, L.main.w - 24, 10.5)
+      .slice(0, 2)
+      .forEach((line, i) => {
+        text(line, L.main.x + 14, L.main.y + 31 + i * 12.5, {
+          size: 10.5,
+          align: "left",
+          color: DIM,
+        });
+      });
+    button(L.aside, "Cancel", { tone: "plain", action: () => (aim = null) });
+  } else if (run.phase === "bonus") {
+    panel(L.main.x, L.main.y, L.main.w, L.main.h, { fill: "rgba(20,70,42,0.55)" });
+    text("Zwischenzug", L.main.x + 16, L.main.y + 19, {
+      size: 15,
+      weight: 700,
+      align: "left",
+      color: ACCENT,
     });
-    button(L.W - pad - 90, rowY, 90, rowH, "Close", {
-      tone: "plain",
-      action: () => (inspect = null),
+    text("a free step before they move", L.main.x + 16, L.main.y + 38, {
+      size: 11,
+      align: "left",
+      color: DIM,
     });
+    button(L.aside, "Skip", { tone: "plain", action: () => play({ type: "wait" }) });
+  } else if (inspect !== null && b.pieces.some((p) => p.id === inspect)) {
+    // Reading a piece takes the whole row: a tip is worth more room than a
+    // Close button, and tapping anywhere on it puts it away.
+    const p = b.pieces.find((x) => x.id === inspect);
+    const k = R.KINDS[p.kind];
+    const row = { x: L.main.x, y: L.main.y, w: L.aside.x + L.aside.w - L.main.x, h: L.main.h };
+    panel(row.x, row.y, row.w, row.h, { fill: RAISED });
+    drawShape(p.kind, row.x + 24, row.y + row.h / 2 + 2, 34, p.kind === "king" ? "royal" : "court");
+    const title =
+      p.kind === "king"
+        ? `Sovereign · his square costs ${view().throne}`
+        : `${k.name}${p.guard ? " · palace guard" : ""} · hits ${k.hit}`;
+    text(title, row.x + 48, row.y + 15, { size: 12.5, weight: 700, align: "left" });
+    wrap(k.tip, row.w - 58, 11)
+      .slice(0, 2)
+      .forEach((line, i) => {
+        text(line, row.x + 48, row.y + 31 + i * 13, { size: 11, color: DIM, align: "left" });
+      });
+    hits.push({ ...row, action: () => (inspect = null) });
   } else {
-    panel(pad, rowY, width - 100, rowH, { fill: "rgba(35,43,60,0.6)" });
-    text(hintText(), pad + 16, rowY + rowH / 2, { size: 12.5, color: DIM, align: "left" });
-    button(L.W - pad - 90, rowY, 90, rowH, "Hold", {
-      sub: run.mana < MANA_CAP ? "+1 mana" : "pass a turn",
+    panel(L.main.x, L.main.y, L.main.w, L.main.h, { fill: "rgba(35,43,60,0.6)" });
+    const lines = wrap(live ? hintText(b) : "", L.main.w - 28, 12.5);
+    lines.slice(0, 2).forEach((line, i, all) => {
+      text(line, L.main.x + 14, L.main.y + L.main.h / 2 + (i - (all.length - 1) / 2) * 16, {
+        size: 12.5,
+        color: DIM,
+        align: "left",
+      });
+    });
+    const { danger } = view();
+    const here = danger[b.wizard.r][b.wizard.c];
+    button(L.aside, "Wait", {
+      sub: here ? `costs ${here}` : "pass",
       tone: "plain",
-      action: hold,
+      action: tapWait,
     });
   }
 
-  // Spellbook.
-  const book = spellbook();
-  const gap = 8;
-  const bw = (width - gap * (book.length - 1)) / book.length;
-  const by = rowY + rowH + 10;
-  const bh = Math.max(56, L.barH - rowH - 26);
-
-  book.forEach((spell, i) => {
-    const cost = spellCost(spell);
-    const poor = run.mana < cost;
-    const active = aiming === spell.id;
-    const x = pad + i * (bw + gap);
-
-    roundRect(x, by, bw, bh, 13);
-    ctx.fillStyle = active ? "#1d3a5f" : poor ? "#161b26" : RAISED;
+  // The hand: one slot per soul you can carry.
+  for (let i = 0; i < run.slots; i++) {
+    const r = slotRect(L, i, run.slots);
+    const kind = run.hand[i];
+    const active = aim === i;
+    roundRect(r.x, r.y, r.w, r.h, 13);
+    if (!kind) {
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(255,255,255,0.1)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      continue;
+    }
+    ctx.fillStyle = active ? "#16432a" : RAISED;
     ctx.fill();
-    ctx.strokeStyle = active ? MANA : "rgba(255,255,255,0.07)";
+    ctx.strokeStyle = active ? ACCENT : "rgba(74,222,128,0.25)";
     ctx.lineWidth = active ? 2 : 1;
     ctx.stroke();
-
-    const tint = poor ? "#4b5566" : active ? MANA : FG;
-    text(spell.glyph, x + bw / 2, by + bh * 0.34, { size: 22, font: GLYPH, color: tint });
-    text(spell.name, x + bw / 2, by + bh * 0.63, { size: 10.5, weight: 600, color: tint });
-    text(`${cost}◈`, x + bw / 2, by + bh * 0.84, {
-      size: 10,
-      color: poor ? "#4b5566" : MANA,
-      font: FONT,
+    const icon = Math.min(r.h * 0.62, r.w * 0.5);
+    drawShape(kind, r.x + r.w / 2, r.y + r.h * 0.4, icon, "soul");
+    text(R.KINDS[kind].soul, r.x + r.w / 2, r.y + r.h - 10, {
+      size: 10.5,
+      weight: 650,
+      color: active ? ACCENT : FG,
     });
-
-    if (!poor) {
+    if (live && run.phase !== "bonus") {
       hits.push({
-        x,
-        y: by,
-        w: bw,
-        h: bh,
+        ...r,
         action: () => {
           sel = null;
           inspect = null;
-          aiming = aiming === spell.id ? null : spell.id;
-          // Nothing to aim at: cast it where you stand.
-          if (aiming === "zugzwang") return;
-          if (aiming && !spellTargets(aiming).length) vibrate(4);
+          aim = aim === i ? null : i;
+          vibrate(6);
         },
       });
     }
-  });
+  }
 }
 
-// --- Screens ----------------------------------------------------------------
-
-function openCodex(from) {
-  codexFrom = from;
-  codexPage = 0;
-  scene = "codex";
-}
+// --- Screens ------------------------------------------------------------------------------
 
 function drawTitle(L) {
-  const saved = savedRun;
   const cx = L.W / 2;
-  const top = L.H * 0.17;
-
+  const top = L.H * 0.2;
   ctx.save();
   ctx.shadowColor = ROYAL;
-  ctx.shadowBlur = 30;
-  text("♞", cx, top, { size: 92, font: GLYPH, color: ROYAL });
+  ctx.shadowBlur = 36;
+  drawShape("knight", cx, top - 6, 120, "royal");
   ctx.restore();
+  text("CHECKWIZ", cx, top + 80, { size: 34, weight: 800 });
+  text("Take the Sovereign. Keep what you take.", cx, top + 112, { size: 14, color: DIM });
 
-  text("CHECKWIZ", cx, top + 84, { size: 34, weight: 800 });
-  text("Dismantle the guard. Take the Sovereign.", cx, top + 116, { size: 14, color: DIM });
-
-  const bw = Math.min(280, L.W - 60);
-  const bx = cx - bw / 2;
-  let y = top + 160;
-
-  if (saved) {
-    button(bx, y, bw, 58, "Continue run", {
-      sub: `chamber ${saved.chamber} · ${saved.hp} life`,
-      action: () => resumeRun(saved),
-    });
-    y += 68;
-    button(bx, y, bw, 52, "New run", { tone: "plain", action: newRun });
-  } else {
-    button(bx, y, bw, 58, "Enter the first chamber", { action: newRun });
+  for (const btn of titleButtons(L.W, L.H, !!savedRun)) {
+    if (btn.id === "continue") {
+      button(btn, "Continue run", {
+        sub: `chamber ${savedRun.chamber} · ${savedRun.hp} life`,
+        action: () => resumeRun(savedRun),
+      });
+    } else if (btn.id === "new") {
+      button(btn, savedRun ? "New run" : "Enter the first chamber", {
+        tone: savedRun ? "plain" : "accent",
+        action: newRun,
+      });
+    } else {
+      button(btn, "How to play", { tone: "plain", action: () => openCodex("title") });
+    }
   }
-  y += 68;
-  button(bx, y, bw, 52, "How to play", { tone: "plain", action: () => openCodex("title") });
-
-  text(`Deepest run: chamber ${best() || 1}`, cx, L.H - 34, { size: 12, color: DIM });
+  const wins = store.get("wins", 0);
+  const record = wins
+    ? `The Keep taken ${wins === 1 ? "once" : `${wins} times`}`
+    : `Deepest run: ${best()} of ${R.FINAL} chambers`;
+  text(record, cx, L.H - 30, { size: 12, color: wins ? ROYAL : DIM });
 }
 
 const RULES = [
-  ["1", "A piece strikes or moves, never both. The red squares are exactly what will hit you."],
-  ["2", "One tick per life it costs. A rook's line is worth two of a pawn's, a queen's three."],
-  ["3", "You cannot take a defended piece. Clear its defenders first — that ordering is the game."],
-  ["4", "Every piece has a safe side. Learn where, and you can walk through a court untouched."],
-  ["5", "The Sovereign's ward is his court. Break it down to one guard and it fails with it."],
+  "Red squares strike. When your move ends, everything attacking your square hits you — the pips say for how much.",
+  "A piece that strikes stays put to do it. Everything else moves.",
+  "Move up beside a piece and it is held: it cannot move away. It can still strike, so pick your side. Waiting holds nothing.",
+  "Take a piece by moving onto it; the red on its square is the price. Its soul is yours: one move in its shape.",
+  "Take the Sovereign by hand — a step, never a soul. Beside him is check, and the court gets one reply.",
+  "Clear a chamber untouched and you heal. Souls do not survive the stairs.",
 ];
 
-const CODEX_PAGES = ["The Court", "Spells", "The Rules"];
+const CODEX_PAGES = ["The Court", "Souls", "The Rules", "Your Relics"];
 
 function drawCodex(L) {
-  ctx.fillStyle = "rgba(8,10,15,0.9)";
+  ctx.fillStyle = "rgba(8,10,15,0.94)";
   ctx.fillRect(0, 0, L.W, L.H);
-
   const pad = 16;
   const width = L.W - pad * 2;
-  // Three pages, not two: the court and the spellbook each fill a small phone
-  // on their own, and a page that runs off the bottom of a 320-wide screen is
-  // a page nobody reads.
-  text(CODEX_PAGES[codexPage], L.W / 2, 34, { size: 22, weight: 700 });
+  const buttons = codexButtons(L.W, L.H);
+  text(CODEX_PAGES[codexPage], L.W / 2, 32, { size: 22, weight: 700 });
+  let y = 58;
+  const room = buttons.next.y - 10;
 
-  let y = 62;
-  if (codexPage === 0) {
-    for (const key of ["pawn", "knight", "bishop", "rook", "queen", "king"]) {
-      const k = KINDS[key];
-      const lines = wrap(k.tip, width - 76, 11.5);
-      const h = Math.max(52, 26 + lines.length * 14);
-      panel(pad, y, width, h, { fill: CARD });
-      text(k.glyph, pad + 26, y + h / 2, {
-        size: 26,
-        font: GLYPH,
-        color: key === "king" ? ROYAL : GOLD,
+  if (codexPage === 0 || codexPage === 1) {
+    // The court page says what each piece does to you, the souls page what
+    // it does for you once taken. One page could not hold both on a small phone.
+    const souls = codexPage === 1;
+    const kinds = ["pawn", "knight", "bishop", "rook", "queen", "king"].filter(
+      (k) => !souls || R.KINDS[k].soul,
+    );
+    const each = Math.min(76, (room - y) / kinds.length - 6);
+    for (const key of kinds) {
+      const k = R.KINDS[key];
+      panel(pad, y, width, each, { fill: CARD });
+      const palette = souls ? "soul" : key === "king" ? "royal" : "court";
+      drawShape(key, pad + 26, y + each / 2 + 2, Math.min(44, each * 0.7), palette);
+      text(souls ? k.soul : k.name, pad + 52, y + 15, {
+        size: 13,
+        weight: 700,
+        align: "left",
+        color: souls ? ACCENT : FG,
       });
-      text(k.name, pad + 50, y + 15, { size: 13.5, weight: 700, align: "left" });
-      text(`${k.hit} damage`, L.W - pad - 12, y + 15, {
+      const right = souls
+        ? `from the ${k.name.toLowerCase()}`
+        : k.hit
+          ? `hits ${k.hit}`
+          : "no strike";
+      text(right, L.W - pad - 10, y + 15, {
         size: 11,
-        color: k.hit > 1 ? DANGER : DIM,
+        color: !souls && k.hit > 1 ? DANGER : DIM,
         align: "right",
       });
-      lines.forEach((line, i) => {
-        text(line, pad + 50, y + 33 + i * 14, { size: 11.5, color: DIM, align: "left" });
-      });
-      y += h + 7;
+      wrap(souls ? k.soulTip : k.tip, width - 64, 11)
+        .slice(0, 2)
+        .forEach((line, i) => {
+          text(line, pad + 52, y + 31 + i * 13, { size: 11, color: DIM, align: "left" });
+        });
+      y += each + 6;
     }
-  } else if (codexPage === 1) {
-    for (const spell of SPELLS) {
-      const lines = wrap(spell.blurb, width - 86, 11.5);
-      const h = Math.max(46, 24 + lines.length * 14);
-      const known = unlocked(spell);
+  } else if (codexPage === 2) {
+    RULES.forEach((rule, i) => {
+      const lines = wrap(rule, width - 34, 12);
+      text(String(i + 1), pad + 10, y + 9, { size: 16, weight: 800, color: ROYAL });
+      lines.forEach((line, j) => {
+        text(line, pad + 30, y + 9 + j * 15, { size: 12, color: FG, align: "left", alpha: 0.85 });
+      });
+      y += lines.length * 15 + 12;
+    });
+  } else {
+    const source = run ?? savedRun;
+    const owned = source ? Object.keys(source.relics) : [];
+    const spent = source ? [...new Set(source.spent)].filter((id) => !owned.includes(id)) : [];
+    if (!owned.length && !spent.length) {
+      wrap(
+        "No relics yet. Every time a Sovereign falls, you choose one of three.",
+        width - 20,
+        13,
+      ).forEach((line, i) => text(line, L.W / 2, y + 30 + i * 18, { size: 13, color: DIM }));
+    }
+    for (const id of [...owned, ...spent]) {
+      const relic = R.relicById(id);
+      const used = !owned.includes(id);
+      const lines = wrap(relic.blurb + (used ? " (spent)" : ""), width - 60, 11);
+      const h = 24 + lines.length * 13;
+      if (y + h > room) break;
       panel(pad, y, width, h, { fill: CARD });
-      text(spell.glyph, pad + 24, y + h / 2, {
+      text(relic.glyph, pad + 22, y + h / 2, {
         size: 20,
         font: GLYPH,
-        color: known ? MANA : "#4b5566",
+        color: used ? FAINT : ACCENT,
       });
-      text(`${spell.name} · ${spell.cost}◈`, pad + 46, y + 14, {
+      const n = used ? source.spent.filter((x) => x === id).length : (source.relics[id] ?? 0);
+      text(`${relic.name}${n > 1 ? ` ×${n}` : ""}`, pad + 44, y + 13, {
         size: 12.5,
         weight: 700,
         align: "left",
-        color: known ? FG : "#6b7688",
+        color: used ? FAINT : FG,
       });
-      lines.forEach((line, i) => {
-        text(line, pad + 46, y + 30 + i * 13, { size: 11, color: DIM, align: "left" });
-      });
-      if (!known) {
-        text(`chamber ${spell.from}`, L.W - pad - 10, y + 14, {
-          size: 10,
-          color: "#6b7688",
-          align: "right",
-        });
-      }
+      lines.forEach((line, i) =>
+        text(line, pad + 44, y + 29 + i * 13, { size: 11, color: DIM, align: "left" }),
+      );
       y += h + 6;
-    }
-  } else {
-    for (const [n, rule] of RULES) {
-      const lines = wrap(rule, width - 46, 11.5);
-      const h = 18 + lines.length * 14;
-      text(n, pad + 12, y + 12, { size: 15, weight: 800, color: ROYAL });
-      lines.forEach((line, i) => {
-        text(line, pad + 30, y + 8 + i * 14, { size: 11.5, color: DIM, align: "left" });
-      });
-      y += h + 8;
     }
   }
 
-  const bw = (L.W - pad * 2 - 10) / 2;
-  const by = L.H - 70;
   const next = (codexPage + 1) % CODEX_PAGES.length;
-  button(pad, by, bw, 52, CODEX_PAGES[next], {
-    tone: "plain",
-    action: () => (codexPage = next),
-  });
-  button(pad + bw + 10, by, bw, 52, "Back", { action: () => (scene = codexFrom) });
+  button(buttons.next, CODEX_PAGES[next], { tone: "plain", action: () => (codexPage = next) });
+  button(buttons.back, "Back", { action: () => (scene = codexFrom) });
 }
 
 function drawDraft(L) {
-  ctx.fillStyle = "rgba(8,10,15,0.86)";
+  ctx.fillStyle = "rgba(8,10,15,0.9)";
   ctx.fillRect(0, 0, L.W, L.H);
-
   const cx = L.W / 2;
-  text("Chamber cleared", cx, L.H * 0.13, { size: 26, weight: 800, color: ROYAL });
-  text(`The way down opens to chamber ${run.chamber}.`, cx, L.H * 0.13 + 28, {
-    size: 13,
-    color: DIM,
+  const top = L.H * 0.1;
+  text("The Sovereign falls", cx, top, { size: 25, weight: 800, color: ROYAL });
+  text(
+    `Down to chamber ${run.chamber} of ${R.FINAL}, ${R.chamberName(run.chamber)}.`,
+    cx,
+    top + 28,
+    {
+      size: 12.5,
+      color: DIM,
+    },
+  );
+  text("Take one.", cx, top + 52, { size: 13 });
+
+  const cards = draftCards(L.W, L.H, run.draft.length);
+  run.draft.forEach((id, i) => {
+    const relic = R.relicById(id);
+    const c = cards[i];
+    panel(c.x, c.y, c.w, c.h, { fill: CARD, stroke: "rgba(74,222,128,0.25)" });
+    text(relic.glyph, c.x + 34, c.y + c.h / 2, { size: 28, font: GLYPH, color: ACCENT });
+    text(relic.name, c.x + 64, c.y + 26, { size: 17, weight: 700, align: "left" });
+    wrap(relic.blurb, c.w - 80, 12)
+      .slice(0, 2)
+      .forEach((line, j) =>
+        text(line, c.x + 64, c.y + 50 + j * 15, { size: 12, color: DIM, align: "left" }),
+      );
+    hits.push({ ...c, action: () => takeRelic(id) });
   });
-  text("Take one.", cx, L.H * 0.13 + 52, { size: 13, color: FG });
 
-  const pad = 18;
-  const width = L.W - pad * 2;
-  const h = 84;
-  let y = L.H * 0.13 + 78;
-
-  for (const upgrade of draft) {
-    panel(pad, y, width, h, { fill: CARD, stroke: "rgba(96,165,250,0.25)" });
-    text(upgrade.glyph, pad + 34, y + h / 2, { size: 28, font: GLYPH, color: MANA });
-    text(upgrade.name, pad + 64, y + 30, { size: 17, weight: 700, align: "left" });
-    text(upgrade.blurb, pad + 64, y + 54, { size: 12, color: DIM, align: "left" });
-    hits.push({
-      x: pad,
-      y,
-      w: width,
-      h,
-      action: () => {
-        upgrade.apply();
-        vibrate(20);
-        startChamber();
-      },
-    });
-    y += h + 12;
-  }
-
-  text(`${run.hp}/${run.maxHp} life · ${run.mana} mana · ${run.captures} taken`, cx, L.H - 40, {
-    size: 12,
-    color: DIM,
-  });
+  text(
+    `${run.hp}/${run.maxHp} life · ${run.captures} taken · ${run.flawless} untouched`,
+    cx,
+    L.H - 36,
+    { size: 12, color: DIM },
+  );
 }
 
-// --- Frame ------------------------------------------------------------------
+// --- Frame ---------------------------------------------------------------------------------
 
 function update(dt) {
   elapsed += dt;
 
-  if (board) {
-    if (!wizAnim) wizAnim = { x: board.wizard.c, y: board.wizard.r };
-    // A chamber change teleports the wizard; anything shorter is a real move.
-    if (Math.hypot(board.wizard.c - wizAnim.x, board.wizard.r - wizAnim.y) > 2.6) {
-      wizAnim = { x: board.wizard.c, y: board.wizard.r };
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    if (timeline[i].at <= elapsed) {
+      const [due] = timeline.splice(i, 1);
+      due.fn();
     }
-    const k = Math.min(1, dt * 14);
-    wizAnim.x += (board.wizard.c - wizAnim.x) * k;
-    wizAnim.y += (board.wizard.r - wizAnim.y) * k;
-    for (const p of board.pieces) {
-      p.ax += (p.c - p.ax) * k;
-      p.ay += (p.r - p.ay) * k;
+  }
+
+  const b = (run ?? demo).board;
+  const k = Math.min(1, dt * 14);
+  for (const p of b.pieces) {
+    const a = anim.get(p.id);
+    if (!a) continue;
+    if (a.delay > 0) {
+      a.delay -= dt;
+      continue;
     }
+    a.x += (p.c - a.x) * k;
+    a.y += (p.r - a.y) * k;
+    a.alpha += (1 - a.alpha) * k;
+  }
+  if (wiz?.to) {
+    wiz.t += dt;
+    if (wiz.t >= wiz.dur) wiz = { x: wiz.to.c, y: wiz.to.r };
+  } else if (wiz) {
+    wiz.x += (b.wizard.c - wiz.x) * k;
+    wiz.y += (b.wizard.r - wiz.y) * k;
   }
 
   for (const s of sparks) {
@@ -2140,51 +1556,59 @@ function update(dt) {
     s.life -= dt;
   }
   sparks = sparks.filter((s) => s.life > 0);
-
   for (const f of floaters) f.life -= dt;
   floaters = floaters.filter((f) => f.life > 0);
-
-  for (const b of beams) b.life -= dt;
-  beams = beams.filter((b) => b.life > 0);
-
+  for (const x of beams) x.life -= dt;
+  beams = beams.filter((x) => x.life > 0);
+  for (const g of ghosts) {
+    if (g.delay > 0) g.delay -= dt;
+    else g.life -= dt;
+  }
+  ghosts = ghosts.filter((g) => g.life > 0);
+  for (const f of flights) f.t += dt;
+  flights = flights.filter((f) => f.t < f.dur);
   if (banner) {
     banner.life -= dt;
     if (banner.life <= 0) banner = null;
   }
-
   shake = Math.max(0, shake - dt * 34);
+  flash = Math.max(0, flash - dt * 1.8);
 }
 
 createLoop((dt) => {
   update(dt);
-
-  const L = layout();
+  const source = run ?? demo;
+  const b = source.board;
+  const L = layout(stage.width, stage.height, b.size);
   hits = [];
+  const { danger, opts } = view();
+  const live = scene === "play" && !!run && (run.phase === "play" || run.phase === "bonus");
 
   ctx.clearRect(0, 0, L.W, L.H);
   ctx.save();
   if (shake > 0) ctx.translate(rand(-shake, shake) * 0.5, rand(-shake, shake) * 0.5);
   drawBackdrop(L);
-
-  if (board) {
-    drawSquares(L);
-    drawMoveHints(L);
-    drawInspection(L);
-    drawSpellTargets(L);
-    drawSelection(L);
-    drawWalls(L);
-    drawPieces(L);
-    if (scene === "play" || scene === "over") drawWizard(L);
-    drawEffects(L);
+  drawSquares(L, b, danger);
+  drawTerrain(L, b);
+  if (live) {
+    drawStepHints(L, opts);
+    drawSoulTargets(L, opts);
   }
+  drawInspection(L, b);
+  if (live) drawSelection(L);
+  drawPieces(L, b, live);
+  if (scene === "play" || scene === "over") drawWizard(L, b);
+  drawEffects(L);
   ctx.restore();
+  drawFlash(L);
 
   if (scene === "play") {
     drawTop(L);
     drawBar(L);
+    drawFlights(L);
     drawBanner(L);
   } else if (scene === "title") {
-    ctx.fillStyle = "rgba(8,10,15,0.72)";
+    ctx.fillStyle = "rgba(8,10,15,0.74)";
     ctx.fillRect(0, 0, L.W, L.H);
     drawTitle(L);
   } else if (scene === "codex") {
@@ -2194,73 +1618,10 @@ createLoop((dt) => {
   }
 });
 
-// --- Input ------------------------------------------------------------------
-
-function tapSquare(r, c) {
-  if (aiming) {
-    const target = spellTargets(aiming).find((t) => t.r === r && t.c === c);
-    // Aiming at the throne while the court stands costs nothing and explains
-    // itself — the mana is not spent and the turn is not handed over.
-    if (target?.warded) {
-      const n = guardsLeft();
-      aiming = null;
-      sel = {
-        kind: "blocked",
-        r,
-        c,
-        piece: target.piece,
-        guards: board.pieces.filter((p) => p !== target.piece),
-        reason: `${n} guards hold his ward`,
-        sub: "his ward turns spells aside",
-      };
-      inspect = target.piece;
-      vibrate(4);
-      return;
-    }
-    if (target) castSpell(aiming, target);
-    else aiming = null;
-    return;
-  }
-
-  // Tapping a pending target again commits it, so a confident player never
-  // has to reach for the bar.
-  if (sel && sel.r === r && sel.c === c && sel.kind !== "blocked") {
-    commit(sel);
-    return;
-  }
-
-  const read = readSquare(r, c);
-  if (!read) {
-    sel = null;
-    inspect = null;
-    return;
-  }
-  if (read.kind === "inspect") {
-    inspect = inspect === read.piece ? null : read.piece;
-    sel = null;
-    return;
-  }
-  if (read.kind === "blocked") {
-    sel = read;
-    inspect = read.piece ?? null;
-    vibrate(4);
-    return;
-  }
-  // A quiet step is just a step. Anything that costs something waits for a yes.
-  if (read.kind === "move" && read.damage === 0) {
-    commit(read);
-    return;
-  }
-  sel = read;
-  inspect = read.piece ?? null;
-}
+// --- Input ---------------------------------------------------------------------------------
 
 createInput(stage, {
   onTap({ x, y }) {
-    // The beat between the Sovereign falling and the draft appearing belongs
-    // to the animation, not to another turn.
-    if (scene === "play" && board?.cleared) return;
-
     for (let i = hits.length - 1; i >= 0; i--) {
       const h = hits[i];
       if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
@@ -2268,26 +1629,20 @@ createInput(stage, {
         return;
       }
     }
-    if (scene !== "play" || !board) return;
-
-    const L = layout();
+    if (scene !== "play" || !run || (run.phase !== "play" && run.phase !== "bonus")) return;
+    const L = layout(stage.width, stage.height, run.board.size);
     const c = Math.floor((x - L.bx) / L.cell);
     const r = Math.floor((y - L.by) / L.cell);
-    if (!inBoard(r, c)) {
-      sel = null;
-      inspect = null;
-      aiming = null;
+    if (!R.inBoard(run.board, r, c)) {
+      clearUi();
       return;
     }
     tapSquare(r, c);
   },
 });
 
-// --- Boot -------------------------------------------------------------------
+// --- Boot ------------------------------------------------------------------------------------
 
-// The title screen wants a board glowing behind it, and a fresh run needs one
-// anyway. A run left mid-chamber is offered back on the title screen.
+// A run left mid-chamber is offered back on the title screen.
 savedRun = loadRun();
-board = genChamber(1);
-refresh();
 syncHud();

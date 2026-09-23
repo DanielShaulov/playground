@@ -35,7 +35,7 @@ export const GAMES = [
   {
     id: "checkwiz",
     title: "Checkwiz",
-    blurb: "Chess-blooded tactics: dismantle the guard, take the Sovereign.",
+    blurb: "Take a piece, keep its move. Fifteen chambers to the Keep.",
     icon: "♞",
   },
 ];
