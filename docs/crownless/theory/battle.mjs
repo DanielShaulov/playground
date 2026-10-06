@@ -524,6 +524,17 @@ export const BREAK_DRAIN = 12; // ...and every squad still in it loses this much
 /** Play one planning round: AI picks orders, then ROUND_S seconds of sim. */
 export function playRound(b) {
   if (b.over) return;
+  beginRound(b);
+  const steps = Math.round(ROUND_S / DT);
+  for (let i = 0; i < steps; i++) step(b);
+  finishRound(b);
+}
+
+/**
+ * The two halves of a round, for anyone who needs to watch the steps in
+ * between (the mockups do; so will the game's view, which animates them).
+ */
+export function beginRound(b) {
   for (const side of [0, 1]) b.ai[side](b, side);
   for (const s of b.squads) {
     s.lostRound = 0;
@@ -533,8 +544,9 @@ export function playRound(b) {
     // thirty steps; a round-long swing is what makes a battle a gamble.
     s.luck = 1 - LUCK + 2 * LUCK * b.rng();
   }
-  const steps = Math.round(ROUND_S / DT);
-  for (let i = 0; i < steps; i++) step(b);
+}
+
+export function finishRound(b) {
   endOfRound(b);
   b.round++;
   checkOver(b);

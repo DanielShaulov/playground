@@ -236,6 +236,18 @@ about 390 × 560 px: 3.9 px a metre, a 40-man squad about 58 × 23 px.
 Everything is drawn in code on canvas, from a handful of shapes and the
 palette in `shared/style.css`. No sprite sheets, no image files.
 
+**Mockups** of the three main screens are in [mockups/](mockups/), drawn by
+this section's rules: [the map](mockups/map.png), [a battle](mockups/battle.png)
+and [the realm overview](mockups/overview.png). The battle is a real frame of
+`theory/battle.mjs`, round 6 of a fight between about 180 men a side.
+Regenerate them with `node docs/crownless/mockups/render.mjs`.
+
+What the battle mockup showed: at 3.9 px a metre, 180 men a side read
+clearly as squads, but the field still looks roomy, and the deployment bands
+leave the bottom third empty once the lines have advanced. M1's phone check
+should judge whether to shrink the field (say 80 × 112 m) or let the battle
+camera follow the fighting.
+
 **The map.** Muted, earthy hex fills that read on the dark UI, each with a
 little seeded variation and a glyph:
 
