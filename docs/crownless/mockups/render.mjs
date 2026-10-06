@@ -21,7 +21,7 @@ const VIEWS = (process.env.VIEWS ?? "map,overview,battle").split(",");
 const OUT = process.env.OUT ?? here;
 const SUFFIX = process.env.SUFFIX ?? "";
 const extra = new URLSearchParams();
-for (const k of ["seed", "round", "step"]) {
+for (const k of ["seed", "round", "step", "camera", "zoom"]) {
   const v = process.env[k.toUpperCase()];
   if (v) extra.set(k, v);
 }

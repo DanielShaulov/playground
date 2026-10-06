@@ -1707,13 +1707,34 @@ function drawBattle() {
   const fieldTop = SAFE_TOP + HUD_H;
   const barH = 176;
   const fieldBottom = H - SAFE_BOTTOM - barH;
-  const scale = Math.min(W / 100, (fieldBottom - fieldTop) / 140);
-  const fx0 = (W - 100 * scale) / 2;
-  const fy0 = fieldTop + (fieldBottom - fieldTop - 140 * scale) / 2;
+  // Two cameras, to compare (ui.md §6): "fit" shows the whole field and every
+  // man is a mark; "follow" sits about 2x on the fighting and every man is a
+  // little figure. ?camera=follow&zoom=2.5
+  const follow = params.get("camera") === "follow";
+  const viewH = fieldBottom - fieldTop;
+  const fit = Math.min(W / 100, viewH / 140);
+  const scale = follow ? fit * Number(params.get("zoom") ?? 2.5) : fit;
+  const zoom = scale / fit;
+  let fx0 = (W - 100 * scale) / 2;
+  let fy0 = fieldTop + (viewH - 140 * scale) / 2;
+  let view = null;
+  if (follow) {
+    const focus = fightCentre(b);
+    const hw = W / 2 / scale;
+    const hh = viewH / 2 / scale;
+    const cx = clamp(focus.x, hw, 100 - hw);
+    const cy = clamp(focus.y, hh, 140 - hh);
+    fx0 = W / 2 - cx * scale;
+    fy0 = fieldTop + viewH / 2 - cy * scale;
+    view = { x: cx - hw, y: cy - hh, w: hw * 2, h: hh * 2 };
+  }
   const P = (x, y) => ({ x: fx0 + x * scale, y: fy0 + y * scale });
 
   // Ground.
   ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, fieldTop, W, viewH);
+  ctx.clip();
   ctx.beginPath();
   ctx.rect(fx0, fy0, 100 * scale, 140 * scale);
   ctx.clip();
@@ -1747,7 +1768,7 @@ function drawBattle() {
   // Grass flecks.
   ctx.strokeStyle = "rgba(110,150,90,.35)";
   ctx.lineWidth = 1;
-  for (let i = 0; i < 260; i++) {
+  for (let i = 0; i < Math.round(260 * zoom * zoom); i++) {
     const p = P(hash(i, 21) * 100, hash(i, 22) * 140);
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
@@ -1791,6 +1812,10 @@ function drawBattle() {
     const p = P(f.x, f.y);
     const age = b.t - f.t;
     ctx.globalAlpha = clamp(0.9 - age / 30, 0.35, 0.9);
+    if (follow) {
+      fallenFigure(p, f, scale);
+      continue;
+    }
     ctx.fillStyle = SIDE[f.side].dark;
     ctx.fillRect(p.x - 1.6, p.y - 0.8, 3.2, 1.6);
     ctx.fillStyle = "rgba(90,20,20,.6)";
@@ -1878,8 +1903,12 @@ function drawBattle() {
     const body = routing ? mix(side.color, "#9aa0a8", 0.6) : side.color;
     const slots = soldierSlots(s);
     const ang = Math.atan2(s.fy, s.fx);
-    for (const m of slots) {
+    for (const [i, m] of slots.entries()) {
       const p = P(m.x, m.y);
+      if (follow) {
+        figure(s, p, ang, scale, body, side, routing, i);
+        continue;
+      }
       if (s.t.role === "cav") {
         ctx.save();
         ctx.translate(p.x, p.y);
@@ -1948,13 +1977,14 @@ function drawBattle() {
       for (let i = 0; i < 7; i++) {
         const off = (hash(i, id + s.id * 7) - 0.5) * 2 * w;
         const p = P(mx - s.fy * off, my + s.fx * off);
+        const c = 2 * Math.sqrt(zoom);
         ctx.strokeStyle = "rgba(255,248,220,.85)";
-        ctx.lineWidth = 0.9;
+        ctx.lineWidth = 0.9 * Math.sqrt(zoom);
         ctx.beginPath();
-        ctx.moveTo(p.x - 2, p.y - 2);
-        ctx.lineTo(p.x + 2, p.y + 2);
-        ctx.moveTo(p.x + 2, p.y - 2);
-        ctx.lineTo(p.x - 2, p.y + 2);
+        ctx.moveTo(p.x - c, p.y - c);
+        ctx.lineTo(p.x + c, p.y + c);
+        ctx.moveTo(p.x + c, p.y - c);
+        ctx.lineTo(p.x - c, p.y + c);
         ctx.stroke();
       }
     }
@@ -1979,18 +2009,19 @@ function drawBattle() {
       const uy = (ey - sy) / d;
       const a = P(x, y);
       // Seen from above, the arc is only in the shadow's distance from the shaft.
-      const lift = Math.sin(Math.PI * p) * 9;
+      const lift = Math.sin(Math.PI * p) * 9 * zoom;
+      const len = 7 * Math.sqrt(zoom);
       ctx.strokeStyle = "rgba(0,0,0,.3)";
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
-      ctx.lineTo(a.x + ux * 7, a.y + uy * 7);
+      ctx.lineTo(a.x + ux * len, a.y + uy * len);
       ctx.stroke();
       ctx.strokeStyle = "#fff4d8";
       ctx.lineWidth = 1.3;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y - lift);
-      ctx.lineTo(a.x + ux * 7, a.y + uy * 7 - lift);
+      ctx.lineTo(a.x + ux * len, a.y + uy * len - lift);
       ctx.stroke();
     }
   }
@@ -2051,6 +2082,10 @@ function drawBattle() {
     }
   }
   ctx.restore();
+
+  // Following: a glance map of the whole field, read-only, with the camera's
+  // rectangle on it, so the zoom never hides where everyone is.
+  if (follow) minimap(b, view, fieldTop);
 
   // Chrome: HUD.
   statusBar();
@@ -2180,7 +2215,25 @@ function drawBattle() {
   ability(10, 74, "Rally", 3);
   ability(90, 74, "Hold!", 2);
   rrect(170, y0 + 114, 40, 54, 12, CARD);
-  text("···", 190, y0 + 141, { size: 15, weight: 700, align: "center", color: DIM });
+  if (follow) {
+    // The camera toggle: fit the whole field.
+    ctx.strokeStyle = FG;
+    ctx.lineWidth = 1.8;
+    for (const [sx, sy] of [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ]) {
+      const cx = 190 + sx * 8;
+      const cy = y0 + 141 + sy * 8;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - sy * 5);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx - sx * 5, cy);
+      ctx.stroke();
+    }
+  } else text("···", 190, y0 + 141, { size: 15, weight: 700, align: "center", color: DIM });
   rrect(218, y0 + 114, 54, 54, 12, CARD);
   ctx.fillStyle = FG;
   ctx.beginPath();
@@ -2199,6 +2252,239 @@ function drawBattle() {
     color: "#06210f",
   });
   homeBar();
+}
+
+/**
+ * What the follow camera frames: across, the middle of the fighting; up and
+ * down, the fighting plus your own squads near it, which puts the clash in
+ * the upper half and your reserves below it, under your thumb.
+ */
+function fightCentre(b) {
+  const up = (s) => s.state === "ok" || s.state === "wavering";
+  const melee = b.squads.filter((s) => up(s) && s.contacts.size);
+  const core = melee.length ? melee : b.squads.filter(up);
+  const n = core.reduce((m, s) => m + s.n, 0) || 1;
+  const cx = core.reduce((m, s) => m + s.x * s.n, 0) / n;
+  const cy = core.reduce((m, s) => m + s.y * s.n, 0) / n;
+  const near = b.squads.filter(
+    (s) => up(s) && (core.includes(s) || (s.side === YOU && Math.hypot(s.x - cx, s.y - cy) < 50)),
+  );
+  // Across, the fight itself; up and down, the fight and your reserves.
+  const ys = near.map((s) => s.y);
+  return { x: cx, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+}
+
+const COATS = ["#6b4a33", "#8a5a35", "#3a2c24", "#a19a8e", "#5e3d29"];
+
+/**
+ * One soldier seen from above, about 12 px across at 2x: shoulders and a
+ * helmet, and what he carries — a shield on the left arm, a sword or a spear
+ * on the right, a bow held out in front, or a horse under him. Drawn in a frame
+ * where +x is the way he faces and one unit is a metre.
+ */
+// Figures are drawn 1.4x life size: at true size a man is a 6 px pill on a
+// phone, and games have always drawn their soldiers big for this reason.
+const FIGURE = 1.4;
+
+function figure(s, p, ang, scale, body, side, routing, i) {
+  scale *= FIGURE;
+  const role = s.t.role;
+  const tint = (hash(s.id * 131 + i, 3) - 0.5) * 0.14;
+  const cloth = routing
+    ? body
+    : tint > 0
+      ? mix(body, "#ffffff", tint)
+      : mix(body, "#000000", -tint);
+  const steel = s.t.armor >= 2 ? "#aeb4bd" : "#7b6248";
+  ctx.save();
+  // Shadow, cast down and right in screen space.
+  ctx.beginPath();
+  const horse = role === "cav";
+  ctx.ellipse(
+    p.x + 0.14 * scale,
+    p.y + 0.18 * scale,
+    (horse ? 0.7 : 0.42) * scale,
+    (horse ? 0.45 : 0.32) * scale,
+    horse ? ang : 0,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fillStyle = "rgba(10,18,8,.32)";
+  ctx.fill();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(ang);
+  ctx.scale(scale, scale);
+  const lw = 0.7 / scale;
+  if (horse) {
+    const coat = s.type === "knight" ? "#d9d4c8" : COATS[Math.floor(hash(s.id, i) * COATS.length)];
+    ctx.beginPath();
+    ctx.moveTo(-0.7, 0);
+    ctx.lineTo(-0.98, 0.07);
+    ctx.lineWidth = 0.12;
+    ctx.strokeStyle = "#1e1611";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(-0.08, 0, 0.62, 0.27, 0, 0, Math.PI * 2);
+    ctx.fillStyle = coat;
+    ctx.fill();
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = "#1e1611";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(0.62, 0, 0.26, 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (s.type === "knight" && !routing) {
+      // A caparison in the rider's colours.
+      ctx.beginPath();
+      ctx.ellipse(-0.12, 0, 0.5, 0.33, 0, 0, Math.PI * 2);
+      ctx.fillStyle = mix(side.color, "#ffffff", 0.15);
+      ctx.fill();
+      ctx.strokeStyle = side.dark;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.ellipse(-0.06, 0, 0.17, 0.3, 0, 0, Math.PI * 2);
+    ctx.fillStyle = cloth;
+    ctx.fill();
+    ctx.strokeStyle = side.dark;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = steel;
+    ctx.fill();
+    ctx.stroke();
+    if (!routing) {
+      ctx.beginPath();
+      ctx.moveTo(0.05, 0.24);
+      ctx.lineTo(s.speedNow > 4 ? 1.7 : 0.7, 0.27);
+      ctx.lineWidth = 0.07;
+      ctx.strokeStyle = s.speedNow > 4 ? "#e6dfcc" : "#c9ccd2";
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+  if (!routing && role === "spear") {
+    ctx.beginPath();
+    ctx.moveTo(-0.5, 0.26);
+    ctx.lineTo(2.0, 0.26);
+    ctx.lineWidth = 0.07;
+    ctx.strokeStyle = "#9c8058";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(2.0, 0.26);
+    ctx.lineTo(2.35, 0.26);
+    ctx.lineWidth = 0.09;
+    ctx.strokeStyle = "#e4e6ea";
+    ctx.stroke();
+  }
+  if (!routing && role === "ranged") {
+    ctx.beginPath();
+    ctx.arc(-0.12, 0, 0.5, -1.05, 1.05);
+    ctx.lineWidth = 0.08;
+    ctx.strokeStyle = "#8b5a2b";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-0.12 + 0.5 * Math.cos(-1.05), 0.5 * Math.sin(-1.05));
+    ctx.lineTo(-0.12 + 0.5 * Math.cos(1.05), 0.5 * Math.sin(1.05));
+    ctx.lineWidth = 0.03;
+    ctx.strokeStyle = "#e8e2d2";
+    ctx.stroke();
+  }
+  // Shoulders.
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 0.21, 0.36, 0, 0, Math.PI * 2);
+  ctx.fillStyle = role === "ranged" ? mix(side.color, "#ffffff", 0.22) : cloth;
+  if (routing) ctx.fillStyle = cloth;
+  ctx.fill();
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = side.dark;
+  ctx.stroke();
+  // Sword arm.
+  if (!routing && role === "inf") {
+    ctx.beginPath();
+    ctx.moveTo(0.1, 0.3);
+    ctx.lineTo(0.62, 0.38);
+    ctx.lineWidth = 0.07;
+    ctx.strokeStyle = "#c9ccd2";
+    ctx.stroke();
+  }
+  // Helmet, or a hood for archers.
+  ctx.beginPath();
+  ctx.arc(0.03, 0, 0.18, 0, Math.PI * 2);
+  ctx.fillStyle = role === "ranged" ? "#5c4a32" : steel;
+  ctx.fill();
+  ctx.strokeStyle = "#1c1c1c";
+  ctx.stroke();
+  // Shield on the left arm, out in front.
+  if (!routing && s.t.shield > 0) {
+    const r = s.t.shield >= 0.4 ? 0.28 : 0.2;
+    ctx.beginPath();
+    ctx.arc(0.28, -0.24, r, 0, Math.PI * 2);
+    ctx.fillStyle = mix(side.color, "#ffffff", 0.35);
+    ctx.fill();
+    ctx.lineWidth = 0.06;
+    ctx.strokeStyle = side.dark;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0.28, -0.24, r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = "#c9ccd2";
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** A man down: on his side, his weapon beside him. */
+function fallenFigure(p, f, scale) {
+  scale *= FIGURE;
+  const a = hash(Math.round(f.x * 10), Math.round(f.y * 10)) * Math.PI * 2;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(a);
+  ctx.scale(scale, scale);
+  ctx.beginPath();
+  ctx.ellipse(0.1, 0.05, 0.42, 0.3, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(90,18,18,.35)";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 0.36, 0.17, 0, 0, Math.PI * 2);
+  ctx.fillStyle = SIDE[f.side].dark;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0.38, 0, 0.13, 0, Math.PI * 2);
+  ctx.fillStyle = "#6f737a";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-0.3, 0.3);
+  ctx.lineTo(0.5, 0.42);
+  ctx.lineWidth = 0.06;
+  ctx.strokeStyle = "#9a9ca0";
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** The whole field in a corner box, squads as blocks, the camera as a frame. */
+function minimap(b, view, top) {
+  const mw = 62;
+  const mh = mw * 1.4;
+  const x0 = W - mw - 10;
+  const y0 = top + 10;
+  const k = mw / 100;
+  rrect(x0 - 3, y0 - 3, mw + 6, mh + 6, 8, "rgba(16,19,26,.82)", LINE);
+  ctx.fillStyle = "#3f5d37";
+  ctx.fillRect(x0, y0, mw, mh);
+  for (const s of b.squads) {
+    if (s.n === 0 || s.state === "fled" || s.state === "dead") continue;
+    const routing = s.state === "routing";
+    ctx.fillStyle = routing ? "#e6e6e6" : SIDE[s.side].color;
+    const w = Math.max(2, Math.min(s.files0, s.n) * s.spacing * k);
+    const h = Math.max(2, Math.ceil(s.n / Math.max(1, Math.min(s.files0, s.n))) * s.spacing * k);
+    ctx.fillRect(x0 + s.x * k - w / 2, y0 + s.y * k - h / 2, w, h);
+  }
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(x0 + view.x * k, y0 + view.y * k, view.w * k, view.h * k);
 }
 
 function roleGlyph(role, x, y, color) {

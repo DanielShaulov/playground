@@ -76,7 +76,9 @@ Done when:
 - A round computes in ≤ 10 ms and draws 400 soldiers at 60 fps on a phone.
 - **On a real phone**: squads can be tapped reliably; a round feels the right
   length; the field reads at a glance. If not, fix before M2 (fallbacks: a
-  6-squad cap, bigger hit areas, army-order-only play).
+  6-squad cap, bigger hit areas, army-order-only play). Also decide the
+  camera: whole field with marks, or the 2.5× follow camera with figures
+  (`ui.md` §6 has both mocked up from the same frame).
 
 ## M2 · The map — 2–3 sessions
 

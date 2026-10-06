@@ -249,9 +249,25 @@ Regenerate them with `node docs/crownless/mockups/render.mjs`.
 
 What the battle mockup showed: at 3.9 px a metre, 180 men a side read
 clearly as squads, but the field still looks roomy, and the deployment bands
-leave the bottom third empty once the lines have advanced. M1's phone check
-should judge whether to shrink the field (say 80 × 112 m) or let the battle
-camera follow the fighting.
+leave the bottom third empty once the lines have advanced.
+
+**The camera is an open decision**, with both options drawn from the same
+frame. [The whole field](mockups/battle.png) is the design above: no camera,
+every man a mark, because at whole-field scale a man has about 6 px and a
+mark is all that fits. [The follow camera](mockups/battle-follow.png)
+(`?camera=follow`) sits at 2.5× on the fighting and draws every man as a
+small top-down figure, at 1.4× life size: helmet, shield on the left arm,
+sword, spear or bow, horse and rider. It frames the middle of the melee
+across, and the melee plus your nearby squads up and down, so the clash sits
+high and your reserves under your thumb. A read-only minimap in the corner
+shows what's off-screen, and a fit button beside ⏯ toggles to the whole
+field.
+
+It looks far richer and fills the screen, but it can't show a whole battle
+(about 40 × 56 m of a 100 × 140 m field): in the mockup your own horse is
+off the top edge. Either way, keep soldier drawing behind one function so the
+choice stays cheap. M1 builds whole-field first and tries the follow camera
+on a phone before deciding.
 
 **The map.** Muted, earthy hex fills that read on the dark UI, each with a
 little seeded variation and a glyph:
