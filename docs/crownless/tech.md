@@ -57,8 +57,12 @@ tests/crownless/
   shots.mjs           screenshots at 390×844 and 375×667
 ```
 
-**From the shared layer** it uses `createShell` (HUD stats Day, 🪙, ⚒, 🐎),
-`createStage`, `createLoop`, `createInput` and `createStore("crownless")`.
+**From the shared layer** it uses `createShell`, `createStage`,
+`createLoop`, `createInput` and `createStore("crownless")`. The shell is made
+with no stats, because the HUD's content changes per screen (`ui.md` §1) and
+`createShell` fixes its stats at creation: `game.js` appends one status
+element of its own to the shell's `.hud` and rewrites it per screen. Nothing
+in `shared/` changes.
 Long-press and the map's drag-to-pan are built in `view/input.js` on top of
 `createInput`'s `onDown` / `onMove` / `onUp`. Per CLAUDE.md, nothing moves
 into `shared/` unless a second game needs it.
@@ -108,13 +112,20 @@ view animates parties between their old and new positions.
   (JavaScriptCore) in the last bit and then visibly. That is fine for play,
   where odds and outcome are computed on the same device. It matters for
   tests: run browser tests in Chromium (V8, like Node), and let rules use a
-  lookup table for `edge()` over integer differences rather than `Math.pow`.
+  lookup table for `edge()` over tenths of a point from −30 to +30 (pierce
+  makes armour fractional) rather than `Math.pow`.
 
 ## 4. Saves
 
-One campaign, autosaved under `playground:crownless:save` after every map
-action and every battle round. Settings and best scores have their own keys,
-so a broken save never loses them.
+One campaign, autosaved under `playground:crownless:save`. Settings and best
+scores have their own keys, so a broken save never loses them.
+
+**When to save.** After every map action; every 6 in-game hours while
+travelling and when travel stops; and on `pagehide`. In battle, **save the
+outcome before showing it**: a round is computed and saved, then animated; an
+auto-resolve is saved before its result sheet appears. Otherwise closing the
+app mid-animation would let a player see the outcome and plan the round
+again — ironman in name only.
 
 ```js
 {
@@ -145,6 +156,11 @@ another version is not loaded: the title says so and offers a new campaign,
 keeping settings and best scores. During development (M2–M8) this will happen
 often and that is acceptable for a toy; from M8 on, write a migration instead.
 
+**Eviction.** Safari may clear the storage of a site that isn't on the home
+screen after about a week unused. The repo README already says to Add to Home
+Screen; the title screen should nudge toward it when not running standalone,
+because a lost campaign is worse here than a lost high score.
+
 ## 5. Performance
 
 Budgets for a mid-range phone (an iPhone 11 or Pixel 6a). Node on a laptop is
@@ -155,7 +171,8 @@ roughly 3–5× faster; measure on a device before trusting a margin.
 | Battle round (30 steps, 12 squads) | ≤ 10 ms  | model: ~0.4 ms per round in Node     |
 | Auto-resolve one battle            | ≤ 15 ms  | model: 4 ms in Node, 200 v 200       |
 | Odds (8 auto-resolves)             | ≤ 120 ms | spread over frames if it shows       |
-| World tick, 80 parties             | ≤ 1 ms   | re-path at most 10 parties per tick  |
+| World tick, 80 parties             | ≤ 1 ms   | movement only; re-path ≤ 10 a tick   |
+| A simulated day, battles included  | ≤ 30 ms  | 24 ticks plus a few 4 ms battles     |
 | A\* on Medium (2128 hexes)         | ≤ 2 ms   | cache by (from, to, terrain version) |
 | Map frame                          | ≤ 6 ms   | ~150 visible hexes, drawn directly   |
 | Battle frame, 600 soldiers         | ≤ 6 ms   | one path per colour, not per man     |
@@ -200,8 +217,8 @@ honest way to set a number that says how hard the game is.
   Reports and asserts: wars and peaces per faction; settlements changing hands
   by week; the largest faction's share at days 50, 100, 150 (fails above
   60%); lords bankrupt or stuck; parties that can't path; the Hollow's
-  strongholds by week (it must not end the realm alone before ~day 120 on
-  Normal, and must take something); battles per day; ms per simulated day.
+  strongholds by week (alone, it must end the realm between days 110 and 150
+  on Normal); battles per day; ms per simulated day.
 - `campaign-bot.mjs` (M8) — a scripted player policy (hunt what it can beat,
   recruit, upgrade, take contracts, go for the Regalia) checked against the
   pacing table in `world.md` §14.

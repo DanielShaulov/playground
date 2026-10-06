@@ -17,8 +17,8 @@
  *     it is one rank deep.
  *   - Melee is frontage-limited. Only soldiers along the touching edge fight
  *     (two ranks for spears), plus a wider line's overhang folding round the
- *     ends. That keeps melee near Lanchester's linear law: twice the men wins
- *     clearly, but is not four times the army.
+ *     ends. That puts melee between Lanchester's linear and square laws, and
+ *     the advantage saturates: past about twice the men, the extra stand idle.
  *   - Damage pools, HoMM-style: hits accumulate on the squad and every `hp`
  *     of it drops one soldier, so overkill carries to the next man.
  *   - Facing matters. Hits on the flank do +30%, on the rear +60%; a squad hit
@@ -44,7 +44,7 @@ export const FIELD_H = 140;
 export const MAX_ROUNDS = 40;
 
 // ---------------------------------------------------------------------------
-// Troops. One generic culture; factions are skews on these (DESIGN.md §7).
+// Troops. One generic culture; cultures are skews on these (../army.md §4).
 // dmg is melee damage per fighting soldier per round; mdmg per arrow that hits.
 // ---------------------------------------------------------------------------
 
@@ -393,7 +393,10 @@ export function createBattle(sides, seed = 1, opts = {}) {
     morale: 0,
     ...(opts.mods?.[side] ?? {}),
   }));
-  for (const s of squads) s.morale += mods[s.side].morale;
+  for (const s of squads) {
+    s.morale += mods[s.side].morale;
+    s.cap += mods[s.side].morale;
+  }
   return {
     squads,
     mods,
@@ -407,10 +410,25 @@ export function createBattle(sides, seed = 1, opts = {}) {
   };
 }
 
-function makeSquad(id, side, { type, n, x, y }) {
+/**
+ * Formations (../battle.md §2). Wide stretches a squad to match a bigger
+ * enemy's frontage so it can't be wrapped, but never wraps anyone itself and a
+ * thin line has thin nerve. Deep fights with fewer men but holds: for chokes,
+ * walls and charges. Line is the default and the only one that envelops.
+ * Every formation that could envelop always won when it did (report.mjs
+ * formations), so only Line may.
+ */
+export const FORMATIONS = {
+  line: { ranks: 1, pressure: 1, morale: 0, wraps: true },
+  wide: { ranks: 0.5, pressure: 1.5, morale: -5, wraps: false },
+  deep: { ranks: 2, pressure: 0.5, morale: 10, wraps: true },
+};
+
+function makeSquad(id, side, { type, n, x, y, formation = "line" }) {
   const t = TROOPS[type];
   if (!t) throw new Error(`unknown troop ${type}`);
-  const ranks = t.ranks ?? DEFAULT_RANKS[t.role];
+  const form = FORMATIONS[formation];
+  const ranks = Math.max(1, Math.round((t.ranks ?? DEFAULT_RANKS[t.role]) * form.ranks));
   return {
     id,
     side,
@@ -428,7 +446,9 @@ function makeSquad(id, side, { type, n, x, y }) {
     runUp: 0, // seconds spent moving at speed; a charge needs CHARGE_RUNUP of it
     engagedFor: 0, // seconds continuously in melee
     pool: 0,
-    morale: t.morale,
+    form,
+    cap: t.morale + form.morale, // the most nerve it can recover to
+    morale: t.morale + form.morale,
     luck: 1,
     state: "ok", // ok | wavering | routing | fled | dead
     order: { kind: "advance", target: null },
@@ -510,7 +530,9 @@ function faceHit(def, att) {
 const FLANK_DMG = [1, 1.3, 1.6];
 const CHARGE_RUNUP = 1.5; // seconds at speed before contact; ~13 m for a horse
 const FIGHT_BACK = [1, 0.5, 0.25];
-const FLANK_MORALE = [0, 6, 12]; // per round, at full pressure
+// Morale lost a round at full flank pressure. Pressure counts men on your flank
+// once and men at your back twice, against your own numbers.
+const FLANK_DRAIN = 6;
 export const MELEE = 1.0; // global melee damage scale: the knob for battle length
 export const CYCLE = true; // whether the AI's cavalry cycle-charges
 export const LUCK = 0.15; // each squad's damage swings ±15% round to round
@@ -573,8 +595,8 @@ export function step(b) {
         const ba = breadth(a, ux, uy);
         const bc = breadth(c, ux, uy);
         const width = Math.min(ba, bc);
-        const wrapA = Math.max(0, Math.min(ba - bc, 4 * extent(c, ux, uy)));
-        const wrapC = Math.max(0, Math.min(bc - ba, 4 * extent(a, ux, uy)));
+        const wrapA = a.form.wraps ? Math.max(0, Math.min(ba - bc, 4 * extent(c, ux, uy))) : 0;
+        const wrapC = c.form.wraps ? Math.max(0, Math.min(bc - ba, 4 * extent(a, ux, uy))) : 0;
         contacts.get(a.id).push({ o: c, width, wrap: wrapA, wrapped: wrapC });
         contacts.get(c.id).push({ o: a, width, wrap: wrapC, wrapped: wrapA });
       }
@@ -808,13 +830,13 @@ function endOfRound(b) {
     if (standing(s)) {
       // A whole squad on your flank (pressure ~1/3) is the full drain; a few
       // men wrapping round the end of your line is a fraction of it.
-      s.morale -= FLANK_MORALE[1] * Math.min(2, 3 * s.flankedRound);
+      s.morale -= FLANK_DRAIN * s.form.pressure * Math.min(2, 3 * s.flankedRound);
       // Fear: monsters drain the nerve of everyone touching them.
       for (const id of s.contacts) {
         const o = b.squads[id];
         if (o.t.fear) s.morale -= o.t.fear;
       }
-      const cap = s.t.morale + b.mods[s.side].morale;
+      const cap = s.cap;
       if (!engaged && s.lostRound === 0) s.morale = Math.min(cap, s.morale + 3);
       if (engaged && s.dealtRound > 0 && s.lostRound === 0) s.morale = Math.min(cap, s.morale + 2);
     } else if (s.state === "routing") {
@@ -838,20 +860,25 @@ function endOfRound(b) {
     const up = list.filter(standing).reduce((m, s) => m + s.n, 0);
     if (up < n0 * BREAK_AT) for (const s of list) if (standing(s)) s.morale -= BREAK_DRAIN;
   }
-  // State changes, and the nerve-shock of watching a neighbour run.
-  for (const s of b.squads) {
-    if (!standing(s)) continue;
-    if (s.morale < 20) {
+  // Routs, and the nerve-shock of watching a neighbour run. Worked out in
+  // waves until nothing more breaks, so the order squads are stored in never
+  // decides who runs: every squad that breaks shakes each neighbour once.
+  for (;;) {
+    const breaking = b.squads.filter((s) => standing(s) && s.morale < 20);
+    if (!breaking.length) break;
+    for (const s of breaking) {
       s.state = "routing";
       s.routed = true;
-      for (const o of b.squads) {
-        if (o !== s && o.side === s.side && standing(o) && Math.hypot(o.x - s.x, o.y - s.y) < 30) {
-          o.morale -= 8;
-        }
-      }
       b.log.push(`r${b.round} ${s.side}:${s.type} routs (${s.n}/${s.n0})`);
-    } else s.state = s.morale < 40 ? "wavering" : "ok";
+    }
+    for (const s of breaking) {
+      for (const o of b.squads) {
+        if (o.side === s.side && standing(o) && Math.hypot(o.x - s.x, o.y - s.y) < 30)
+          o.morale -= 8;
+      }
+    }
   }
+  for (const s of b.squads) if (standing(s)) s.state = s.morale < 40 ? "wavering" : "ok";
 }
 
 function checkOver(b) {
@@ -861,10 +888,13 @@ function checkOver(b) {
     b.winner = up[0] ? 0 : up[1] ? 1 : null;
   } else if (b.round >= MAX_ROUNDS) {
     b.over = true;
-    // Nobody broke: whoever has more of their army still standing holds the field.
-    const left = [0, 1].map((side) =>
-      b.squads.filter((s) => s.side === side && standing(s)).reduce((m, s) => m + s.n / s.n0, 0),
-    );
+    // Nobody broke: whoever has the larger share of their men still standing
+    // holds the field.
+    const left = [0, 1].map((side) => {
+      const list = b.squads.filter((s) => s.side === side);
+      const up = list.filter(standing).reduce((m, s) => m + s.n, 0);
+      return up / list.reduce((m, s) => m + s.n0, 0);
+    });
     b.winner = left[0] === left[1] ? null : left[0] > left[1] ? 0 : 1;
     b.stalemate = true;
   }

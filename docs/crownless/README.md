@@ -18,7 +18,7 @@ knows what the others decided.
 
 | Milestone                                           | State       |
 | --------------------------------------------------- | ----------- |
-| M0 Design + battle theory model (`docs/crownless/`) | done        |
+| M0 Design, battle theory model, mockups             | done        |
 | M1 Battle sandbox (Skirmish)                        | not started |
 | M2 World map, travel, bandits, saves                | not started |
 | M3 Army, economy, hero progression                  | not started |
@@ -48,8 +48,13 @@ Rules for keeping them true:
 - **The docs are the spec until the code exists; then the code is.** When an
   implementation has to deviate, change the doc in the same PR, and say why in
   a line. A doc that silently disagrees with the game is worse than none.
-- **Every number has one home.** Troop stats live in `army.md`, prices and
-  pacing in `world.md`, battle constants in `battle.md`. Elsewhere, link.
+- **Every number has one home.** Troop stats, troop prices and the hero live
+  in `army.md`; the economy, the map and pacing in `world.md`; battle
+  constants in `battle.md`. Elsewhere, link. (`theory/report.mjs` mirrors
+  the troop prices in `PRICE`; change both together.)
+- **Until M1 lands, `theory/battle.mjs` is the spec for the battle rules**
+  it covers, and `battle.md` describes it. If they disagree, the code is
+  right and the doc has a bug.
 - **Numbers that say how hard the game is come out of a simulator**, never a
   guess. `theory/report.mjs` is the start of that; from M1 it moves to
   `tests/crownless/` and imports the game's real rules.
@@ -123,7 +128,7 @@ A Medium campaign is aimed at **120–180 in-game days and 4–6 hours** of play
 **Winning** is killing the Hollow King. **Losing** is the Hollow holding a third
 of the realm's towns and castles. There is no other game over: a lost battle
 means capture, a ransom or an escape, and a rebuilt warband — expensive, never
-final. Details in [world.md § The Hollow](world.md#the-hollow-the-regalia-and-the-end).
+final. Details in [world.md § The Hollow](world.md#12-the-hollow-the-regalia-and-the-end).
 
 ## Constraints, and what they force
 

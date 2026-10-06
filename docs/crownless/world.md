@@ -42,20 +42,20 @@ shows about 8 columns and 15 rows at once.
 
 ### Terrain
 
-| Terrain   | Cost                         | Sight                              | Battlefield   | Where                                     |
-| --------- | ---------------------------- | ---------------------------------- | ------------- | ----------------------------------------- |
-| Plains    | 1                            |                                    | open          | everywhere; Valemark                      |
-| Farmland  | 1                            |                                    | open, houses  | around villages                           |
-| Steppe    | 0.9                          | +1                                 | open          | Ulus                                      |
-| Forest    | 1.6                          | hides parties in it beyond 2 hexes | woods         | Fenreach                                  |
-| Marsh     | 2                            |                                    | mud           | Fenreach                                  |
-| Hills     | 1.4                          | +2 standing on it                  | slope         | Kharum; iron                              |
-| Mountains | —                            |                                    | —             | ridges between regions; Kharum            |
-| Pass      | 2                            |                                    | slope         | 2–3 gaps per ridge                        |
-| River     | —                            |                                    | —             | crossed only at fords (2) and bridges (1) |
-| Road      | ×0.6 of the terrain under it |                                    |               | between settlements                       |
-| Sea, lake | —                            |                                    | —             | map edges, a few lakes                    |
-| Blight    | +0.2                         | −1                                 | as underneath | spreads from the Hollow (§12)             |
+| Terrain   | Cost                         | Sight                              | Battlefield   | Where                                                       |
+| --------- | ---------------------------- | ---------------------------------- | ------------- | ----------------------------------------------------------- |
+| Plains    | 1                            |                                    | open          | everywhere; Valemark                                        |
+| Farmland  | 1                            |                                    | open, houses  | around villages                                             |
+| Steppe    | 0.9                          | +1                                 | open          | Ulus                                                        |
+| Forest    | 1.6                          | hides parties in it beyond 2 hexes | woods         | Fenreach                                                    |
+| Marsh     | 2                            |                                    | mud           | Fenreach                                                    |
+| Hills     | 1.4                          | +2 standing on it                  | slope         | Kharum; iron                                                |
+| Mountains | —                            |                                    | —             | ridges between regions; Kharum                              |
+| Pass      | 2                            |                                    | slope         | 2–3 gaps per ridge                                          |
+| River     | —                            |                                    | —             | a chain of hexes, entered only at fords (2) and bridges (1) |
+| Road      | ×0.6 of the terrain under it |                                    |               | between settlements                                         |
+| Sea, lake | —                            |                                    | —             | map edges, a few lakes                                      |
+| Blight    | +0.2                         | −1                                 | as underneath | spreads from the Hollow (§12)                               |
 
 ### Generation
 
@@ -106,10 +106,12 @@ your thinking.
 **Pace** is hexes per day on cost-1 terrain:
 
 ```
-pace = 12 × class × size × wounded × (1 + Logistics) × culture
+pace = 12 × class × size × wounded × limit × (1 + Logistics + mount) × culture
 class:   all mounted 1.35 · at least half mounted 1.15 · otherwise 1
 size:    1 − 0.003 × max(0, men + prisoners / 2 − 40), at least 0.75
 wounded: 1 − 0.2 × (wounded share)
+limit:   0.9 while over the party limit (§7), else 1
+mount:   the hero's mount item (army.md §8): Rouncey 0.05, Courser 0.1, …
 ```
 
 **Time to cross a hex** is `24 / pace × terrain cost` hours, with road ×0.6
@@ -134,7 +136,10 @@ faster (§7).
 
 **Contact** happens when two parties come within 0.6 hex of each other and one
 of them means to fight (§5). Positions are continuous along paths, so a faster
-party catches a slower one, and a slower one can't get away.
+party catches a slower one, and a slower one can't get away. Contact is
+checked along each party's movement during a tick (the closest approach of
+the two moves), not only where they end it: two fast parties on a road close
+by over 3 hexes an hour and would otherwise pass through each other.
 
 ## 3. Sight and fog
 
@@ -186,7 +191,7 @@ renown (20 / 40 / 80 by size) and hero XP of 200 / 500 / 1200.
 | Troll bridge    | 1–3 trolls and their thralls, 80–150                 | gold 600–1000; rare item                   |
 | Barrow          | barrow-wights, 80–160                                | rare item; a shrine ability                |
 | Ruined fort     | deserters, 100–180                                   | the deserters' survivors offer to join you |
-| Great lair (×3) | 180 / 260 / 340 (§12)                                | one of the Regalia each                    |
+| Great lair (×3) | by composition (§12)                                 | one of the Regalia each                    |
 
 ### Everything else
 
@@ -220,7 +225,7 @@ odds from eight auto-resolves (`battle.md` §12), and the options that apply.
 | --------------------- | ------------------------------------------------------------------------------------- |
 | Fight                 | always: the battle                                                                    |
 | Auto-resolve          | always: the battle, instantly                                                         |
-| Leave                 | they're not hostile, or they're hostile but not faster than you                       |
+| Leave                 | they're not hostile, or they're hostile and slower than you                           |
 | Sacrifice a rearguard | they're faster and want you: leave your slowest 15% of worth behind (lost) and escape |
 | Pay                   | brigands: 20% of your gold, and they leave you alone for 3 days                       |
 | Talk                  | lords: news, contracts, join their campaign, demand surrender of a weaker party       |
@@ -230,6 +235,11 @@ odds from eight auto-resolves (`battle.md` §12), and the options that apply.
 allied to one side and at war with the other joins it, bringing its squads
 under its own AI (`battle.md` §2 caps). That is how a lone scout turns into a
 pitched battle, and why a relief army matters.
+
+**Getting away** has a cost and a rule. After a Leave, a retreat or a draw,
+the two parties can't make contact for 6 hours, and the one that withdrew
+moves first; met again within a day, Leave is offered only if you are faster
+(`battle.md` §11).
 
 Battles between AI parties are fought by the same function out of sight, with
 no screen. (About 4 ms each; a Medium world has a few a day.)
@@ -244,24 +254,25 @@ buildings, **horses** for mounts.
 | Source         | Amount                                                                                                               |
 | -------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Loot           | 15% of the value (`army.md` §3) of enemies killed or captured, plus their purse: all of a brigand's, 20% of a lord's |
-| Ransom         | sell prisoners at a town's broker: 4 / 10 / 22 / 45 / 90 by tier (×1.5 mounted); lords 400 + 150 × rank              |
+| Ransom         | sell prisoners at a town's broker at `army.md` §3's ransom; lords 400 + 150 × rank                                   |
 | Fiefs          | per week: village 15 (+specialty), castle 40, town 100; Market +50%                                                  |
 | Sites          | iron mine 1 iron/day, ranch 1 horse/day, gold mine 20 gold/day                                                       |
 | Mercenary pay  | per week: 2 × your party's worth (§9)                                                                                |
 | Contracts      | 100–600 gold (§11)                                                                                                   |
+| Raiding        | 6 hours at an enemy village: 100–200 gold and 1–2 of its specialty; it gives nothing for 14 days (relations: §9)     |
 | Lairs, pickups | §4                                                                                                                   |
 | Markets        | buy iron at 30 (5 a week per town), horses at 40 (3 a week; Ulus towns 6 at 30)                                      |
 
 ### Where it goes
 
-| Sink              | Amount                                                                          |
-| ----------------- | ------------------------------------------------------------------------------- |
-| Recruiting        | 10–70 gold a man (`army.md` §3)                                                 |
-| Upgrades          | 20 / 40 / 80 / 150 gold, plus iron and horses                                   |
-| Wages             | weekly, 1 / 2 / 4 / 7 / 12 by tier, ×1.5 mounted; garrisons half; companions 15 |
-| Buildings         | 300–1500 gold and iron (§10)                                                    |
-| Items, companions | 300–3000; 300–800                                                               |
-| Shrine abilities  | 300                                                                             |
+| Sink              | Amount                                              |
+| ----------------- | --------------------------------------------------- |
+| Recruiting        | 10–70 gold a man (`army.md` §3)                     |
+| Upgrades          | `army.md` §3: gold, iron and horses                 |
+| Wages             | weekly, `army.md` §3; garrisons half; companions 15 |
+| Buildings         | 300–1500 gold and iron (§10)                        |
+| Items, companions | 300–3000; 300–800                                   |
+| Shrine abilities  | 300                                                 |
 
 ### The week
 
@@ -282,21 +293,25 @@ tick, buildings progress.
 
 ## 7. Keeping a warband
 
-**Party size** is in `army.md` §6. Over the limit, you can't recruit or take
-prisoners, and pace drops 10%.
+**Party size** is in `army.md` §6. Over the limit (it can happen when the
+limit drops, or troops join from a lair), you can't recruit or upgrade, and
+pace drops 10%.
 
 **Wounded** men (`battle.md` §11) travel with you, are paid, and don't fight.
 They heal 10% of the original count a day (×1.5 resting in a friendly
 settlement; Medicine multiplies).
 
-**Prisoners** ride along (counting half against pace and size) up to half
-your party limit. Sell them at a town's broker, release them (relations with
-their faction +1 per 10), or **recruit** them: after 4 days held (−1 per
-Diplomacy rank) a prisoner stack can be recruited at half the troop's value,
-keeping its tier, no XP.
+**Prisoners** ride along up to half your party limit. They count half
+against pace and not at all against party size, and being over the party
+limit stops recruiting and upgrading, never taking prisoners. Sell them at a
+town's broker, release them (relations with their faction +1 per 10), or
+**recruit** them: after 4 days held (−1 per Diplomacy rank) a prisoner stack
+can be recruited at half the troop's value plus all of its line's iron and
+horses, keeping its tier, no XP. Recruited prisoners can't be delivered for a
+Raise troops contract (§11).
 
 **Party morale** (0–100, base 60) shifts every squad's starting morale in
-battle by `(party morale − 60) / 4`, so ±10 at the extremes.
+battle by `(party morale − 60) / 4`: −15 at 0, +10 at 100.
 
 | Party morale change  | Amount                      |
 | -------------------- | --------------------------- |
@@ -313,7 +328,12 @@ Under 20 at the week's turn, 5% of your tier 1–2 men desert.
 taken. Your surviving troops scatter (lost), your prisoners go free, and you
 are held at the captor's nearest settlement for 3–10 days, then ransomed for
 20% of your gold or escape. You restart from that settlement with your gold,
-items, companions (wounded) and fiefs, and no army. Expensive, never final.
+items, companions (wounded) and fiefs, and no army. Expensive, never final. A
+hero with a mount item escapes the field half the time instead (a Courser
+always).
+
+**A wounded hero** — down in a battle, captured or not — can't use abilities
+until healed: 3 days, 1 with Medicine Expert.
 
 ## 8. Lords and the strategic AI
 
@@ -468,7 +488,7 @@ to go somewhere, and they are template-made.
 | Bounty             | destroy a named brigand party (marked on the map) | 100–300 gold, relation +5      |
 | Clear the lair     | a marked lair                                     | 200–500 gold, relation +5      |
 | Escort             | keep a caravan alive from A to B                  | 150–400 gold                   |
-| Raise troops       | deliver N men of a tier to a lord                 | their value × 1.5, relation +8 |
+| Raise troops       | deliver N men of a tier to a lord                 | their value × 1.1, relation +8 |
 | Defend the village | a raiding party is coming; be there               | 200 gold, relation +10         |
 | Raid               | (vassal or mercenary) raid a named enemy village  | 300 gold, war goes better      |
 | Hunt the beast     | a monster party roams; kill it                    | a rare item                    |
@@ -498,11 +518,11 @@ the rising` (≤ 900) behind level-3 walls. Waiting makes the end harder.
 Three great lairs are revealed on the map at the rising, in three different
 regions, each guarded by its own host and a ring of lesser guards:
 
-| Lair                     | Guard (worth, Normal)             | Gives                                                          |
-| ------------------------ | --------------------------------- | -------------------------------------------------------------- |
-| Barrow of the First King | 180, barrow-wights and their lord | **Sceptre**: Command +2, party +15                             |
-| Wyrm's Hoard             | 260, the Wyrm and its thralls     | **Orb**: +1 ability slot, +2 Valor at the start of each battle |
-| Hall of the Troll-King   | 340, trolls and the Troll-King    | **Great Seal**: +10 with every lord; Call the Banners          |
+| Lair                     | Guard (worth, Normal)                         | Gives                                                          |
+| ------------------------ | --------------------------------------------- | -------------------------------------------------------------- |
+| Barrow of the First King | a barrow lord, 60 barrow-wights, 40 skeletons | **Sceptre**: Command +2, party +15                             |
+| Wyrm's Hoard             | the Wyrm, 2 trolls, 60 thralls                | **Orb**: +1 ability slot, +2 Valor at the start of each battle |
+| Hall of the Troll-King   | the Troll-King, 4 trolls, 80 thralls          | **Great Seal**: +10 with every lord; Call the Banners          |
 
 Only you hunt them; the claimants are too busy with each other. The gate of
 Crownhold is sealed until all three are brought to it.
@@ -521,12 +541,12 @@ over the following weeks of the epilogue.
 
 ### Endings
 
-| Ending             | When                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------ |
-| **Crowned**        | you kill the Hollow King as a free company or a ruler                                                  |
-| **Kingmaker**      | as a vassal, you set the crown on your liege's head                                                    |
-| **Usurper**        | as a vassal, you keep it — and the epilogue says what that costs                                       |
-| **The Long Night** | the Hollow holds a third of the towns and castles (Medium: 7 of 20). Warnings at a sixth and a quarter |
+| Ending             | When                                                                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Crowned**        | you kill the Hollow King as a free company, a mercenary or a ruler                                                            |
+| **Kingmaker**      | as a vassal, you set the crown on your liege's head                                                                           |
+| **Usurper**        | as a vassal, you keep it — and the epilogue says what that costs                                                              |
+| **The Long Night** | the Hollow holds a third of the towns and castles, Crownhold not counted (Medium: 7 of 20). Warnings at a sixth and a quarter |
 
 **Score** = `(20 000 − 60 × day) × difficulty + renown + 100 × fiefs in your
 realm`, at least 0. The best per difficulty is kept on the title screen, the
@@ -560,7 +580,8 @@ the design has already kept.
 | 160 | 115   | 3.5      | 260   | 21         | 1000   | Calling the Banners at Crownhold |
 
 For scale against those: brigands 8–60, lords 65–260, a marshal's army
-300–700, the great lairs 180–340, the Hollow King's host 400–900. A player
+300–700, the great lairs roughly 180–340 (to be measured, §12), the Hollow
+King's host 400–900. A player
 alone does not take Crownhold; a player with allies does. That is the design.
 
 The quiet risks, which the world simulator exists to catch:

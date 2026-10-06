@@ -51,7 +51,8 @@ column comes from `report.mjs` (`battle.md` §10.1). Change one, rerun it.
 
 `dmg` is melee damage per fighting man per round; `mdmg` per missile that
 hits. Speed is metres per second on the battlefield. Shields are the share of
-frontal missile damage blocked when not in melee.
+frontal missile damage blocked when not in melee. Every ranged troop reloads
+in 3 s unless its line says otherwise.
 
 | Troop         | T   | Role   | hp  | atk | def | dmg | armour | shield | speed | morale | special                                                       | worth |
 | ------------- | --- | ------ | --- | --- | --- | --- | ------ | ------ | ----- | ------ | ------------------------------------------------------------- | ----- |
@@ -74,55 +75,75 @@ frontal missile damage blocked when not in melee.
 | Banner Knight | 5   | horse  | 50  | 7   | 6   | 9   | 6      | 0.5    | 9     | 84     | charge 16 · Valemark                                          | 5.59  |
 | Keshig        | 5   | h.arch | 40  | 5   | 5   | 7   | 4      | —      | 11    | 74     | range 65, mdmg 9, acc .55, 16 volleys · Ulus                  | 2.90  |
 
-**How the tiers were built.** Each tier step is +1 atk, +1 def, about +15% hp
-and damage on the role's base, which compounds to roughly ×1.5 fighting power
-per man. Roles then skew it: spears trade damage for a second fighting rank and
+**How the tiers were built.** Each tier step is roughly +1 atk, +1 def and
++15% hp and damage on the role's base (more where the role leans: footmen
++2 atk, men-at-arms +3 def), which compounds to about ×1.5 fighting power per
+man. Roles then skew it: spears trade damage for a second fighting rank and
 antiCav; ranged trade melee for range; horse carry most of their hp on the
 horse and most of their damage in the charge. The first hand-written table
 jumped several factors at once between tiers and produced a knight worth 7
-militia; the formula is what made the ladder even (`theory/` history).
+militia; tuning against the model to a formula is what made the ladder even.
 
-**Worth is a duel number, and it misleads in two known ways** (`battle.md`
-§10.7): it overrates horse, which slaughter archers and militia but lose to
-any braced line, and underrates heavy infantry, whose value is standing in
-front of everyone else. Prices below follow tier, not worth.
+**Worth is a duel number** and only places a troop among its peers: it
+underrates heavy infantry, whose value is standing in front of everyone else.
+Prices are checked against gold and men together (`battle.md` §10.4, rule 1 of
+§10.9).
 
 ## 3. Prices, wages, XP
 
-| Tier | Value (gold) | Upgrade from below | Weekly wage | XP to reach | Ransom |
-| ---- | ------------ | ------------------ | ----------- | ----------- | ------ |
-| 1    | 10           | recruit 10         | 1           | —           | 4      |
-| 2    | 30           | +20                | 2           | 20          | 10     |
-| 3    | 70           | +40                | 4           | 60          | 22     |
-| 4    | 150          | +80                | 7           | 150         | 45     |
-| 5    | 300          | +150               | 12          | 300         | 90     |
+Foot are priced by tier. Mounted troops cost about 1.8× their tier in gold and
+pay double wages: the first draft priced them like foot, and at equal gold the
+knights army beat everything (`battle.md` §10.4). `PRICE` in
+`theory/report.mjs` mirrors this table; change both together.
 
-- **Mounted troops** pay wages ×1.5 (rounded up) and ransom ×1.5.
-- **Recruiting** directly at tier 2 (militia, bowmen) costs 30; squires cost
-  40 and a horse; tier 3 at a Barracks costs 70 plus the line's iron.
-- **Iron and horses** are paid at the upgrade that needs them:
+| Troop         | Upgrade from      | Gold | Iron | Horses | Value | Weekly wage |
+| ------------- | ----------------- | ---- | ---- | ------ | ----- | ----------- |
+| Levy          | recruit (village) | 10   |      |        | 10    | 1           |
+| Militia       | levy              | 20   |      |        | 30    | 2           |
+| Bowman        | levy              | 20   |      |        | 30    | 2           |
+| Footman       | militia           | 40   | 1    |        | 70    | 4           |
+| Spearman      | militia           | 40   | 1    |        | 70    | 4           |
+| Archer        | bowman            | 40   |      |        | 70    | 4           |
+| Man-at-arms   | footman           | 80   | 1    |        | 150   | 7           |
+| Pikeman       | spearman          | 80   | 1    |        | 150   | 7           |
+| Crossbowman   | archer            | 80   | 1    |        | 150   | 7           |
+| Longbowman    | archer            | 170  |      |        | 240   | 7           |
+| Hearthguard   | man-at-arms       | 150  | 2    |        | 300   | 12          |
+| Warden        | longbowman        | 150  |      |        | 390   | 12          |
+| Squire        | recruit (castle)  | 55   |      | 1      | 55    | 4           |
+| Horseman      | squire            | 70   | 1    |        | 125   | 8           |
+| Knight        | horseman          | 145  | 2    | 1      | 270   | 14          |
+| Horse archer  | horseman          | 95   |      |        | 220   | 14          |
+| Banner Knight | knight            | 270  | 2    | 1      | 540   | 24          |
+| Keshig        | horse archer      | 250  | 2    | 1      | 470   | 24          |
 
-| Troop         | Iron | Horses | Note                                |
-| ------------- | ---- | ------ | ----------------------------------- |
-| Footman       | 1    |        | mail                                |
-| Spearman      | 1    |        |                                     |
-| Man-at-arms   | 2    |        | plate; 3 iron in all from levy      |
-| Pikeman       | 1    |        |                                     |
-| Crossbowman   | 2    |        | the bow is steel                    |
-| Squire        |      | 1      |                                     |
-| Horseman      | 1    |        |                                     |
-| Knight        | 2    | 1      | a warhorse; 3 iron, 2 horses in all |
-| Horse archer  |      |        |                                     |
-| Hearthguard   | 2    |        | 5 iron in all                       |
-| Banner Knight | 2    | 1      | 5 iron, 3 horses in all             |
-| Keshig        | 2    | 1      |                                     |
+**Value** is everything paid in gold from a recruit up; iron and horses add up
+the same way (a knight is 3 iron and 2 horses from a squire, a banner knight 5
+and 3). Longbowmen are the one foot exception: at tier price the longbow army
+won 16 of 18 at equal gold, so a lifetime at the butts costs 170.
 
-Gold per militia of worth, for reference: levy 19, militia 32, bowman 28,
-squire 25, archer 45, footman 54, horseman 33, knight 41, crossbowman 73,
-man-at-arms 82, pikeman 91, hearthguard 124. Low tiers are cheap per worth on
-purpose: a starting warband can only afford numbers, and numbers are what
-break (rule 6). Horse look cheap in gold and pay in horses, iron and wages.
-Heavy infantry look dear, and are the strongest doctrine in the armies table.
+| Tier | XP to reach | Ransom |
+| ---- | ----------- | ------ |
+| 2    | 20          | 10     |
+| 3    | 60          | 22     |
+| 4    | 150         | 45     |
+| 5    | 300         | 90     |
+
+Tier 1 ransoms for 4; mounted troops ransom ×1.5.
+
+- **Recruiting** militia and bowmen at a town costs 30; a squire at a castle
+  55 and a horse. A tier-3 recruit at a Barracks costs the line's value and
+  all of its iron and horses (a Barracks horseman needs both).
+- **Recruited prisoners** (`world.md` §7) cost half their value, plus all of
+  their line's iron and horses. Neither path gets round the horse supply.
+
+Gold per militia of worth, iron at 30 and horses at 40: levy 19, bowman 28,
+militia 32, archer 45, squire 61, spearman 72, footman 78, horseman 82,
+crossbowman 88, longbowman 102, knight 114, man-at-arms 115, pikeman 127,
+horse archer 141. Low tiers are cheap per worth on purpose: a starting
+warband can only afford numbers, and numbers are what break (`battle.md`
+§10.9, rule 6). Later the party-size cap binds instead of gold, and the dear
+troops are the ones that fit.
 
 **XP.** Each troop type in your party has one XP pool, as in Mount & Blade.
 When the pool covers the next tier's threshold, that many men can upgrade, for
@@ -140,15 +161,16 @@ handful of tier 5s by the end, not an army of them.
 
 ## 4. Cultures and factions
 
-Four claimants, each the heir of one culture. Their homelands are placed by
-the world generator around the ruined capital (`world.md`).
+Four claimants, each the heir of one culture. Their homelands sit around the
+ruined capital; which one is north and which east changes with the seed
+(`world.md` §1).
 
-| Faction          | Homeland                  | Colour           | Doctrine                                   |
-| ---------------- | ------------------------- | ---------------- | ------------------------------------------ |
-| **Valemark**     | west: plains, farmland    | blue `#5b8def`   | heavy horse, crossbows, a steady foot line |
-| **Fenreach**     | south-west: forest, marsh | green `#4caf6a`  | longbows behind pikes, light horse         |
-| **Kharum Holds** | north: hills, mountains   | ochre `#d08a3c`  | shield infantry and crossbows              |
-| **Ulus**         | east: steppe              | violet `#b46bd6` | horse archers and lancers                  |
+| Faction          | Homeland         | Colour           | Doctrine                                   |
+| ---------------- | ---------------- | ---------------- | ------------------------------------------ |
+| **Valemark**     | plains, farmland | blue `#5b8def`   | heavy horse, crossbows, a steady foot line |
+| **Fenreach**     | forest, marsh    | green `#4caf6a`  | longbows behind pikes, light horse         |
+| **Kharum Holds** | hills, mountains | ochre `#d08a3c`  | shield infantry and crossbows              |
+| **Ulus**         | steppe           | violet `#b46bd6` | horse archers and lancers                  |
 
 What each culture's tree has (✓), lacks (—), or changes:
 
@@ -156,7 +178,7 @@ What each culture's tree has (✓), lacks (—), or changes:
 | ------------ | ------------------------------------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Man-at-arms  | ✓                                                | ✓ −1 def, speed 4.5                                                  | ✓ +1 def                                                                          | —                                                                                 |
 | Pikeman      | ✓                                                | ✓                                                                    | ✓                                                                                 | —                                                                                 |
-| Longbowman   | —                                                | ✓ +10 m range                                                        | —                                                                                 | —                                                                                 |
+| Longbowman   | —                                                | ✓ (the trait gives +10 m range)                                      | —                                                                                 | —                                                                                 |
 | Crossbowman  | ✓                                                | —                                                                    | ✓ +1 armour                                                                       | —                                                                                 |
 | Knight       | ✓                                                | —                                                                    | ✓                                                                                 | ✓ as Lancer: −1 armour, speed 10                                                  |
 | Horse archer | —                                                | —                                                                    | —                                                                                 | ✓                                                                                 |
@@ -173,32 +195,40 @@ Troop names are the culture word plus the generic name ("Vale Footman",
 
 ## 5. The Hollow, brigands, beasts
 
-**The Hollow** (Act II onward; rules in `battle.md` §9). They have no morale;
-they crumble without a captain near. Not yet modelled — the crumble rule needs
-its own measurement.
+**The Hollow** (Act II onward; rules in `battle.md` §9). They have no morale:
+they never waver or rout, and crumble without a captain near. None of this is
+modelled yet, so no Hollow unit has a measured worth; M7 measures them, and
+until then the Hollow's strength in `world.md` is a budget in militia-worth
+spent at these placeholder rates.
 
-| Unit         | Like        | hp   | atk | def | dmg | armour | Notes                                      |
-| ------------ | ----------- | ---- | --- | --- | --- | ------ | ------------------------------------------ |
-| Skeleton     | levy        | 20   | 2   | 2   | 5   | 1      | the bulk; Raise Dead makes more            |
-| Bone archer  | bowman      | 18   | 1   | 1   | 4   | 1      | range 60, mdmg 6, acc .45, 8 volleys       |
-| Wight        | man-at-arms | 40   | 6   | 7   | 9   | 5      | shield .3                                  |
-| Death knight | knight      | 48   | 7   | 6   | 9   | 6      | charge 12, speed 8                         |
-| Wight-lord   | captain     | 150  | 7   | 7   | 20  | 5      | squad of 1–3; binds; Raise Dead            |
-| Hollow King  | boss        | 2000 | 10  | 10  | 120 | 8      | squad of 1; aura +2 atk; his death ends it |
+| Unit         | Like        | hp   | atk | def | dmg | armour | shield | speed | Notes                                            | worth (placeholder) |
+| ------------ | ----------- | ---- | --- | --- | --- | ------ | ------ | ----- | ------------------------------------------------ | ------------------- |
+| Skeleton     | levy        | 20   | 2   | 2   | 5   | 1      | —      | 4     | the bulk; Raise Dead makes more                  | 0.6                 |
+| Bone archer  | bowman      | 18   | 1   | 1   | 4   | 1      | —      | 4     | range 60, mdmg 6, acc .45, reload 3 s, 8 volleys | 0.8                 |
+| Wight        | man-at-arms | 40   | 6   | 7   | 9   | 5      | 0.3    | 4     |                                                  | 2.0                 |
+| Death knight | knight      | 48   | 7   | 6   | 9   | 6      | 0.3    | 8     | charge 12                                        | 3.5                 |
+| Wight-lord   | captain     | 150  | 7   | 7   | 20  | 5      | 0.3    | 4     | squad of 1–3; binds; Raise Dead                  | 15                  |
+| Hollow King  | boss        | 2000 | 10  | 10  | 120 | 8      | 0.5    | 4     | squad of 1; aura +2 atk; his death ends it       | —                   |
 
 **Brigands** use the generic stats under other names: Looter (levy), Brigand
 (militia), Poacher (bowman), Raider (squire), Deserter (footman or
-crossbowman). A **Brigand Chief** leads a banner squad of six militia-grade
-toughs with the stats of a hero's guard.
+crossbowman). A brigand party carries a purse of 20 gold plus 3 a man.
 
-**Beasts** are neutral guards of lairs and wanderers in the wild.
+**Beasts** are neutral guards of lairs and wanderers in the wild. They follow
+the normal morale rules; the barrow's dead follow the Hollow's.
 
-| Beast        | hp   | atk | def | dmg | speed | Notes                                                                       | worth |
-| ------------ | ---- | --- | --- | --- | ----- | --------------------------------------------------------------------------- | ----- |
-| Wolf         | 18   | 4   | 2   | 6   | 12    | charge 4; packs of 3–5 squads                                               | 0.83  |
-| Troll        | 400  | 8   | 6   | 70  | 4     | squads of 1–4, 4 m apart; fear 4                                            | 36    |
-| Wyrm         | 3000 | 10  | 9   | 150 | 5     | squad of 1; fear 8; breath every 2nd round: one squad within 50 m takes 300 | —     |
-| Barrow-wight | 40   | 6   | 7   | 9   | 4     | Hollow rules, but bound to its barrow, not a captain                        | —     |
+| Beast        | hp   | atk | def | dmg | armour | morale | speed | Notes                                                                       | worth |
+| ------------ | ---- | --- | --- | --- | ------ | ------ | ----- | --------------------------------------------------------------------------- | ----- |
+| Wolf         | 18   | 4   | 2   | 6   | 0      | 55     | 12    | charge 4; packs of 3–5 squads                                               | 0.83  |
+| Troll        | 400  | 8   | 6   | 70  | 4      | 90     | 4     | squads of 1–4, 4 m apart, 1 rank; fear 4                                    | 36    |
+| Troll-King   | 900  | 9   | 7   | 100 | 5      | 95     | 4     | squad of 1; fear 6; his trolls +10 morale while he stands                   | —     |
+| Wyrm         | 3000 | 10  | 9   | 150 | 8      | 100    | 5     | squad of 1; fear 8; breath every 2nd round: one squad within 50 m takes 300 | —     |
+| Thrall       | 26   | 3   | 3   | 6   | 1      | 60     | 4.5   | beast-cult militia that serve trolls and the wyrm; immune to fear           | 0.93  |
+| Barrow-wight | 40   | 6   | 7   | 9   | 5      | —      | 4     | Hollow rules, bound to the barrow's lord instead of a captain               | —     |
+| Barrow lord  | 150  | 7   | 7   | 20  | 5      | —      | 4     | a Wight-lord who never leaves his barrow                                    | —     |
+
+Monsters and the Hollow without a measured worth are placed in lairs by
+**composition**, not worth (`world.md` §4, §12); M3 and M7 measure them.
 
 ## 6. The hero
 
@@ -234,7 +264,7 @@ two heroes of the same build differ).
 | Cunning   | every 3 points: +1 Valor maximum; at 9, +1 Valor a round |
 
 A level-25 hero has about +4 atk, +3 def and +6 morale over a level-1 one.
-By §10.5 of `battle.md`, that is worth roughly +40% troops before skills —
+By §10.7 of `battle.md`, that is worth roughly +40% troops before skills —
 the hero matters, but a big army still beats a great hero with a small one.
 
 **Levels.** Each level-up also offers **two skills** — new ones, or a rank up
@@ -252,7 +282,31 @@ amounts (`world.md`). Pacing target: **level 10 around day 50, level 20 around
 day 150.**
 
 **Party size.** `20 + 2 × level + 8 × Leadership rank + renown / 40`, +15
-with the Sceptre. About 30 at the start, 65 by day 60, 110 late.
+with the Sceptre. 22 at the start (30 with Leadership Basic), about 65 by day
+60, 110 late.
+
+**In battle** the hero is one soldier of the banner squad (`battle.md` §6),
+and always the last of it to fall:
+
+| Who       | hp                                     | atk         | def         | dmg | armour | shield | morale | Notes                                                                    |
+| --------- | -------------------------------------- | ----------- | ----------- | --- | ------ | ------ | ------ | ------------------------------------------------------------------------ |
+| Hero      | 60 + 4 × level                         | 6 + level/5 | 6 + level/5 | 10  | 5      | 0.5    | 90     | rounded down; moves at the squad's pace                                  |
+| Companion | as their culture's man-at-arms, +10 hp |             |             |     |        |        |        | wounded, never killed                                                    |
+| Household | as the home culture's footman          |             |             |     |        |        |        | 4 of them when the squad would have fewer; the hero's own, replaced free |
+
+The squad's role is its guards' role, infantry when it has none. Items that
+name the banner squad (Plate of the Vale, the Destrier) apply to every man in
+it.
+
+**Other banner squads.** A **lord** of rank r fights as a hero of level 4r,
+with attributes of r each and a household of 6 + 2r of their culture's best
+tier-4 troops (horse for Valemark and Ulus, foot for Fenreach and Kharum). A
+**brigand chief** is a level-3 hero with six militia.
+
+**A hero for Skirmish** (and anywhere a hero is needed without a campaign) at
+level N has every attribute at 1 + ⌊N / 4⌋; Leadership, Tactics and Offense
+at rank min(3, ⌈N / 8⌉); and the abilities Rally, Hold the Line, their
+culture's, and Inspire from Leadership Advanced.
 
 ## 7. Skills
 
@@ -269,17 +323,17 @@ matter outside battle.
 | Archery       | ranged damage +10 / 20 / 30%; range +0 / 5 / 10 m                                                     | Loose! (Adv)           |
 | Armorer       | damage taken −5 / 10 / 15%                                                                            |                        |
 | Horsemanship  | horse speed +5 / 10 / 15%; charge +15 / 30 / 45%                                                      | Charge! (Adv)          |
-| Logistics     | party pace +10 / 20 / 30%                                                                             |                        |
+| ◆ Logistics   | party pace +10 / 20 / 30%                                                                             |                        |
 | ◆ Pathfinding | terrain cost above 1 reduced 25 / 50 / 75%                                                            |                        |
 | ◆ Scouting    | sight +1 / 2 / 3; see compositions / lords' intents / into forest                                     |                        |
 | ◆ Medicine    | wounded share +15 / 30 / 45%; healing ×1.5 / 2 / 2.5                                                  |                        |
 | Training      | daily XP +1 / 2 / 3 per man, for tiers ≤ 2 / 3 / 4                                                    |                        |
-| Stewardship   | wages −10 / 20 / 30%; fief income +10 / 20 / 30%                                                      |                        |
+| ◆ Stewardship | wages −10 / 20 / 30%; fief income +10 / 20 / 30%                                                      |                        |
 | ◆ Engineering | siege works 1 / 2 / 3 days faster (min 1); own walls +1 level (Exp)                                   |                        |
 | Diplomacy     | relation gains +25 / 50 / 75%; ransoms +20 / 40 / 60%; persuade lords to defect (Exp)                 |                        |
 
 Sizing note: Leadership Expert's +12 morale is, by itself, worth about +22%
-troops (`battle.md` §10.5). That is the strongest single skill, deliberately,
+troops (`battle.md` §10.7). That is the strongest single skill, deliberately,
 and the reason no item gives more than +5 morale.
 
 **Abilities** are listed in `battle.md` §6. Rally, Hold the Line and your
@@ -310,7 +364,7 @@ only the Regalia. Items come from lairs, quests, pickups and town smiths
 | Rouncey                       | mount   | common | party pace +5%                                                                    |
 | Courser                       | mount   | rare   | pace +10%; you always escape capture                                              |
 | Steppe Mare                   | mount   | rare   | pace +10% on plains and steppe; horse archers +1 volley                           |
-| Destrier                      | mount   | relic  | banner squad charges (charge 10)                                                  |
+| Destrier                      | mount   | relic  | banner squad +6 charge if it is horse, +2 atk if it is foot                       |
 | Spyglass                      | trinket | common | sight +1                                                                          |
 | Lucky Coin                    | trinket | common | loot +10%                                                                         |
 | Surgeon's Kit                 | trinket | common | Medicine +1 rank (to Expert at most)                                              |
@@ -332,9 +386,10 @@ wage 15 a week. You can keep **2 + Leadership rank** of them.
 
 A companion does one of two jobs:
 
-- **Party role.** Scout, Surgeon, Engineer or Quartermaster: the party uses
-  their skill if it beats the hero's (◆ in §7; Quartermaster covers
-  Logistics and Stewardship).
+- **Party role.** The party uses a companion's skill when it beats the
+  hero's (◆ in §7): the **Scout** covers Scouting and Pathfinding, the
+  **Surgeon** Medicine, the **Engineer** Engineering, the **Quartermaster**
+  Logistics and Stewardship.
 - **Captain.** Assigned to a squad, they fight in it and give it their trait:
 
 | Trait        | Captained squad gets                                      |

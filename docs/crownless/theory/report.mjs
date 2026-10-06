@@ -1,10 +1,10 @@
 /**
- * Asks the battle model the questions DESIGN.md §5 needs answered, and prints
+ * Asks the battle model the questions ../battle.md needs answered, and prints
  * the tables that went into it.
  *
  *     node docs/crownless/theory/report.mjs            # everything
  *     node docs/crownless/theory/report.mjs worth      # one section:
- *          worth | matrix | armies | scale | mods | length | perf
+ *          worth | matrix | armies | gold | formations | scale | mods | length | perf
  *
  * Read every number as "what the plain AI gets". A player who flanks, holds a
  * charge on braced spears or pulls archers back will do better; the point is
@@ -44,7 +44,7 @@ function worthVs(type, ref) {
   return 30 / lo;
 }
 
-if (want("worth") || want("matrix") || want("armies")) {
+if (want("worth") || want("matrix") || want("armies") || want("gold")) {
   // Militia beat 30 militia at 33, so normalise: militia are worth exactly 1.
   const norm = worthVs("militia", "militia");
   for (const r of PANEL) Wm[r] = worthVs(r, "militia") / norm;
@@ -165,10 +165,115 @@ if (want("armies")) {
   console.log("\nTotal wins (out of " + names.length * SEEDS.length + "):", JSON.stringify(wins));
 }
 
+if (want("formations")) {
+  // Each formation in the situation it exists for, against plain Line.
+  // ../battle.md §2 says what each is for; this says whether it delivers.
+  console.log("\n## Formations — wins of 9 for the first side\n");
+  const SEEDS9 = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const score = (a, b) => {
+    let w = 0;
+    let l = 0;
+    let dead = 0;
+    for (const seed of SEEDS9) {
+      const r = fight([a, b], seed);
+      if (r.winner === 0) w++;
+      else if (r.winner === 1) l++;
+      dead += r.sides[1].dead;
+    }
+    return `${w}/${l}/${SEEDS9.length - w - l} (kills ${Math.round(dead / SEEDS9.length)})`;
+  };
+  const sq = (type, n, formation = "line") => [{ type, n, formation }];
+  const rows = [
+    ["equal numbers, 40 v 40", (t, f) => score(sq(t, 40, f), sq(t, 40))],
+    ["outnumbered, 40 v 56", (t, f) => score(sq(t, 40, f), sq(t, 56))],
+    ["against a charge, 40 v 12 knights", (t, f) => score(sq(t, 40, f), sq("knight", 12))],
+  ];
+  for (const t of ["militia", "footman", "spearman"]) {
+    console.log(`${t}`);
+    for (const [label, run] of rows) {
+      console.log(
+        `  ${padr(label, 36)} line ${padr(run(t, "line"), 18)} wide ${padr(run(t, "wide"), 18)} deep ${run(t, "deep")}`,
+      );
+    }
+  }
+}
+
+// What a soldier costs in gold, with iron at 30 and horses at 40 (the market
+// prices in ../world.md §6). Must match ../army.md §3.
+export const PRICE = {
+  levy: 10,
+  militia: 30,
+  bowman: 30,
+  squire: 55 + 40,
+  footman: 70 + 30,
+  spearman: 70 + 30,
+  archer: 70,
+  horseman: 125 + 30 + 40,
+  manatarms: 150 + 60,
+  pikeman: 150 + 60,
+  longbow: 240,
+  crossbow: 150 + 30,
+  knight: 270 + 90 + 80,
+  horsearcher: 220 + 30 + 40,
+};
+
+if (want("gold")) {
+  // Both limits a real party has: gold, and men (party size, ../army.md §6).
+  // A doctrine that hits the cap first spends less than the budget.
+  const BUDGET = 12000;
+  const CAP = 110;
+  const names = Object.keys(ARMIES);
+  const buy = (name) => {
+    const raw = Object.entries(ARMIES[name]).map(([type, share]) => ({
+      type,
+      n: (BUDGET * share) / PRICE[type],
+    }));
+    const men = raw.reduce((m, s) => m + s.n, 0);
+    const k = men > CAP ? CAP / men : 1;
+    return raw.map((s) => ({ type: s.type, n: Math.max(1, Math.round(s.n * k)) }));
+  };
+  const spent = (a) => a.reduce((g, s) => g + s.n * PRICE[s.type], 0);
+  console.log(
+    `\n## Armies at equal gold — ${BUDGET} a side, at most ${CAP} men (iron 30, horses 40)\n`,
+  );
+  for (const n of names) {
+    const a = buy(n);
+    const worth = a.reduce((m, s) => m + s.n * W[s.type], 0);
+    console.log(
+      `${padr(n, 11)} ${a.map((s) => `${s.n} ${s.type}`).join(", ")}  (${a.reduce((m, s) => m + s.n, 0)} men, worth ${Math.round(worth)}, ${spent(a)} gold)`,
+    );
+  }
+  console.log("\nRow vs column: W/L/D over 3 seeds, then median rounds.\n");
+  console.log(padr("", 11) + names.map((n) => pad(n, 12)).join(""));
+  const wins = Object.fromEntries(names.map((n) => [n, 0]));
+  for (const a of names) {
+    let line = padr(a, 11);
+    for (const c of names) {
+      let w = 0;
+      let l = 0;
+      let d = 0;
+      const rounds = [];
+      for (const seed of SEEDS) {
+        const r = fight([buy(a), buy(c)], seed);
+        if (r.winner === 0) w++;
+        else if (r.winner === 1) l++;
+        else d++;
+        rounds.push(r.rounds);
+      }
+      wins[a] += w;
+      rounds.sort((x, y) => x - y);
+      line += pad(`${w}/${l}/${d} r${rounds[1]}`, 12);
+    }
+    console.log(line);
+  }
+  console.log("\nTotal wins (out of " + names.length * SEEDS.length + "):", JSON.stringify(wins));
+}
+
 if (want("scale")) {
   console.log("\n## Scale — what doubling buys\n");
   console.log("N attackers vs 30 defenders of the same troop: rounds, and each side's");
-  console.log("dead. Lanchester's square law would have 60 lose ~4 men to 30's 30.\n");
+  console.log("dead. To kill 12 of 30, Lanchester's linear law costs 60 men 12 of");
+  console.log("theirs and the square law about 5.\n");
   for (const t of ["militia", "archer", "knight"]) {
     for (const n of [30, 45, 60, 90]) {
       const r = fight([[{ type: t, n }], [{ type: t, n: 30 }]], 1);
@@ -182,7 +287,7 @@ if (want("scale")) {
 if (want("mods")) {
   // What a hero is worth: for each army-wide bonus, how much bigger the plain
   // army has to be to break even with it. This is the exchange rate for
-  // skills, banners and abilities (DESIGN.md §6).
+  // skills, banners and abilities (../battle.md §6, ../army.md §7).
   console.log("\n## Modifiers — each bonus, as the % more troops it is worth\n");
   const base = { footman: 30, spearman: 14, archer: 20, horseman: 10 };
   const army = (k) => Object.entries(base).map(([type, n]) => ({ type, n: Math.round(n * k) }));

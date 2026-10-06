@@ -22,7 +22,9 @@ assume a 390 × 844 phone (iPhone 13) and must still work at 375 × 667.
 
 1. **Reach.** Everything tapped more than once a minute sits in the bottom
    45% of the screen. The top 44 px is the shared HUD (`shared/ui.js`):
-   back link, day and time, gold, iron, horses. Read-only.
+   the back link, then a status line the game writes per screen (day, time
+   and resources on the map; round, Valor and men in battle). Read-only:
+   nothing in it is a button.
 2. **Size.** Touch targets at least 44 × 44 px; primary actions 56 px tall.
    A squad or party smaller than that on screen gets a 44 px hit area around
    its marker.
@@ -192,7 +194,7 @@ money), and open contracts with **Show on map**.
 
 ```
 ┌──────────────────────────────────────┐
-│ ‹   Round 3   Valor ●●●○○○        ⏸   │  HUD
+│ ‹ Round 3  Valor ●●●○○○  ● 145 v ● 91│  HUD, read-only
 ├──────────────────────────────────────┤
 │ ┄┄┄┄┄┄┄┄┄┄ enemy band ┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
 │   ⚑      ⚑        ⚑          ⚑       │
@@ -217,9 +219,12 @@ about 390 × 560 px: 3.9 px a metre, a 40-man squad about 58 × 23 px.
 
 - **Select** with a chip or by tapping a squad on the field. **All** selects
   every squad of yours.
-- **Order** with the middle row. **Advance** and **Charge** then take an
-  optional tap on an enemy squad to target it. With a squad selected, tapping
-  open ground means **Move there**.
+- **Order** with the middle row. **Advance** and **Charge** then let you
+  pick a target: the chip row turns into the enemy's squads, nearest first,
+  so their far wing is never a reach to the top of the screen; tapping an
+  enemy squad on the field works too, and doing neither leaves the role's
+  default target. With a squad selected, tapping open ground means **Move
+  there**.
 - **⋯** holds the rest: formation, fire mode, cycle, skirmish, **Retreat**,
   **Auto finish**.
 - **Go** plays three seconds; its ring fills while it does. **⏯** toggles

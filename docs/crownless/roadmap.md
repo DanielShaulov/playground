@@ -31,13 +31,21 @@ The battle layer as a game on its own: pick two armies, fight. Registered on
 the launcher as Crownless with only Skirmish on its title screen. If nothing
 else were ever built, this should still be worth playing.
 
-Read: `battle.md`, `army.md` §1–4, `ui.md` §1, §5–7, `tech.md`.
+Read: `battle.md`, `army.md` §1–7, `ui.md` §1, §5–7, `tech.md`.
 
-- Scaffold with `npm run new -- crownless "Crownless" "👑" "Raise a warband.
-Take the crown."`.
+- Scaffold it:
+
+  ```sh
+  npm run new -- crownless "Crownless" "👑" "Raise a warband. Take the crown."
+  ```
+
+  and add `test:crownless:*` scripts to `package.json` the way Checkwiz has
+  `test:checkwiz:*`.
+
 - `rules/`: `rng.js`, `data/troops.js` (generic tree, culture variants, the
   elites), `battle.js` ported from the theory model and extended with mixed
-  squads, formations, every order in `battle.md` §5, the banner squad and
+  squads, the Line and Wide formations, every order in `battle.md` §5, the
+  AI's ability policy, the banner squad and
   aura, Valor, and the abilities that don't need the map (Rally, Hold the
   Line, Loose!, Charge!, Inspire, the four culture abilities). `battle-ai.js`
   with the role preferences and one addition: split a squad whose line
@@ -46,8 +54,11 @@ Take the crown."`.
 - `view/`: the battlefield and soldiers, the command bar, deployment,
   continuous play with auto-pause, the result sheet.
 - Skirmish setup: each side picks a culture, a doctrine (the six in
-  `battle.md` §10.3 or random at a worth) and a hero level. Best record: the
-  toughest win, by the odds it was shown at.
+  `battle.md` §10.3 or random at a worth) and a hero level (the template in
+  `army.md` §6). A doctrine is a share of worth by role; where a culture
+  lacks a troop, it fields its nearest one of the same role (Ulus
+  "shieldwall" is footmen and archers). Best record: the toughest win, by the
+  odds it was shown at.
 - `tests/crownless/`: `battle-sim.mjs` (the report, on the real rules — then
   delete `docs/crownless/theory/battle.mjs` and point the docs at it),
   `harness.mjs`, `play.mjs`, `shots.mjs`.
@@ -55,9 +66,10 @@ Take the crown."`.
 Done when:
 
 - `battle-sim` reproduces the model's tables (worth within 10%, the same
-  winner in every counter cell) before any rule is changed; then measures
-  culture variants, mixed squads and the abilities, and `battle.md` §10
-  is regenerated.
+  winner in every counter cell) before any rule is changed — the model is
+  normative until then (`battle.md`, top); then measures culture variants,
+  mixed squads, the hero and each ability in troops, and `battle.md` §10 is
+  regenerated.
 - A Playwright run deploys, gives orders, plays to the end through the bottom
   bar alone, finds the result in the save, and leaves the console clean.
 - Screenshots at 390 × 844 and 375 × 667 show nothing clipped.
@@ -103,7 +115,8 @@ Read: `army.md` §3, §6–9 (companions only as data), `world.md` §4, §6–7.
   capture and ransom of the player.
 - The hero: XP, levels, attributes, skills, the level-up choice, ability
   slots, equipment; shrines, standing stones, markets, smiths.
-- Sites to flag; small and medium lairs.
+- Sites to flag; small and medium lairs, barrows included (their dead follow
+  `battle.md` §9's barrow rule, so they don't wait for M7).
 - The Army and Hero sheets.
 
 Done when:
@@ -129,7 +142,7 @@ Done when, across 50 seeds of 200 days with no player:
 - every faction fights at least two wars, and settlements change hands;
 - no faction holds over 60% of towns and castles at days 100 and 150;
 - no lord is broke or stuck for more than a week;
-- a simulated day costs ≤ 5 ms.
+- a simulated day, battles included, costs ≤ 30 ms (`tech.md` §5).
 
 ## M5 · Sieges and fiefs — 2–3 sessions
 
@@ -138,14 +151,18 @@ Take castles. Hold them.
 Read: `world.md` §10, `battle.md` §8.
 
 - The siege flow: works, starvation, sallies, relief.
-- The assault battle: wall, entries, merlons, the ram.
+- The assault battle: wall, entries, merlons, the ram, and squads routed
+  through entries by waypoints. The Deep and Square formations, which only
+  earn their place here.
 - Fiefs for the player (a free company that takes a castle founds a realm),
   garrisons, buildings. Marshal campaigns for the AI.
 
 Done when:
 
 - `battle-sim` gains assaults: defenders at a ladder hold against about four
-  times their number; a breached gate changes that.
+  times their number; a breached gate changes that; Deep beats Line at an
+  entry, and Square holds spears against horse from every side, or both are
+  cut.
 - `world-sim`: AI armies besiege and take castles at a steady rate; no
   settlement is taken and retaken every week.
 - In the browser: besiege, build ladders, assault, own the castle.
