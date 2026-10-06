@@ -32,6 +32,10 @@ Only touch `shared/` when two or more games genuinely need the same thing. It
 is deliberately small: canvas + loop + input, HUD/overlay chrome, namespaced
 storage, base CSS.
 
+A game too big for one sitting keeps its design in `docs/<id>/` (outside
+`games/`, so `npm run new` can still scaffold it). Crownless is the first:
+read `docs/crownless/README.md` before touching it.
+
 ### Two things that bite
 
 - **Coordinates are CSS pixels** and retina scaling is already applied to the

@@ -52,6 +52,7 @@ worth knowing before you go debugging a red Actions run.
 index.html          launcher — grid of game tiles
 games.js            the registry; add a game here and it appears
 games/<id>/         one folder per game (index.html + game.js)
+docs/<id>/          design docs for games too big to build in one sitting
 shared/
   engine.js         canvas sizing, game loop, pointer input, small math helpers
   ui.js             HUD bar, stat readouts, start/game-over overlays
