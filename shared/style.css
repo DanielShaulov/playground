@@ -49,6 +49,19 @@ body {
   padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
 
+/* On the home screen iOS draws the page from the top of the screen but sizes
+   it as if it started below the status bar: dvh, %, inset: 0 and innerHeight
+   all come up 59px short on a 932px iPhone, leaving a dead band under the
+   game. lvh is the whole screen there. Not in a Safari tab, where lvh would
+   tuck the bottom under the toolbar. iOS sometimes reports the home screen
+   as fullscreen. */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  .app {
+    height: 100vh;
+    height: 100lvh;
+  }
+}
+
 /* --- Top bar (back link + score readouts) --- */
 
 .hud {
