@@ -1,7 +1,9 @@
 /**
  * The living map, run for 200 days on 50 seeds (roadmap.md M2, world.md §5):
  * brigands and wolves spawning, growing, hunting and roaming, and a player
- * who walks from town to town and fights whatever catches them. It fails if
+ * who walks from town to town, recruits and trains whatever they can afford
+ * where they stop, sells prisoners at towns, and fights whatever catches
+ * them. It fails if
  * a party gets stuck where no path leads, a party stands where nothing can,
  * the caps are broken, or a tick or a day goes over its budget (tech.md §5);
  * it reports the rest.
@@ -24,6 +26,14 @@ import {
 } from "../../games/crownless/rules/world.js";
 import { partyWorth } from "../../games/crownless/rules/parties.js";
 import { autoResolve, dismiss } from "../../games/crownless/rules/encounter.js";
+import {
+  placeHere,
+  offersAt,
+  recruit,
+  sellPrisoners,
+  upgradesOf,
+  upgrade,
+} from "../../games/crownless/rules/warband.js";
 import { MAX_BRIGANDS, MAX_WOLVES } from "../../games/crownless/rules/data/parties.js";
 import { CULTURE_IDS } from "../../games/crownless/rules/data/world.js";
 import { dist } from "../../games/crownless/rules/hex.js";
@@ -42,7 +52,19 @@ const fail = (why) => {
 };
 const ticks = [];
 const days = [];
-const tally = { met: 0, won: 0, lost: 0, draw: 0, chiefs: 0, bands: 0, packs: 0, far: 0 };
+const tally = {
+  met: 0,
+  won: 0,
+  lost: 0,
+  draw: 0,
+  taken: 0,
+  chiefs: 0,
+  bands: 0,
+  packs: 0,
+  far: 0,
+  men: 0,
+  gold: 0,
+};
 const pct = (list, p) => list[Math.min(list.length - 1, Math.floor(list.length * p))];
 
 for (let seed = 1; seed <= SEEDS; seed++) {
@@ -57,10 +79,24 @@ for (let seed = 1; seed <= SEEDS; seed++) {
     for (let h = 0; h < 24; h++) {
       if (s.encounter) {
         tally.met++;
-        tally[autoResolve(s, realm).kind]++;
+        const r = autoResolve(s, realm);
+        tally[r.kind]++;
+        if (r.held) tally.taken++;
       }
       if (s.result) dismiss(s);
-      if (!busy(s) && !travelTo(s, towns[(k = (k * 7 + 3) % towns.length)].i)) rest(s);
+      if (!busy(s)) {
+        // Where you stop: hire all you can, sell prisoners at a town, train who's ready.
+        const here = placeHere(s, realm);
+        if (here) {
+          for (const o of offersAt(s, realm, here)) recruit(s, realm, o.type);
+          if (here.kind === "town")
+            for (let j = s.player.party.prisoners.length - 1; j >= 0; j--)
+              sellPrisoners(s, realm, j);
+        }
+        for (const t of [...s.player.party.troops])
+          for (const to of upgradesOf(t.type)) upgrade(s, t.type, to);
+        if (!travelTo(s, towns[(k = (k * 7 + 3) % towns.length)].i)) rest(s);
+      }
       const t0 = performance.now();
       advance(s, realm);
       ticks.push(performance.now() - t0);
@@ -91,6 +127,8 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   tally.bands += s.parties.filter((p) => p.kind === "brigands").length;
   tally.packs += s.parties.filter((p) => p.kind === "wolves").length;
   tally.chiefs += s.parties.filter((p) => p.chief).length;
+  tally.men += s.player.party.troops.reduce((m, t) => m + t.n, 0);
+  tally.gold += s.player.gold;
   if (seed === 1) {
     const worths = s.parties
       .filter((p) => p.kind === "brigands")
@@ -105,7 +143,10 @@ const ms = (v) => `${v.toFixed(2)} ms`;
 console.log(`\n${SEEDS} seeds × ${DAYS} days, the player fighting whatever catches them\n`);
 console.log(
   `meetings ${tally.met} (${(tally.met / SEEDS).toFixed(1)} a campaign): ` +
-    `won ${tally.won}, lost ${tally.lost}, drawn ${tally.draw}`,
+    `won ${tally.won}, lost ${tally.lost} (taken ${tally.taken}), drawn ${tally.draw}`,
+);
+console.log(
+  `your party at the end, on average: ${(tally.men / SEEDS).toFixed(1)} men, ${Math.round(tally.gold / SEEDS)} gold`,
 );
 console.log(
   `at the end, on average: ${(tally.bands / SEEDS).toFixed(1)} bands (${(tally.chiefs / SEEDS).toFixed(1)} with chiefs), ` +

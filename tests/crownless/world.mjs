@@ -66,10 +66,11 @@ import {
   autoResolve,
   dismiss,
   encounterBattle,
+  strength,
 } from "../../games/crownless/rules/encounter.js";
 import { autoFinish, aftermath } from "../../games/crownless/rules/battle.js";
 import { purseOf, brigandWorth, VALUE } from "../../games/crownless/rules/data/parties.js";
-import { worthOf } from "../../games/crownless/rules/data/troops.js";
+import { worthOf, troop } from "../../games/crownless/rules/data/troops.js";
 import {
   CAMPAIGN_V,
   readCampaign,
@@ -86,6 +87,36 @@ import {
   REGIONS,
 } from "../../games/crownless/rules/data/world.js";
 import { startingHero } from "../../games/crownless/rules/data/hero.js";
+import {
+  upgradesOf,
+  xpNext,
+  lineOf,
+  offersAt,
+  recruit,
+  stockAt,
+  placeHere,
+  weekTurn,
+  dayTurn,
+  marketAt,
+  buy,
+  mercenaryOf,
+  upgradeRoom,
+  upgrade,
+  fightXp,
+  moraleOf,
+  cheer,
+  ransomOf,
+  sellPrisoners,
+  releasePrisoners,
+  prisonerRoom,
+  recruitPrisoners,
+  freeArms,
+  takePrisoners,
+  wagesOf,
+  release,
+} from "../../games/crownless/rules/warband.js";
+import { PRICE, FROM } from "../../games/crownless/rules/data/warband.js";
+import { roll } from "../../games/crownless/rules/rng.js";
 
 let failed = 0;
 let total = 0;
@@ -1209,9 +1240,10 @@ function meeting(troops, kind = "brigands", by = "them", seed = 99) {
   );
 }
 {
-  // A fight you lose: 12 levies against 40 brigands, two hexes out.
+  // A fight you lose: 12 levies against 40 brigands, two hexes out, with 3 prisoners in tow.
   const { s, pt } = meeting([["militia", 40]]);
   s.player.at.i = plainsAway(s, 2);
+  s.player.party.prisoners = [{ type: "levy", n: 3, since: s.t }];
   const gold = s.player.gold;
   const r = autoResolve(s);
   const realm = realmOf(s);
@@ -1220,21 +1252,106 @@ function meeting(troops, kind = "brigands", by = "them", seed = 99) {
     ...realm.places.filter((p) => p.kind === "village").map((p) => dist(realm.grid, p.i, pt.at.i)),
   );
   check(
-    "a defeat: 12 fresh levies at the nearest village, your gold kept",
+    "a defeat by brigands: the warband scatters, the prisoners go free, and they hold you 3–10 days at the nearest village",
     r.kind === "lost" &&
       village?.kind === "village" &&
       s.player.at.i === village.i &&
       dist(realm.grid, village.i, pt.at.i) === nearest &&
-      JSON.stringify(s.player.party.troops) ===
-        JSON.stringify([{ type: "vale:levy", n: 12, xp: 0, wounded: 0 }]) &&
-      s.player.gold === gold,
-    r.at,
+      s.player.party.troops.length === 0 &&
+      s.player.party.prisoners.length === 0 &&
+      s.player.gold === gold &&
+      r.held >= 3 &&
+      r.held <= 10 &&
+      s.player.captive?.until === s.t + 24 * r.held,
+    `${r.at}, ${r.held} days`,
   );
   check(
     "…and the band lets you be for a day",
     s.truce[pt.id] === s.t + 24 && s.parties.includes(pt),
   );
   check("a band that's fought you no longer spares an outlaw", s.player.provoked === true);
+  check("a defeat sinks morale 15: 45", moraleOf(s.player) === 45);
+  dismiss(s);
+  const until = s.player.captive.until;
+  const ransom = s.player.captive.ransom;
+  check(
+    "held, you can't travel or rest, but time runs",
+    !travelTo(s, plainsAway(s, 2)) && !rest(s) && busy(s),
+  );
+  check(
+    "…nor recruit at the village you're held at",
+    placeHere(s, realm) === null && recruit(s, realm, "vale:levy") === 0,
+  );
+  {
+    // A band already on its way to you, half a hex out, when you're taken.
+    const h = structuredClone(s);
+    const nb = neighbours(realm.grid, h.player.at.i).find((j) => realm.terrain[j] === T.plains);
+    putParty(h, nb, "brigands", [["militia", 30]], {
+      at: { i: nb, to: h.player.at.i, progress: 0.5 },
+      goal: "hunt",
+    });
+    advance(h);
+    check("a band already coming for you when you're taken doesn't meet you", !h.encounter);
+  }
+  putParty(s, plainsAway(s, 1), "brigands", [["militia", 30]]);
+  const ev = play(s, 24 * 11);
+  const freed = ev.find((e) => e.k === "freed");
+  check(
+    `nobody meets you while you're held; on day ${dayOf(until)} you're ${ransom ? "ransomed for a fifth of your gold" : "away, having escaped"}`,
+    !ev.some((e) => e.k === "encounter" || (e.k === "spotted" && e.t < until)) &&
+      freed?.t === until &&
+      !s.player.captive &&
+      !busy(s) &&
+      s.player.gold === gold - (ransom ? Math.floor(gold / 5) : 0) &&
+      freed.gold === (ransom ? Math.floor(gold / 5) : 0),
+    `${freed?.t} ${until}`,
+  );
+  // Ransomed or escaped, even odds; held 3 to 10 days.
+  let ransomed = 0;
+  const days = new Set();
+  for (let k = 0; k < 40; k++) {
+    const m = meeting([["militia", 40]]);
+    for (let j = 0; j < k; j++) roll(m.s);
+    const mr = autoResolve(m.s);
+    if (m.s.player.captive.ransom) ransomed++;
+    days.add(mr.held);
+  }
+  // Half of 40 is 20, give or take 3: 12–28 is two and a half spreads either way.
+  check(
+    `over 40 defeats, about half are ransomed (${ransomed}) and the rest escape, held 3 to 10 days`,
+    ransomed >= 12 &&
+      ransomed <= 28 &&
+      Math.min(...days) >= 3 &&
+      Math.max(...days) <= 10 &&
+      days.size >= 5,
+    [...days].sort((a, b) => a - b).join(","),
+  );
+  const fifth = (ransom) => {
+    const t = lone();
+    t.player.gold = 1000;
+    t.player.captive = { by: "Test band", until: t.t, ransom };
+    return [release(t), t.player.gold, t.player.captive];
+  };
+  check(
+    "ransomed: 200 of your 1000 gold; escaped: none of it",
+    JSON.stringify(fifth(true)) === "[200,800,null]" &&
+      JSON.stringify(fifth(false)) === "[0,1000,null]",
+  );
+}
+{
+  // Wolves don't take prisoners.
+  const { s } = meeting([["wolf", 40]], "wolves");
+  const r = autoResolve(s);
+  check(
+    "a defeat by wolves: the warband scatters and you get away to the village alone, held by nobody",
+    r.kind === "lost" && r.held === 0 && !s.player.captive && s.player.party.troops.length === 0,
+  );
+}
+{
+  // No fit men, no rearguard.
+  const { s } = meeting([["militia", 20]]);
+  s.player.party.troops[0].wounded = 12;
+  check("with no fit men there's no rearguard to leave", choices(s).rearguard === false);
 }
 {
   // Chasing: Attack a band in sight and you catch it, unless it runs.
@@ -1387,6 +1504,552 @@ function meeting(troops, kind = "brigands", by = "them", seed = 99) {
   );
 }
 
+// --- The warband ----------------------------------------------------------------
+
+console.log("\n# The warband: recruits, wages, XP, prisoners (world.md §4, §6–7; army.md §3)\n");
+/** You, alone on the map, standing in `place` with `troops` and `gold`. */
+function standAt(place, troops = [["vale:levy", 12]], gold = 500) {
+  const s = lone();
+  s.player.at = { i: place.i, to: -1, progress: 0 };
+  s.player.party.troops = troops.map(([type, n, xp = 0, wounded = 0]) => ({
+    type,
+    n,
+    xp,
+    wounded,
+  }));
+  s.player.gold = gold;
+  return s;
+}
+const realm7 = realmOf(fresh());
+const placeOf = (kind, culture) =>
+  realm7.places.find((p) => p.kind === kind && (!culture || p.culture === culture));
+const stacks = (s) => Object.fromEntries(s.player.party.troops.map((t) => [t.type, t.n]));
+{
+  check(
+    "the tree: a levy goes up to militia or bowman; a militia to footman or spearman",
+    upgradesOf("vale:levy").join() === "vale:militia,vale:bowman" &&
+      upgradesOf("vale:militia").join() === "vale:footman,vale:spearman",
+  );
+  check(
+    "each culture's own branches: Vale archers become crossbowmen, Fen archers longbowmen, and only Fen longbows become Wardens",
+    upgradesOf("vale:archer").join() === "vale:crossbow" &&
+      upgradesOf("fen:archer").join() === "fen:longbow" &&
+      upgradesOf("fen:longbow").join() === "fen:warden" &&
+      upgradesOf("hold:crossbow").join() === "",
+  );
+  check(
+    "where a culture lacks the next step, the line ends: Fen horsemen, Ulus footmen, Vale men-at-arms",
+    upgradesOf("fen:horseman").length === 0 &&
+      upgradesOf("ulus:footman").length === 0 &&
+      upgradesOf("vale:manatarms").length === 0 &&
+      upgradesOf("hold:manatarms").join() === "hold:hearthguard",
+  );
+  check(
+    "the steppe's horse: horsemen become lancers or horse archers, horse archers Keshig",
+    upgradesOf("ulus:horseman").join() === "ulus:knight,ulus:horsearcher" &&
+      upgradesOf("ulus:horsearcher").join() === "ulus:keshig",
+  );
+  check(
+    "XP to go up: 20 to militia, 60 to footman, 150 to man-at-arms, 300 to hearthguard; nothing past the top",
+    xpNext("vale:levy") === 20 &&
+      xpNext("vale:militia") === 60 &&
+      xpNext("hold:footman") === 150 &&
+      xpNext("hold:manatarms") === 300 &&
+      xpNext("hold:hearthguard") === 0,
+  );
+  const lines = Object.keys(PRICE).every(
+    (t) => PRICE[t].value === PRICE[t].gold + (FROM[t] ? PRICE[FROM[t]].value : 0),
+  );
+  check("every troop's value is the gold of its whole line (army.md §3's Value column)", lines);
+  const k = lineOf("vale:knight");
+  const bk = lineOf("vale:bannerknight");
+  check(
+    "a knight's line is 3 iron and 2 horses, a banner knight's 5 and 3",
+    k.iron === 3 && k.horses === 2 && bk.iron === 5 && bk.horses === 3,
+  );
+}
+{
+  // Recruiting at the start village: 12 levies, room for 10 more.
+  const home = realm7.places[realm7.starts.vale];
+  const s = standAt(home);
+  const [o] = offersAt(s, realmOf(s), home);
+  check(
+    "a village raises levies of its culture at 10 gold: 12 in the pool, room for 10 (limit 22 at level 1)",
+    o.type === "vale:levy" && o.left === 12 && o.cost.gold === 10 && o.n === 10 && o.why === "room",
+    JSON.stringify(o),
+  );
+  check(
+    "recruit them all: 10 join, 100 gold paid, 2 left in the pool",
+    recruit(s, realmOf(s), "vale:levy") === 10 &&
+      stacks(s)["vale:levy"] === 22 &&
+      s.player.gold === 400 &&
+      stockAt(s, realmOf(s), home)["vale:levy"] === 2,
+  );
+  check(
+    "at the party limit, no more",
+    recruit(s, realmOf(s), "vale:levy") === 0 && offersAt(s, realmOf(s), home)[0].why === "room",
+  );
+  check(
+    "off a settlement, nobody to recruit",
+    (() => {
+      const t = structuredClone(s);
+      t.player.at = { i: plainsAway(t, 2), to: -1, progress: 0 };
+      return placeHere(t, realmOf(t)) === null && recruit(t, realmOf(t), "vale:levy") === 0;
+    })(),
+  );
+  check(
+    "half a step out of the village, nobody either",
+    (() => {
+      const t = structuredClone(s);
+      t.player.at = { i: home.i, to: neighbours(realm7.grid, home.i)[0], progress: 0.5 };
+      return placeHere(t, realmOf(t)) === null;
+    })(),
+  );
+  // A week on: wages for 22 levies, and the pool up 3.
+  const r = realmOf(s);
+  const week = weekTurn(s, r);
+  check(
+    "the week's turn: 22 levies' wages, 22 gold; the pool refills by 3 to 5",
+    week.due === 22 &&
+      week.paid === 22 &&
+      s.player.gold === 378 &&
+      stockAt(s, r, home)["vale:levy"] === 5,
+    JSON.stringify(week),
+  );
+  for (let w = 0; w < 3; w++) weekTurn(s, r);
+  check(
+    "pools fill to 12 and no further, and a full pool drops out of the save",
+    stockAt(s, r, home)["vale:levy"] === 12 && s.stock[home.id] === undefined,
+  );
+}
+{
+  // A town: militia and bowmen; a castle: squires and a horse each.
+  const town = placeOf("town", "vale");
+  const s = standAt(town, [], 1000);
+  const offers = offersAt(s, realmOf(s), town);
+  check(
+    "a town raises militia and bowmen at 30, 8 of each",
+    offers.map((o) => `${o.type} ${o.left} ${o.cost.gold}`).join() ===
+      "vale:militia 8 30,vale:bowman 8 30",
+  );
+  const castle = placeOf("castle", "vale");
+  const c = standAt(castle, [], 1000);
+  const [sq] = offersAt(c, realmOf(c), castle);
+  check(
+    "a castle raises 4 squires at 55 gold and a horse; with no horses, none",
+    sq.type === "vale:squire" &&
+      sq.left === 4 &&
+      sq.cost.gold === 55 &&
+      sq.cost.horses === 1 &&
+      sq.n === 0 &&
+      sq.why === "horses",
+  );
+  c.player.horses = 3;
+  check(
+    "with 3 horses, 3 squires",
+    recruit(c, realmOf(c), "vale:squire") === 3 && c.player.horses === 0 && c.player.gold === 835,
+  );
+  const ulus = placeOf("town", "ulus");
+  const u = standAt(ulus, [], 1000);
+  check(
+    "an Ulus town raises squires too",
+    offersAt(u, realmOf(u), ulus)
+      .map((o) => o.type)
+      .join() === "ulus:militia,ulus:bowman,ulus:squire",
+  );
+  // The market.
+  const m = marketAt(s, realmOf(s), town);
+  check(
+    "a town's market: iron at 30 (5 a week), horses at 40 (3 a week)",
+    m.map((x) => `${x.what} ${x.price} ${x.left}`).join() === "iron 30 5,horses 40 3",
+  );
+  check(
+    "buy all the iron: 5 for 150",
+    buy(s, realmOf(s), "iron") === 5 &&
+      s.player.iron === 5 &&
+      s.player.gold === 850 &&
+      marketAt(s, realmOf(s), town)[0].why === "left",
+  );
+  weekTurn(s, realmOf(s));
+  check(
+    "a week on, the market has its 5 iron again",
+    marketAt(s, realmOf(s), town)[0].left === 5 && s.stock[town.id] === undefined,
+  );
+  const um = marketAt(u, realmOf(u), ulus);
+  check("an Ulus market sells 6 horses at 30", um[1].price === 30 && um[1].left === 6);
+  check(
+    "a village has no market",
+    marketAt(standAt(placeOf("village")), realm7, placeOf("village")).length === 0,
+  );
+  // A mercenary camp.
+  const camp = placeOf("camp");
+  const mc = standAt(camp, [], 2000);
+  const [mo] = offersAt(mc, realmOf(mc), camp);
+  const t = mercenaryOf(realm7, camp);
+  check(
+    `a mercenary camp sells one tier 3–4 troop at 2.5× value, 6 of them: here ${t} at ${mo.cost.gold}`,
+    mo.type === t &&
+      [3, 4].includes(troop(t).tier) &&
+      mo.cost.gold === Math.ceil(2.5 * PRICE[troop(t).type].value) &&
+      mo.cost.iron === 0 &&
+      mo.cost.horses === 0 &&
+      mo.left === 6 &&
+      mercenaryOf(realmOf(fresh()), camp) === t,
+  );
+  const camps = realm7.places.filter((q) => q.kind === "camp");
+  const sold = camps.map((q) => mercenaryOf(realm7, q));
+  check(
+    `each camp its own troop: ${sold.join(", ")}`,
+    camps.length > 1 && new Set(sold).size === camps.length,
+  );
+}
+{
+  // XP and upgrades.
+  const home = realm7.places[realm7.starts.vale];
+  const s = standAt(home, [["vale:levy", 12, 100]], 500);
+  const room = upgradeRoom(s, "vale:levy", "vale:militia");
+  check(
+    "12 levies with 100 XP between them: 5 can become militia (20 each), held back by XP",
+    room.n === 5 && room.why === "xp" && room.cost.gold === 20,
+    JSON.stringify(room),
+  );
+  check(
+    "upgrade them: 5 militia, 7 levies, 100 gold and all the XP spent",
+    upgrade(s, "vale:levy", "vale:militia") === 5 &&
+      stacks(s)["vale:levy"] === 7 &&
+      stacks(s)["vale:militia"] === 5 &&
+      s.player.gold === 400 &&
+      s.player.party.troops[0].xp === 0,
+  );
+  s.player.party.troops.find((t) => t.type === "vale:militia").xp = 300;
+  const fm = upgradeRoom(s, "vale:militia", "vale:footman");
+  check("militia to footman needs iron: none, so none", fm.n === 0 && fm.why === "iron");
+  s.player.iron = 2;
+  check(
+    "with 2 iron, 2 footmen (40 gold and an iron each)",
+    upgrade(s, "vale:militia", "vale:footman") === 2 &&
+      s.player.iron === 0 &&
+      s.player.gold === 320,
+  );
+  const w = standAt(home, [["vale:levy", 12, 240, 9]]);
+  check(
+    "only fit men go up: 3 of 12, with 9 wounded",
+    upgradeRoom(w, "vale:levy", "vale:militia").n === 3 &&
+      upgradeRoom(w, "vale:levy", "vale:militia").why === "wounded",
+  );
+  check(
+    "a stack's XP is never more than its men can use",
+    (() => {
+      const t = standAt(home, [["vale:levy", 4]]);
+      fightXp(t.player, {
+        fought: { "vale:levy": 4 },
+        killed: {},
+        beaten: 100,
+        fielded: 1,
+        won: true,
+      });
+      return t.player.party.troops[0].xp === 80;
+    })(),
+  );
+  check(
+    "no going up off the tree: levy to footman",
+    upgradeRoom(s, "vale:levy", "vale:footman").why === "none" &&
+      upgrade(s, "vale:levy", "vale:footman") === 0,
+  );
+  const full = standAt(home, [["vale:levy", 22, 440]]);
+  check(
+    "at the party limit, not over it (22 of 22): all 22 can go up, and morale is 60",
+    upgradeRoom(full, "vale:levy", "vale:militia").n === 22 && moraleOf(full.player) === 60,
+  );
+  const over = standAt(home, [["vale:levy", 30, 600]]);
+  check(
+    "over the party limit (30 of 22), no upgrades",
+    upgradeRoom(over, "vale:levy", "vale:militia").why === "limit",
+  );
+  // The XP a fight gives a man.
+  const xp = (beaten, fielded, won) => {
+    const t = standAt(home, [["vale:levy", 10]]);
+    return fightXp(t.player, {
+      fought: { "vale:levy": 10 },
+      killed: { "vale:levy": 4 },
+      beaten,
+      fielded,
+      won,
+    });
+  };
+  check(
+    "a man's XP from a fight: 12 for a fair win, 6 for half, 2 at least, 40 at most, 30% of it not won",
+    xp(10, 10, true) === 12 &&
+      xp(5, 10, true) === 6 &&
+      xp(1, 10, true) === 2 &&
+      xp(100, 10, true) === 40 &&
+      xp(10, 10, false) === 3.6,
+  );
+  const f = standAt(home, [["vale:levy", 10]]);
+  fightXp(f.player, {
+    fought: { "vale:levy": 10 },
+    killed: { "vale:levy": 4 },
+    beaten: 10,
+    fielded: 10,
+    won: true,
+  });
+  check("only the men who lived get it: 6 × 12 = 72", f.player.party.troops[0].xp === 72);
+}
+{
+  // A won fight, auto-resolved: XP from the battle's own strengths.
+  const { s } = meeting([["levy", 6]], "brigands", "you");
+  s.player.party.troops = [{ type: "vale:militia", n: 20, xp: 0, wounded: 4 }];
+  const b = encounterBattle(s);
+  const mine = strength(b, 0).worth;
+  const theirs = strength(b, 1).worth;
+  const each = Math.round(Math.min(40, Math.max(2, (12 * theirs) / mine)) * 10) / 10;
+  const r = autoResolve(s);
+  const left = s.player.party.troops[0];
+  check(
+    `beating 6 looters with 16 fit militia: ${each} XP a man who fought and lived (12 × ${theirs.toFixed(1)} / ${mine.toFixed(1)}, at least 2), none for the 4 wounded`,
+    r.kind === "won" && r.xp === each && near(left.xp, each * (16 - r.killed)),
+    `${r.kind} ${r.xp} ${left.xp}`,
+  );
+  check("a victory lifts morale 10: 70", moraleOf(s.player) === 70);
+}
+{
+  // A draw: XP for the enemy beaten, those they lost, not all they brought.
+  const { s } = meeting([["wolf", 10]], "wolves", "them", 2);
+  const b = encounterBattle(s);
+  const mine = strength(b, 0).worth;
+  const lost = aftermath(autoFinish(encounterBattle(structuredClone(s))), {
+    worthOf,
+    medicine: [0, 0],
+  })[1];
+  let beaten = 0;
+  for (const m of [lost.killed, lost.wounded, lost.captured])
+    for (const [t, n] of Object.entries(m)) beaten += n * worthOf(t);
+  const each = Math.round(0.3 * Math.min(40, Math.max(2, (12 * beaten) / mine)) * 10) / 10;
+  const r = autoResolve(s);
+  check(
+    `a draw with 10 wolves: 30% of 12 × the ${beaten.toFixed(1)} worth of wolves beaten / ${mine.toFixed(1)}, ${each} a man`,
+    r.kind === "draw" && r.xp === each && beaten < strength(b, 1).worth,
+    `${r.kind} ${r.xp}`,
+  );
+}
+{
+  // Morale.
+  const s = lone();
+  const p = s.player;
+  check("party morale starts at 60", moraleOf(p) === 60);
+  cheer(p, "won");
+  dayTurn(s, realmOf(s));
+  check("a victory, one midnight later: 68", moraleOf(p) === 68);
+  const k = newCampaign({ seed: 7, culture: "vale", background: "knight" });
+  check("Leadership Basic: 65", moraleOf(k.player) === 65);
+  k.player.party.troops[0].n = 40;
+  check("over the party limit: 10 less", moraleOf(k.player) === 55);
+  for (let k = 0; k < 5; k++) cheer(p, "lost");
+  check("never below 0", moraleOf(p) === 0);
+}
+{
+  // Wages, the wounded's too, and the week's turn on the clock.
+  const home = realm7.places[realm7.starts.vale];
+  const s = standAt(home, [["vale:levy", 12, 0, 5]], 100);
+  check("12 levies, 5 of them wounded: 12 gold a week", wagesOf(s.player) === 12);
+  s.t = 2 * HOURS_A_WEEK - 1;
+  const ev = advance(s);
+  check(
+    "the hour the week turns, the wages leave: 12 of 100 gold, and the Journal says so",
+    s.player.gold === 88 &&
+      ev.some((e) => e.k === "week" && e.paid === 12) &&
+      s.journal.at(-1)?.k === "week",
+    `${s.player.gold}`,
+  );
+}
+{
+  // Unpaid wages and low morale.
+  const home = realm7.places[realm7.starts.vale];
+  const s = standAt(
+    home,
+    [
+      ["vale:levy", 12],
+      ["vale:militia", 10],
+    ],
+    10,
+  );
+  const r = realmOf(s);
+  const week = weekTurn(s, r);
+  // Wages 12 + 20 = 32; 10 paid; 22 men × 22/32 unpaid = 15.1 → 16; a tenth → 2, levies first.
+  check(
+    "short of wages: 10 of 32 paid, morale −20, 2 of 16 unpaid men desert, levies first",
+    week.due === 32 &&
+      week.paid === 10 &&
+      s.player.gold === 0 &&
+      week.deserted === 2 &&
+      stacks(s)["vale:levy"] === 10 &&
+      stacks(s)["vale:militia"] === 10 &&
+      moraleOf(s.player) === 40,
+    JSON.stringify(week),
+  );
+  const low = standAt(
+    home,
+    [
+      ["vale:levy", 12],
+      ["vale:footman", 10],
+    ],
+    1000,
+  );
+  low.player.mood = -45;
+  const lw = weekTurn(low, r);
+  check(
+    "morale under 20 at the week's turn: 5% of the tier 1–2 men desert, ceil 0.6 = 1 levy",
+    lw.deserted === 1 && stacks(low)["vale:levy"] === 11 && stacks(low)["vale:footman"] === 10,
+  );
+}
+{
+  // Healing: a tenth a day, ×1.5 in a settlement, × Medicine.
+  const healed = (place, medicine = 0) => {
+    const s = place ? standAt(place, [["vale:levy", 20, 0, 10]]) : lone();
+    if (!place) {
+      s.player.party.troops = [{ type: "vale:levy", n: 20, xp: 0, wounded: 10 }];
+      s.player.at = { i: plainsAway(s, 2), to: -1, progress: 0 };
+    }
+    s.player.hero.medicine = medicine;
+    dayTurn(s, realmOf(s));
+    return s.player.party.troops[0].wounded;
+  };
+  const home = realm7.places[realm7.starts.vale];
+  check(
+    "10 wounded of 20 heal 2 a night in the open, 3 in a village, 3 with Medicine, 5 with both",
+    healed(null) === 8 && healed(home) === 7 && healed(null, 1) === 7 && healed(home, 1) === 5,
+    `${healed(null)} ${healed(home)} ${healed(null, 1)} ${healed(home, 1)}`,
+  );
+}
+{
+  // Prisoners: sold at a town, recruited after four days.
+  const town = placeOf("town", "vale");
+  const s = standAt(town, [["vale:levy", 10]], 100);
+  s.player.party.prisoners = [
+    { type: "militia", n: 6, since: s.t },
+    { type: "squire", n: 2, since: s.t },
+  ];
+  check(
+    "ransoms: 10 a brigand (tier 2), 15 a raider (mounted, ×1.5), 4 a looter",
+    ransomOf(s.player, "militia") === 10 &&
+      ransomOf(s.player, "squire") === 15 &&
+      ransomOf(s.player, "levy") === 4,
+  );
+  const dip = structuredClone(s);
+  dip.player.hero.diplomacy = 2;
+  check(
+    "Diplomacy Expert: ransoms +40%, 14 a brigand, 21 a raider",
+    ransomOf(dip.player, "militia") === 14 && ransomOf(dip.player, "squire") === 21,
+  );
+  const v = structuredClone(s);
+  v.player.at.i = realm7.places[realm7.starts.vale].i;
+  check("no broker at a village", sellPrisoners(v, realmOf(v), 0) === 0);
+  const pr = prisonerRoom(s, 0);
+  check(
+    "brigands can't be recruited yet: ready 4 days after they were taken",
+    pr.n === 0 && pr.why === "days" && pr.ready === s.t + 96 && pr.as === "vale:militia",
+  );
+  s.t += 96;
+  const ready = prisonerRoom(s, 0);
+  check(
+    "four days on: they'd join as Vale militia at 15 gold each (half of 30), 6 of them",
+    ready.n === 6 && ready.cost.gold === 15,
+  );
+  check(
+    "a raider joins as a squire for 28 gold and the horse of its line",
+    prisonerRoom(s, 1).cost.gold === 28 &&
+      prisonerRoom(s, 1).cost.horses === 1 &&
+      prisonerRoom(s, 1).why === "horses",
+  );
+  check(
+    "recruit 4 of the brigands: 60 gold, 2 still held",
+    recruitPrisoners(s, 0, 4) === 4 &&
+      s.player.gold === 40 &&
+      stacks(s)["vale:militia"] === 4 &&
+      s.player.party.prisoners[0].n === 2,
+  );
+  check(
+    "sell the rest at the town's broker: 2 × 10 + 2 × 15 = 50",
+    sellPrisoners(s, realmOf(s), 1) === 30 &&
+      sellPrisoners(s, realmOf(s), 0) === 20 &&
+      s.player.gold === 90 &&
+      s.player.party.prisoners.length === 0,
+  );
+  const crowded = standAt(town, [["vale:levy", 20]], 1000);
+  crowded.player.party.prisoners = [{ type: "militia", n: 6, since: crowded.t - 96 }];
+  const cr = prisonerRoom(crowded, 0);
+  check("with 20 of 22, only 2 of 6 ready prisoners can join", cr.n === 2 && cr.why === "room");
+  const taken = lone();
+  takePrisoners(taken, { militia: 2 });
+  taken.t += 1;
+  takePrisoners(taken, { militia: 3 });
+  takePrisoners(taken, { militia: 1 });
+  check(
+    "each hour's prisoners are a stack of their own, held from then: 2 militia, then 4",
+    taken.player.party.prisoners.map((x) => `${x.n}@${x.since - lone().t}`).join() === "2@0,4@1",
+  );
+  const rel = standAt(town);
+  rel.player.party.prisoners = [{ type: "levy", n: 5, since: rel.t }];
+  check(
+    "release them, and they're gone",
+    releasePrisoners(rel, 0) === 5 && rel.player.party.prisoners.length === 0,
+  );
+}
+{
+  // Abandoned arms.
+  const s = lone();
+  const p = s.player;
+  p.party.troops = [
+    { type: "vale:militia", n: 4, xp: 0, wounded: 0 },
+    { type: "vale:levy", n: 3, xp: 0, wounded: 1 },
+  ];
+  const up = freeArms(p);
+  check(
+    "abandoned arms: 5 men up a tier for nothing, the lowest first and only the fit (2 levies, then 3 militia)",
+    JSON.stringify(up) ===
+      JSON.stringify([
+        ["vale:levy", "vale:militia", 2],
+        ["vale:militia", "vale:footman", 3],
+      ]) &&
+      stacks(s)["vale:levy"] === 1 &&
+      stacks(s)["vale:militia"] === 3 &&
+      stacks(s)["vale:footman"] === 3 &&
+      p.gold === 500,
+    JSON.stringify(stacks(s)),
+  );
+  const hurt = lone();
+  hurt.player.party.troops = [{ type: "vale:levy", n: 6, xp: 0, wounded: 6 }];
+  check(
+    "with every man wounded, nobody takes up the arms",
+    freeArms(hurt.player).length === 0 && stacks(hurt)["vale:levy"] === 6,
+  );
+  const realm = realmOf(s);
+  const arms = realm.places.find((q) => q.kind === "pickup" && q.pickup === "arms");
+  if (arms) {
+    const e = lone();
+    const nb = neighbours(realm.grid, arms.i).find((j) => realm.placeAt[j] < 0 && route(e, j));
+    e.player.at = { i: nb, to: -1, progress: 0 };
+    e.player.party.troops = [];
+    travelTo(e, arms.i);
+    const ev = play(e);
+    check(
+      "with no men, the arms stay where they lie",
+      !e.gone.includes(arms.id) && ev.some((x) => x.k === "pickup" && x.none),
+    );
+    e.player.party.troops = [{ type: "vale:levy", n: 12, xp: 0, wounded: 0 }];
+    travelTo(e, nb);
+    play(e);
+    travelTo(e, arms.i);
+    const ev2 = play(e);
+    check(
+      "come back with levies, and 5 of them take up the arms",
+      e.gone.includes(arms.id) &&
+        ev2.some((x) => x.k === "pickup" && x.up) &&
+        stacks(e)["vale:militia"] === 5,
+    );
+  }
+}
+
 // --- The save ------------------------------------------------------------------
 
 console.log("\n# The campaign save (tech.md §4)\n");
@@ -1422,6 +2085,21 @@ console.log("\n# The campaign save (tech.md §4)\n");
       !staleCampaign(save) &&
       !staleCampaign(null),
   );
+  const old = JSON.parse(JSON.stringify({ ...save, v: 2 }));
+  delete old.stock;
+  delete old.player.mood;
+  delete old.player.captive;
+  old.player.party.prisoners = [{ type: "levy", n: 2 }];
+  const up = readCampaign(old);
+  check(
+    "a version 2 save (brigands and wolves) is brought up to date, not thrown away",
+    up?.v === CAMPAIGN_V &&
+      up.player.mood === 0 &&
+      up.player.captive === null &&
+      JSON.stringify(up.stock) === "{}" &&
+      up.player.party.prisoners[0].since === old.t &&
+      !staleCampaign(old),
+  );
   check(
     "nothing, or junk, loads as no campaign",
     readCampaign(null) === null && readCampaign({ v: CAMPAIGN_V }) === null,
@@ -1455,7 +2133,9 @@ console.log("\n# The campaign save (tech.md §4)\n");
   const last = j.journal[j.journal.length - 1];
   check(
     "the Journal keeps the last 60 entries: after 70 arrivals, 60, the latest last",
-    j.journal.length === 60 && j.journal.every((e) => e.k === "arrive") && last.id === home.id,
+    j.journal.length === 60 &&
+      j.journal.every((e) => e.k === "arrive" || e.k === "week") &&
+      last.id === home.id,
     `${j.journal.length}`,
   );
   check(

@@ -173,6 +173,22 @@ Done when:
 - In the browser: recruit at a village, upgrade at a town, watch wages leave
   at the week's turn — all read back from the save.
 
+Built so far, in three PRs (`/mnt/project-files/crownless/m3-plan.md`):
+
+1. **Recruit, pay and upgrade** (done): recruit pools at villages, towns,
+   castles and mercenary camps; the market and the ransom broker; troop XP
+   and upgrades paid in gold, iron and horses; wages and the week's turn;
+   party morale and desertion; healing; prisoners recruited, sold or let go;
+   capture by brigands; abandoned arms. The place and Army sheets. Checked by
+   `world.mjs` (each rule by hand, 106 sabotages each watched failing),
+   `campaign.mjs` (the browser line above, read back from the save) and
+   `world-sim.mjs` (its player now recruits, trains and sells prisoners).
+   The browser half of "done when" holds; the Node half waits on PR 3.
+2. **The hero**: XP, levels, skills on the map, equipment, shrines, stones,
+   chests, renown, the Hero sheet.
+3. **Sites, lairs and the pacing check**: `world-sim` v2's policy against
+   the day-15 row.
+
 ## M4 · The realm at war — 3 sessions
 
 Lords, factions, war and peace. The world moves without you.

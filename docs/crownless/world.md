@@ -278,12 +278,12 @@ no screen. (About 4 ms each; a Medium world has a few a day.)
 - **Auto-resolve** keeps `battle.md` §11's aftermath. Won: your dead leave,
   your wounded stay, loot is 15% of the value of their dead and taken plus
   their whole purse, the taken ride as prisoners up to half your limit (none
-  from wolves), and the band is gone. Lost (until M3's capture): your
-  warband scatters and you start again at the nearest village with 12
-  levies and your gold, the band leaving you be for a day. Drawn: 6 hours.
-- Pickups: gold, iron and horses are taken in passing; a chest and abandoned
-  arms stay put until M3 can open them. Battles don't grow yet (there are no
-  allies to join), and AI parties don't fight each other.
+  from wolves), and the band is gone. Lost: see capture in §7's as-built
+  note; the band leaves you be for a day. Drawn: 6 hours.
+- Pickups: gold, iron and horses are taken in passing; abandoned arms when
+  you pass with men who can use them (§7); a chest waits for the hero's XP
+  (M3's second PR). Battles don't grow yet (there are no allies to join), and
+  AI parties don't fight each other.
 
 ## 6. Economy
 
@@ -375,6 +375,35 @@ always).
 
 **A wounded hero** — down in a battle, captured or not — can't use abilities
 until healed: 3 days, 1 with Medicine Expert.
+
+**As built in M3 so far** (`rules/warband.js`, numbers in
+`rules/data/warband.js`, which mirrors §4, §6, this section and `army.md` §3):
+
+- **Recruiting** needs no goodwill until lords exist (M4): every village,
+  town and castle recruits. Each troop has its own pool at each place (a town
+  keeps 8 militia _and_ 8 bowmen), full until first touched. A recruit costs
+  its line's value, iron and horses; a camp's mercenary 2.5× its value and
+  nothing else, one troop per camp chosen by the seed. Over the limit, or
+  with no room left under it, you can't.
+- **The week** runs at the seventh midnight as §6 says, minus income (no
+  fiefs yet): wages (unpaid: morale −20 and a tenth of the unpaid share of
+  your men desert, lowest tiers first), then morale under 20 costs 5% of the
+  tier 1–2 men, then pools and markets refill, then the spawns, then a
+  Journal line.
+- **Morale** in battle waits on the battle rework; for now it drives
+  desertion only. Victories and defeats fade 2 a day toward nothing.
+- **Healing** is ×1.5 in any settlement you stand in (no hostility yet).
+- **Prisoners** from each fight are a stack of their own, ready 4 days from
+  that hour. A band's men join in your culture's colours, keeping their tier.
+  Release has no relations to change yet.
+- **Capture**: every defeat by brigands is one until the battle reports a
+  broken banner. You're held 3–10 days at the village nearest the fight,
+  then ransomed for 20% of your gold or (even odds) escape; while held, time
+  runs, no party can meet you and nothing can be ordered. Wolves leave you
+  at the nearest village with no army. No free levies either way.
+- **Abandoned arms** go to the five lowest-tier fit men that have a next
+  tier, on the first branch of their tree; with nobody to use them they
+  stay.
 
 ## 8. Lords and the strategic AI
 
