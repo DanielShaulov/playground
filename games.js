@@ -38,4 +38,10 @@ export const GAMES = [
     blurb: "Take a piece, keep its move. Fifteen chambers to the Keep.",
     icon: "♞",
   },
+  {
+    id: "crownless",
+    title: "Crownless",
+    blurb: "Raise a warband. Take the crown.",
+    icon: "👑",
+  },
 ];

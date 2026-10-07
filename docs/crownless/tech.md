@@ -30,7 +30,7 @@ games/crownless/
     data/troops.js    army.md §2–4 as data
     data/world.js     terrain, places, buildings, contracts
     data/hero.js      backgrounds, skills, abilities, items
-    battle.js         the battle (successor of docs/crownless/theory/battle.mjs)
+    battle.js         the battle (successor of the theory model, retired in M1)
     battle-ai.js      the plain AI and lord personalities
     battle-setup.js   parties → squads; deployment presets; terrain from hex
     worldgen.js       seed → map
@@ -47,10 +47,12 @@ games/crownless/
     map-view.js       camera, hexes, fog, places, parties, paths
     battle-view.js    field, soldiers, pennants, volleys, effects
     sheets.js         DOM bottom sheets: a tiny h() helper and each sheet
-    input.js          tap, drag, long-press over shared createInput
+    input.js          tap, drag, long-press over shared createInput (M2: M1's
+                      long-press is a dozen lines in game.js)
 tests/crownless/
   README.md           how to run, what each script proves
-  battle-sim.mjs      the theory report, importing rules/battle.js
+  rules.mjs           the battle rules, checked in Node
+  battle-sim.mjs      the theory model's report, on the real rules
   world-sim.mjs       AI-only realms for 200 days over many seeds
   harness.mjs         Playwright helpers: launch, tap via layout.js, read the save
   play.mjs            scripted sessions, one block per milestone
@@ -87,12 +89,16 @@ tap ──▶ view/input ──▶ action ──▶ rules ──▶ state′ + e
                                                   └──▶ views animate events
 ```
 
-**The battle round is computed, then played.** `playRound(battle, orders)`
-runs all 30 steps at once and returns a **timeline**: every squad's position,
-facing and count per step, plus events (a volley, a charge's impact, a rout,
-a death). The view animates the timeline over three seconds. Rules never wait
-on rendering, the view can't drift from the outcome, and a round can be
-skipped instantly.
+**The battle round is computed, then played.** `playRound(battle)` runs all
+30 steps at once and returns a **timeline**: `frames`, 31 of them (the start,
+then after each step), each a row per squad of `[x, y, fx, fy, n, state,
+engaged]`; and `events` with the step they happened at — volleys, charges,
+waverings, routs, rallies, abilities used, a squad out of arrows or in
+position, the banner down, the end. Orders are already on the squads: the
+AI's written by `plan`, a person's standing commands (`squad.cmd`) turned
+into orders by `command`, both in `battle-ai.js`. The view animates the
+timeline over three seconds. Rules never wait on rendering, the view can't
+drift from the outcome, and a round can be skipped instantly.
 
 **The world tick** is the same idea: `advance(world, hours)` returns events
 ("party X now at hex Y", "Greyford besieged", "week turned"), and the map
@@ -113,12 +119,25 @@ view animates parties between their old and new positions.
   where odds and outcome are computed on the same device. It matters for
   tests: run browser tests in Chromium (V8, like Node), and let rules use a
   lookup table for `edge()` over tenths of a point from −30 to +30 (pierce
-  makes armour fractional) rather than `Math.pow`.
+  makes armour fractional) rather than `Math.pow`. The table is built by
+  repeated multiplication, and the rules use `Math.sqrt`, never `Math.hypot`.
+- **Mirror symmetry is a determinism property too.** Side 0's coordinates sit
+  near y = 140 and side 1's near 0, so the same sum rounds differently on each
+  side; a rule that compares floats can break every tie the same way.
+  `battle.md` §3.6 has the two places that did, and `tests/crownless/rules.mjs`
+  checks that a mirror match without fortune stays a mirror.
 
 ## 4. Saves
 
 One campaign, autosaved under `playground:crownless:save`. Settings and best
 scores have their own keys, so a broken save never loses them.
+
+**M1 saves a Skirmish** there (`rules/save.js`):
+`{ v, setup, odds, phase: "deploy" | "plan" | "over", battle, result }`, where
+`battle` is the whole battle as the rules keep it — it is plain JSON by
+design — and `result` the result sheet's numbers once it ends. The best
+record is `playground:crownless:best`, the camera choice
+`playground:crownless:settings`.
 
 **When to save.** After every map action; every 6 in-game hours while
 travelling and when travel stops; and on `pagehide`. In battle, **save the
@@ -178,6 +197,24 @@ roughly 3–5× faster; measure on a device before trusting a margin.
 | Battle frame, 600 soldiers         | ≤ 6 ms   | one path per colour, not per man     |
 | Save write                         | ≤ 5 ms   | JSON.stringify of ~100 KB            |
 
+**Measured in M1** (`npm run test:crownless:sim -- perf`; the browser numbers
+from `play.mjs`, Chromium with the CPU throttled 4× as a stand-in for a phone):
+
+| Work                                  | Node    | Chromium, CPU ÷4           |
+| ------------------------------------- | ------- | -------------------------- |
+| Battle round, 16 squads, 400 men      | ~0.7 ms | median ~4 ms, p95 9–12 ms  |
+| Auto-resolve one battle (no timeline) | 5.2 ms  | —                          |
+| Odds, 8 auto-resolves of a 150-worth  | ~70 ms  | one a frame while you pick |
+| Battle frame, 400 soldiers, 390 × 662 | —       | median ~7 ms, p95 13–15 ms |
+
+The frame is the game's own work — updating and issuing the draw calls.
+Headless Chromium then rasterises on the CPU, another ~12 ms unthrottled,
+which a phone does on its GPU; `play.mjs` flushes it untimed each frame so it
+can't pile up into one giant frame. The frame is over the 6 ms budget on the
+stand-in and inside a 60 fps frame: the ground is cached, each soldier is one
+arc in one path per colour, and the next saving would be fewer gradients for
+dust. A phone will say which matters.
+
 **Don't cache the whole map** in an offscreen canvas: at DPR 2 a Medium map
 is ~60 MB of pixels. Draw the visible hexes each frame; cache only the small
 overview image.
@@ -230,7 +267,9 @@ honest way to set a number that says how hard the game is.
   name (`getByRole("button", { name: "Go" })`) — the sheet's own labels, not
   test ids.
 - Seed positions by writing a save and pressing Continue: a battle at round 5,
-  a town with a full recruit pool, a siege on its last day of food.
+  a town with a full recruit pool, a siege on its last day of food. A
+  battle's state is too long to write by hand, so the rules may _build_ one
+  (setup); what a check expects stays a literal.
 - Assert on gameplay through the save: a squad's count dropped, a troop
   upgraded, the day advanced, the week paid wages; and that the console is
   clean.
