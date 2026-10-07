@@ -14,6 +14,10 @@ This is by far the biggest thing in the repo. It is meant to be built over
 many sessions, one milestone per PR, and these documents are how each session
 knows what the others decided.
 
+**Nobody reviews Crownless PRs**; the owner playtests on a phone instead. When
+a change's checks pass, squash-merge its PR yourself (that deploys it), and
+end by listing what to try on the phone — what a headless run can't judge.
+
 ## Status
 
 | Milestone                                           | State       |

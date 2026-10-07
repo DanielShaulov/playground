@@ -59,6 +59,8 @@ Work on a branch and land it through a PR — don't commit straight to `main`.
 2. Commit, push with `git push -u origin <branch>`, open a PR against `main`.
 3. **Squash-merge** it. That's what keeps `main` linear while leaving you free
    to push fix-ups on the branch. Merging is what deploys the site.
+   Crownless PRs go unreviewed: once the checks pass, merge it yourself and
+   say what to playtest (`docs/crownless/README.md`).
 
 Sessions that skip the PR and push to `main` directly leave the task looking
 unfinished in the UI, because there's no PR lifecycle to close.
