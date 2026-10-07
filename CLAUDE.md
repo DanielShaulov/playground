@@ -117,7 +117,8 @@ never run `playwright install`.
 
 A game with rules worth protecting can keep a harness next to it; `checkwiz` has
 one in `tests/checkwiz/` (`npm run test:checkwiz`) that is worth reading before
-writing another. Three tricks generalise:
+writing another, and `crownless` the biggest (`tests/crownless/`). Four tricks
+generalise:
 
 - A game that persists its state is readable _and_ seedable through
   `localStorage`, so a test can resume any position instead of playing to it.
@@ -126,6 +127,10 @@ writing another. Three tricks generalise:
   `npm run test:checkwiz:sim` is the example.
 - A check you have never seen fail proves nothing. Break the rule it guards,
   or point it at the previous commit, and watch it go red.
+- A two-sided simulation can be checked by symmetry: two identical armies
+  with the dice switched off must stay mirror images. Crownless's battle
+  model gave the first side to move 83 wins in 96, and nothing else caught it
+  (`tests/crownless/README.md`).
 
 In remote agent sessions **browser egress is blocked**: Chromium cannot reach
 any external host, though `curl` can. To verify something already deployed,

@@ -61,14 +61,20 @@ World map ─┬─ tab: Army · Hero · Realm · Journal          (sheets)
 ```
 
 **Title.** Continue (if a save exists), New campaign, Skirmish, Codex,
-Settings, and the best score per difficulty.
+Settings, and the best score per difficulty. M1's title has Continue (a
+battle in progress), Skirmish and the toughest Skirmish win, over a battle
+between two plain AIs that plays behind it.
 
 **New campaign.** Four choices on one scrolling sheet: map size, difficulty,
 home culture (four cards with doctrine and trait), background (four cards),
 banner colour; an optional seed. **Begin**.
 
 **Skirmish** (M1's whole game, kept forever as practice): pick two armies from
-presets or "random at worth N", a terrain, and fight.
+presets or "random at worth N", a terrain, and fight. One sheet, a tab per
+side: culture, doctrine (or Random), strength (60–200 worth), hero level
+(none, 1, 5, 10, 20), and the field (open or woods). The odds sit at the top
+of the sheet, worked out one auto-resolve a frame while you choose, and are
+saved with the battle: the best record is the win with the lowest odds.
 
 **Codex.** Every troop with its stats, its worth and what it counters (from
 the tables in `army.md` / `battle.md`); five cards on how battles work; the
@@ -217,20 +223,27 @@ money), and open contracts with **Show on map**.
 The bottom block is about 180 px. On a 390 × 844 phone that leaves the field
 about 390 × 560 px: 3.9 px a metre, a 40-man squad about 58 × 23 px.
 
-- **Select** with a chip or by tapping a squad on the field. **All** selects
-  every squad of yours.
+- **Select** with a chip or by tapping a squad on the field; tapping it again
+  lets it go. **All** selects every squad of yours but the banner, and an
+  order given with nothing selected goes to the same squads: the army orders
+  of `battle.md` §5. Your banner moves only when its own chip is picked; it
+  otherwise keeps behind the line (`battle.md` §6).
 - **Order** with the middle row. **Advance** and **Charge** then let you
   pick a target: the chip row turns into the enemy's squads, nearest first,
   so their far wing is never a reach to the top of the screen; tapping an
   enemy squad on the field works too, and doing neither leaves the role's
   default target. With a squad selected, tapping open ground means **Move
   there**.
-- **⋯** holds the rest: formation, fire mode, cycle, skirmish, **Retreat**,
-  **Auto finish**.
-- **Go** plays three seconds; its ring fills while it does. **⏯** toggles
-  continuous play, pausing on the events chosen in Settings.
-- **Chips** show role, count, a morale bar, ⚠ wavering, ⚑ routing, and ammo
-  pips. More than four chips scroll sideways.
+- **⋯** holds the rest: formation, fire mode, cycle, skirmish, the camera,
+  **Retreat** (a second tap confirms it), **Auto finish**.
+- **Go** plays three seconds; its ring fills while it does, and while it does
+  it reads **Skip ▶▶** and finishes the round at once. **⏯** toggles
+  continuous play, pausing on the events of `battle.md` §1 (Settings will make
+  them choosable; M1 pauses on all of them) with a line saying why.
+- **Chips** show the lead troop's short name (Militia, Archers, Knights; a
+  `+` when the squad mixes troops), count, a morale bar, ! wavering, "runs"
+  routing, and ammo pips. More than four chips scroll sideways.
+- **Long-press** a squad for its troops, morale, ammo and what it is doing.
 - Every squad of yours draws an arrow to where it's going or what it's
   attacking. With Tactics, enemy intents show as red dashes.
 - **Deployment** is the same screen with the band highlighted, formation
@@ -244,7 +257,7 @@ palette in `shared/style.css`. No sprite sheets, no image files.
 **Mockups** of the three main screens are in [mockups/](mockups/), drawn by
 this section's rules: [the map](mockups/map.png), [a battle](mockups/battle.png)
 and [the realm overview](mockups/overview.png). The battle is a real frame of
-`theory/battle.mjs`, round 6 of a fight between about 180 men a side.
+the game's own rules, round 6 of a fight between about 180 men a side.
 Regenerate them with `node docs/crownless/mockups/render.mjs`.
 
 What the battle mockup showed: at 3.9 px a metre, 180 men a side read
@@ -266,8 +279,8 @@ field.
 It looks far richer and fills the screen, but it can't show a whole battle
 (about 40 × 56 m of a 100 × 140 m field): in the mockup your own horse is
 off the top edge. Either way, keep soldier drawing behind one function so the
-choice stays cheap. M1 builds whole-field first and tries the follow camera
-on a phone before deciding.
+choice stays cheap. M1 built both — whole field by default, Follow in ⋯ —
+so the choice can be made with a phone in hand.
 
 **The map.** Muted, earthy hex fills that read on the dark UI, each with a
 little seeded variation and a glyph:
@@ -292,6 +305,9 @@ Explored-but-unseen hexes sit under a 45% dark veil; unexplored ones are
 towers (town), a keep (castle), three roofs (village), a broken crown
 (Crownhold), a pick, a horseshoe, a coin (sites), a cave mouth (lair), a star
 (shrine).
+
+In battle you are always red with a star; the enemy fly their culture's
+colour and charge.
 
 **Banners never rely on colour alone.** Each faction has a charge as well:
 Valemark a chevron, Fenreach a tree, Kharum an anvil, Ulus a crescent, the

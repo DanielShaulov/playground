@@ -19,7 +19,7 @@ knows what the others decided.
 | Milestone                                           | State       |
 | --------------------------------------------------- | ----------- |
 | M0 Design, battle theory model, mockups             | done        |
-| M1 Battle sandbox (Skirmish)                        | not started |
+| M1 Battle sandbox (Skirmish)                        | done        |
 | M2 World map, travel, bandits, saves                | not started |
 | M3 Army, economy, hero progression                  | not started |
 | M4 Factions, lords, strategic AI                    | not started |
@@ -41,7 +41,11 @@ Details, acceptance criteria and the cut list are in [roadmap.md](roadmap.md).
 | [ui.md](ui.md)           | screens, wireframes, one-thumb interaction rules, art direction   |
 | [tech.md](tech.md)       | module layout, determinism, saves, performance, testing           |
 | [roadmap.md](roadmap.md) | what to build next and how to know it is done                     |
-| [theory/](theory/)       | the Node model the battle numbers came from                       |
+
+The game is in `games/crownless/`; its tests and simulators, and how each was
+checked, are in [`tests/crownless/`](../../tests/crownless/README.md). The
+theory model the first battle numbers came from (`theory/`) was retired in M1
+once the rules reproduced it; it lives in git history.
 
 Rules for keeping them true:
 
@@ -50,14 +54,14 @@ Rules for keeping them true:
   a line. A doc that silently disagrees with the game is worse than none.
 - **Every number has one home.** Troop stats, troop prices and the hero live
   in `army.md`; the economy, the map and pacing in `world.md`; battle
-  constants in `battle.md`. Elsewhere, link. (`theory/report.mjs` mirrors
-  the troop prices in `PRICE`; change both together.)
-- **Until M1 lands, `theory/battle.mjs` is the spec for the battle rules**
-  it covers, and `battle.md` describes it. If they disagree, the code is
-  right and the doc has a bug.
+  constants in `battle.md`. Elsewhere, link. Code that needs them mirrors
+  them, and the mirror is named in the doc: troop stats and worth in
+  `rules/data/troops.js`, prices in `PRICE` in `tests/crownless/battle-sim.mjs`.
+- **The battle is now code:** `games/crownless/rules/battle.js` and
+  `battle-ai.js` are the spec for everything M1 built, and `battle.md`
+  describes them. If they disagree, the code is right and the doc has a bug.
 - **Numbers that say how hard the game is come out of a simulator**, never a
-  guess. `theory/report.mjs` is the start of that; from M1 it moves to
-  `tests/crownless/` and imports the game's real rules.
+  guess: `tests/crownless/battle-sim.mjs` for battles, `world-sim` from M2.
 - **Update the status table** when a milestone lands.
 
 ## Pillars
@@ -191,7 +195,7 @@ The only loss is the realm falling to the Hollow.
 
 **D8 · Design docs live in `docs/crownless/`, not `games/crownless/`.**
 `npm run new` refuses to scaffold into an existing folder, and the game should
-be scaffolded by it (CLAUDE.md). M1 runs the scaffold; these docs stay put.
+be scaffolded by it (CLAUDE.md). M1 ran the scaffold; these docs stayed put.
 
 ## Open questions
 

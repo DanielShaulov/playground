@@ -5,7 +5,7 @@
  *
  *   index.html?view=map        the world map, day 14, travelling to a town
  *   index.html?view=overview   the whole realm, day 52, the Hollow risen
- *   index.html?view=battle     a frame of a real battle from theory/battle.mjs
+ *   index.html?view=battle     a frame of a real battle, from the game's rules
  *
  * This is a picture, not the game: the world generator here is a sketch of
  * world.md §1 good enough to look right, and the chrome is painted rather
@@ -16,10 +16,10 @@ import {
   beginRound,
   finishRound,
   step,
-  defaultAI,
   ROUND_S,
   DT,
-} from "../theory/battle.mjs";
+} from "../../../games/crownless/rules/battle.js";
+import { troop } from "../../../games/crownless/rules/data/troops.js";
 
 const params = new URLSearchParams(location.search);
 const VIEW = params.get("view") ?? "map";
@@ -1581,29 +1581,27 @@ const SIDE = [
   { color: "#5b8def", dark: "#183262", light: "#9dbcf6" },
 ];
 
+/** The drawing reads a squad's troop as `s.t` and its type as `s.type`. */
+function dress(b) {
+  for (const s of b.squads) {
+    if (s.t) continue;
+    Object.defineProperty(s, "t", { value: troop(s.units[0].type), enumerable: false });
+    s.type = s.units[0].type;
+  }
+}
+
 /** Play the battle up to `round` + `steps`, keeping what the picture needs. */
 function simulate(armies, seed, round, steps) {
-  // Your side is the plain AI too, except that the hero's banner squad keeps
-  // behind the centre of the line instead of charging off with the horse.
-  const yourAI = (b, side) => {
-    defaultAI(b, side);
-    const banner = b.squads.find((s) => s.side === side && s.banner);
-    const centreSquad = b.squads.find((s) => s.side === side && s.type === "footman");
-    if (banner && centreSquad)
-      banner.order = { kind: "move", x: centreSquad.x + 6, y: centreSquad.y + 15 };
-  };
-  const b = createBattle(armies, seed, { place: true, ai: [yourAI, defaultAI] });
-  b.squads.forEach(
-    (s, i) =>
-      (s.banner =
-        armies[s.side].some((a) => a.banner) && i === armies[0].findIndex((a) => a.banner)),
-  );
+  // Both sides are the plain AI; your banner squad keeps behind your line.
+  const b = createBattle({ seed, sides: armies.map((squads) => ({ squads, place: true })) });
+  dress(b);
   const fallen = [];
   const volleys = [];
   const lostThisRound = new Map();
   const per = Math.round(ROUND_S / DT);
   for (let r = 0; r < round && !b.over; r++) {
     beginRound(b);
+    dress(b); // a squad the AI split off is new
     for (const s of b.squads) lostThisRound.set(s.id, 0);
     const last = r === round - 1 ? steps : per;
     for (let i = 0; i < last; i++) {
@@ -1615,7 +1613,7 @@ function simulate(armies, seed, round, steps) {
           lostThisRound.set(s.id, lostThisRound.get(s.id) + lost);
           const slots = soldierSlots(s, s.n + lost);
           for (let j = 0; j < lost; j++) {
-            const at = s.contacts.size
+            const at = s.contacts.length
               ? slots[j % Math.max(1, Math.min(slots.length, s.files0))]
               : slots[Math.floor(hash(s.id * 97 + j, b.t * 10) * slots.length)];
             if (at)
@@ -1664,7 +1662,7 @@ function soldierSlots(s, n = s.n) {
   const pyy = fx;
   const halfD = (ranks * sp) / 2;
   const routing = s.state === "routing";
-  const melee = s.contacts.size > 0;
+  const melee = s.contacts.length > 0;
   const out = [];
   for (let i = 0; i < n; i++) {
     const f = i % files;
@@ -1868,7 +1866,7 @@ function drawBattle() {
     if (s.state !== "ok" && s.state !== "wavering") continue;
     const o = s.order;
     const tgt = o.target != null ? b.squads[o.target] : null;
-    if (s.contacts.size) continue;
+    if (s.contacts.length) continue;
     if (s.side === YOU && tgt) arrow(s, tgt, "rgba(255,255,255,.75)", [6, 5]);
     else if (s.side === YOU && o.kind === "move") arrow(s, o, "rgba(255,255,255,.75)", [6, 5]);
     else if (s.side !== YOU && tgt && s.t.charge) arrow(s, tgt, "rgba(248,113,113,.8)", [3, 4]);
@@ -1968,7 +1966,7 @@ function drawBattle() {
 
   // Clash marks along fronts in melee.
   for (const s of b.squads) {
-    if (!s.contacts.size || s.side !== YOU) continue;
+    if (!s.contacts.length || s.side !== YOU) continue;
     for (const id of s.contacts) {
       const o = b.squads[id];
       const mx = (s.x + o.x) / 2;
@@ -2261,7 +2259,7 @@ function drawBattle() {
  */
 function fightCentre(b) {
   const up = (s) => s.state === "ok" || s.state === "wavering";
-  const melee = b.squads.filter((s) => up(s) && s.contacts.size);
+  const melee = b.squads.filter((s) => up(s) && s.contacts.length);
   const core = melee.length ? melee : b.squads.filter(up);
   const n = core.reduce((m, s) => m + s.n, 0) || 1;
   const cx = core.reduce((m, s) => m + s.x * s.n, 0) / n;

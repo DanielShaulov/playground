@@ -20,12 +20,12 @@ to plan by, not promises.
 
 ## M0 · Design — done
 
-These documents, and `theory/`: a Node model of the battle rules with a
+These documents, and `theory/` (retired in M1, in git history): a Node model of the battle rules with a
 report that measures worth, counters, doctrines, scale, the value of a bonus,
 battle length and cost. The numbers in `battle.md` §10 and `army.md` §2 came
 from it.
 
-## M1 · Battle sandbox ("Skirmish") — 2–3 sessions
+## M1 · Battle sandbox ("Skirmish") — done
 
 The battle layer as a game on its own: pick two armies, fight. Registered on
 the launcher as Crownless with only Skirmish on its title screen. If nothing
@@ -79,6 +79,32 @@ Done when:
   6-squad cap, bigger hit areas, army-order-only play). Also decide the
   camera: whole field with marks, or the 2.5× follow camera with figures
   (`ui.md` §6 has both mocked up from the same frame).
+
+**As built.** Everything above, measured in `battle.md` §10 and checked as
+`tests/crownless/README.md` describes. Where the build went further or
+differently, the docs now say so; the larger points:
+
+- The model reproduced exactly (in model mode, step for step), then three
+  things it got wrong were fixed, each found by a test: squads moved one at a
+  time, so side 0 won 83 of 96 decisive mirror matches; equal lines wrapped
+  each other by a rounding error; horse archers slid one way round, which a
+  mirror reverses (`battle.md` §3.6).
+- The AI's ability triggers had to be by men, not squads ("two ranged
+  squads"), or armies with one squad of archers never loosed (§5).
+- Shield Wall's "shields work in melee" means against arrows: shields never
+  stop a sword in this game (§3.5, §6).
+- A front wider than the field forms a second line (§2): a horde in squads of
+  forty is one.
+- The Skirmish hero is strong: level 1 is worth nearly +50% troops and level 20
+  more than doubles an army (§10.10). That is the template in `army.md` §6
+  measured, not changed; it is a design question for M3.
+- The Skirmish title has Continue as well as Skirmish: a battle in progress
+  survives closing the app.
+
+**Still for a phone** (the headless runs can't say): tapping squads while they
+move, whether three seconds is a round, how the field reads, the camera
+choice (both are built; ⋯ → Camera), and real frame and round times — the 4×
+throttled Chromium numbers are a stand-in (`tech.md` §5).
 
 ## M2 · The map — 2–3 sessions
 

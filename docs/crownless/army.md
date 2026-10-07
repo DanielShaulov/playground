@@ -46,8 +46,10 @@ of another faction" pleasure, and the main reason to want a particular castle.
 
 ## 2. Troop stats
 
-These are the stats in `theory/battle.mjs`, and every number in the worth
-column comes from `report.mjs` (`battle.md` §10.1). Change one, rerun it.
+These are the stats in `games/crownless/rules/data/troops.js`, and every
+number in the worth column comes from `tests/crownless/battle-sim.mjs`
+(`battle.md` §10.1). Change one, rerun `npm run test:crownless:sim -- worth`,
+and paste the line it prints into `WORTH` in `troops.js`.
 
 `dmg` is melee damage per fighting man per round; `mdmg` per missile that
 hits. Speed is metres per second on the battlefield. Shields are the share of
@@ -56,8 +58,8 @@ in 3 s unless its line says otherwise.
 
 | Troop         | T   | Role   | hp  | atk | def | dmg | armour | shield | speed | morale | special                                                       | worth |
 | ------------- | --- | ------ | --- | --- | --- | --- | ------ | ------ | ----- | ------ | ------------------------------------------------------------- | ----- |
-| Levy          | 1   | inf    | 22  | 2   | 2   | 5   | 0      | —      | 4.5   | 50     |                                                               | 0.53  |
-| Militia       | 2   | inf    | 26  | 3   | 3   | 6   | 1      | 0.3    | 4.5   | 60     |                                                               | 0.93  |
+| Levy          | 1   | inf    | 22  | 2   | 2   | 5   | 0      | —      | 4.5   | 50     |                                                               | 0.56  |
+| Militia       | 2   | inf    | 26  | 3   | 3   | 6   | 1      | 0.3    | 4.5   | 60     |                                                               | 0.89  |
 | Bowman        | 2   | ranged | 22  | 1   | 1   | 4   | 0      | —      | 4.5   | 52     | range 60, mdmg 7, acc .5, 10 volleys                          | 1.07  |
 | Squire        | 2   | horse  | 30  | 4   | 2   | 6   | 1      | 0.2    | 10    | 58     | charge 6                                                      | 1.57  |
 | Footman       | 3   | inf    | 30  | 5   | 4   | 7.5 | 2      | 0.4    | 4.5   | 66     |                                                               | 1.29  |
@@ -94,7 +96,7 @@ Prices are checked against gold and men together (`battle.md` §10.4, rule 1 of
 Foot are priced by tier. Mounted troops cost about 1.8× their tier in gold and
 pay double wages: the first draft priced them like foot, and at equal gold the
 knights army beat everything (`battle.md` §10.4). `PRICE` in
-`theory/report.mjs` mirrors this table; change both together.
+`tests/crownless/battle-sim.mjs` mirrors this table; change both together.
 
 | Troop         | Upgrade from      | Gold | Iron | Horses | Value | Weekly wage |
 | ------------- | ----------------- | ---- | ---- | ------ | ----- | ----------- |
@@ -187,8 +189,31 @@ What each culture's tree has (✓), lacks (—), or changes:
 | Ability      | Lance Charge                                     | Stakes                                                               | Shield Wall                                                                       | Feigned Flight                                                                    |
 | AI temper    | aggressive, honourable                           | defensive, cunning, raids                                            | slow to war, relentless besiegers                                                 | opportunistic raiders, fast                                                       |
 
-Abilities are in `battle.md` §6. Culture variants are **not yet measured**;
-M1's port of the report must add them before the numbers are trusted.
+Abilities are in `battle.md` §6. A trait applies to its culture's own troops,
+elites included, and "infantry" means the infantry role: footmen, not spears.
+Kharum's men-at-arms take both their +1 def and Stone-born's, for def 9.
+Where a culture lacks a troop it fields the nearest of the same role
+(`cultureTroop` in `troops.js`): men-at-arms → footmen, pikemen → spearmen,
+longbows ↔ crossbows → archers, knights and horse archers → horsemen.
+M1 measured every variant (`battle.md` §10.13 has the table and each
+culture's doctrines): worth in militia, with the generic troop for reference
+and — for a troop the culture doesn't field.
+
+| Troop       | generic | Valemark | Fenreach | Kharum | Ulus |
+| ----------- | ------- | -------- | -------- | ------ | ---- |
+| Levy        | 0.56    | 0.47     | 0.56     | 0.60   | 0.42 |
+| Militia     | 0.89    | 0.84     | 0.89     | 0.92   | 0.84 |
+| Footman     | 1.29    | 1.23     | 1.29     | 1.32   | 1.20 |
+| Man-at-arms | 1.82    | 1.70     | 1.83     | 1.91   | —    |
+| Bowman      | 1.07    | 1.07     | 1.14     | 1.07   | 1.07 |
+| Archer      | 1.55    | 1.55     | 1.68     | 1.55   | 1.55 |
+| Longbowman  | 2.35    | —        | 2.45     | —      | —    |
+| Horseman    | 2.39    | 2.48     | 2.39     | 2.39   | 2.39 |
+| Knight      | 3.86    | 4.16     | —        | 3.86   | 3.86 |
+| Elite       |         | 5.97     | 3.12     | 2.45   | 2.99 |
+
+Spearmen, pikemen, crossbowmen and squires are the same everywhere they are
+fielded; Valemark's Lance lifts squires to 1.60.
 
 Troop names are the culture word plus the generic name ("Vale Footman",
 "Steppe Horseman"), except the four elites.
@@ -219,7 +244,7 @@ the normal morale rules; the barrow's dead follow the Hollow's.
 
 | Beast        | hp   | atk | def | dmg | armour | morale | speed | Notes                                                                       | worth |
 | ------------ | ---- | --- | --- | --- | ------ | ------ | ----- | --------------------------------------------------------------------------- | ----- |
-| Wolf         | 18   | 4   | 2   | 6   | 0      | 55     | 12    | charge 4; packs of 3–5 squads                                               | 0.83  |
+| Wolf         | 18   | 4   | 2   | 6   | 0      | 55     | 12    | charge 4; packs of 3–5 squads                                               | 0.87  |
 | Troll        | 400  | 8   | 6   | 70  | 4      | 90     | 4     | squads of 1–4, 4 m apart, 1 rank; fear 4                                    | 36    |
 | Troll-King   | 900  | 9   | 7   | 100 | 5      | 95     | 4     | squad of 1; fear 6; his trolls +10 morale while he stands                   | —     |
 | Wyrm         | 3000 | 10  | 9   | 150 | 8      | 100    | 5     | squad of 1; fear 8; breath every 2nd round: one squad within 50 m takes 300 | —     |
@@ -266,6 +291,10 @@ two heroes of the same build differ).
 A level-25 hero has about +4 atk, +3 def and +6 morale over a level-1 one.
 By §10.7 of `battle.md`, that is worth roughly +40% troops before skills —
 the hero matters, but a big army still beats a great hero with a small one.
+Skills change that: the Skirmish template below, with Leadership and Offense
+at Expert by level 17, is worth +48% troops at level 1 and more than doubles
+an army at level 20 (`battle.md` §10.10). Whether skills come that fast is
+M3's question.
 
 **Levels.** Each level-up also offers **two skills** — new ones, or a rank up
 of one you have — and you take one (HoMM). Eight skill slots, three ranks
