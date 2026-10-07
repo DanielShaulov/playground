@@ -36,7 +36,7 @@ A game too big for one sitting keeps its design in `docs/<id>/` (outside
 `games/`, so `npm run new` can still scaffold it). Crownless is the first:
 read `docs/crownless/README.md` before touching it.
 
-### Two things that bite
+### Three things that bite
 
 - **Coordinates are CSS pixels** and retina scaling is already applied to the
   context — but the play area is whatever the phone gives you. Size everything
@@ -44,6 +44,12 @@ read `docs/crownless/README.md` before touching it.
 - **Store widths/positions in pixels and a resize breaks them.** If a game
   keeps persistent geometry (like Stack's tower), handle `stage.onResize` and
   rescale. The iOS URL bar collapsing counts as a resize.
+- **Keep the iOS status bar `black`, never `black-translucent`** (the
+  `apple-mobile-web-app-status-bar-style` meta). Translucent, iOS 26 sizes a
+  home-screen app one status bar short and paints nothing below it: a dead
+  band under every game that no CSS unit, `lvh` included, reaches past
+  (WebKit bug 301108). iOS reads the style only when the app is added to the
+  home screen.
 
 ## Git
 
