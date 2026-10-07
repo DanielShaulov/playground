@@ -8,6 +8,7 @@ harness is (`tests/checkwiz/README.md`, read it first).
 ```sh
 npm run test:crownless:rules  # rules — the battle rules, checked in Node (a second)
 npm run test:crownless:world  # world — the map rules, checked in Node (a few seconds)
+npm run test:crownless:world-sim # world-sim — 200 days × 50 seeds of the living map (half a minute)
 npm run test:crownless:sim    # sim   — battle.md §10, measured (a few minutes)
 npm start                     # then, in another terminal:
 npm run test:crownless        # play  — whole Skirmishes, tapped through in a browser
@@ -57,7 +58,13 @@ road, rivers crossable at least every 7 hexes and no lair within 5 of a start;
 pace and the hours a hex takes, by hand (2 h for plains at pace 12, 3.2 for
 forest, 24 / 10.8 for Kharum's hills); arriving in the hour the route
 promised, Stop, Rest, a watchtower; sight by day, night, hills and Scouting;
-and the save. Seed 1's realm is pinned by hash: if it changes, every saved
+brigands and wolves (pace, how a band is made up and grows, spawns and caps,
+chiefs, who hunts and who runs, contact within 0.6 hex, travel stopping
+itself); meetings (what the sheet offers, Pay, Leave, a rearguard by hand,
+loot to the gold piece against `battle.js`'s own aftermath, the household's
+losses kept out, prisoners, a defeat, chasing, truces); pickups; healing;
+and the save. Every check was watched failing: each rule was broken in a
+copy of the rules, one at a time, and the suite went red for each. Seed 1's realm is pinned by hash: if it changes, every saved
 campaign's map has changed with it, and `CAMPAIGN_V` must be bumped.
 
 **`campaign.mjs`** plays a campaign the same way, on the campaign's own save
@@ -66,7 +73,18 @@ journey tapped out on the map from `map-layout.js`, a reload in the middle of
 the journey, then Rest, Stop, a tap on the road and the tabs. The journey's
 end is compared with the same journey played in Node without a break: same
 hex, hour, fog and Journal. Then it screenshots each campaign screen on both
-phones, with `shots.mjs`'s 44 px and on-screen checks.
+phones, with `shots.mjs`'s 44 px and on-screen checks. Then a band met on
+the road: the sheet opens by itself and is saved, the odds come in, a
+reload brings the meeting back, Pay costs what Node says; Auto-resolve
+fights exactly Node's fight and Continue leaves exactly Node's save; a
+tapped shield shows its card and Attack sets off after it.
+
+**`world-sim.mjs`** runs the living map for 200 days on 50 seeds with a
+player walking town to town and fighting whatever catches them. It fails on
+a party stuck for a week, one standing where nothing can, the caps broken,
+or an hour's tick or a day over `tech.md` §5's budgets, and reports the
+rest: meetings and how they went, bands and chiefs at the end, ms per tick
+and per day. `-- 5 60` runs 5 seeds × 60 days.
 
 ## How the browser scripts talk to the game
 

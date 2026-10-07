@@ -133,6 +133,13 @@ As built in M2 so far:
 - **Tabs** are Map, Army (read-only until M3), Log and **Menu**, which holds
   Title screen until Hero and Realm exist. The HUD's ‹ still leaves for the
   arcade; the campaign saves on the way out.
+- **Parties** are the mockup's shields with their men beneath: grey with
+  knives for brigands, brown with red eyes for wolves. One coming for you has
+  a red rim and a dashed red line towards you. A shield answers taps within
+  26 px; its card on the context bar reads "16 men · strength 11 · you 11"
+  (or "coming for you", or with Scouting what it's doing) over a two-coloured
+  bar, with **Attack ▶** and no ⌖, for room. Tapping the shield again attacks. While you chase,
+  the bar reads "After Brigands of Baatar · 2 hexes ahead".
 
 ## 4. Sheets
 
@@ -153,6 +160,16 @@ Each wireframe is the sheet as it sits over the bottom of the map.
 │ [ Pay 82 ]   [ Auto ]   [ ⚔ Fight ]   │
 └──────────────────────────────────────┘
 ```
+
+As built in M2: no Fight until the battle screen can start from the map
+(M2's last PR). The sheet covers the tab bar until you answer: Pay N, then
+Leave or Rearguard, then **Auto ▶**, and the map slides up to keep the
+meeting in view above it. It says whether they came for you,
+both sides' men and strength with the same two-coloured bar, the odds as
+they come in (one auto-resolve a frame), the losses of your own men, and
+whether you can outrun them. Auto opens a result sheet (Victory, Defeat or
+A draw: your killed and wounded, theirs, prisoners, loot) whose Continue
+returns to the map. A meeting or a result waiting on you survives a reload.
 
 **Place** (a town)
 

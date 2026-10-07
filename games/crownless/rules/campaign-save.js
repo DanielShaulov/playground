@@ -8,7 +8,7 @@
  * worldgen makes of a seed is one (tech.md §3). A save from another version
  * is not loaded; the title offers a new campaign instead.
  */
-export const CAMPAIGN_V = 1;
+export const CAMPAIGN_V = 2;
 
 /** Warn past this many characters of JSON (tech.md §4's 200 KB). */
 const WARN_AT = 200_000;

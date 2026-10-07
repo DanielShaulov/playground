@@ -153,3 +153,39 @@
   font-size: 13px;
   color: var(--gold);
 }
+
+/* --- Parties and meetings (ui.md §3–4) ----------------------------------- */
+
+/* You against them: your share of the strength in green, theirs in red. */
+.cl-vs {
+  height: 6px;
+  margin: 6px 0 2px;
+  border-radius: 3px;
+  background: var(--danger);
+  overflow: hidden;
+}
+
+.cl-vs i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.cl-ctx .cl-vs {
+  height: 4px;
+  margin: 4px 0 0;
+}
+
+.cl-ctx-text:has(.cl-vs) .cl-ctx-sub {
+  margin-top: 1px;
+}
+
+.cl-away {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.cl-meet .cl-vs {
+  margin: 12px 0 10px;
+}

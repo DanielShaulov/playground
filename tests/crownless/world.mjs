@@ -1,6 +1,7 @@
 /**
  * The map rules, checked in Node: the realm a seed makes, travel, the clock,
- * sight and the campaign save. No browser, a few seconds.
+ * sight, brigands and wolves, meeting them, and the campaign save. No
+ * browser, a few seconds.
  *
  *     npm run test:crownless:world
  *
@@ -41,7 +42,34 @@ import {
   dayOf,
   hourOf,
   clock,
+  attack,
+  yourWorth,
+  closest,
+  partiesInSight,
 } from "../../games/crownless/rules/world.js";
+import {
+  partyPace,
+  partyHours,
+  partyWorth,
+  partyMen,
+  bandOf,
+  spawn,
+  think,
+  HOURS_A_WEEK,
+} from "../../games/crownless/rules/parties.js";
+import {
+  choices,
+  leave,
+  payOff,
+  sacrifice,
+  rearguardOf,
+  autoResolve,
+  dismiss,
+  encounterBattle,
+} from "../../games/crownless/rules/encounter.js";
+import { autoFinish, aftermath } from "../../games/crownless/rules/battle.js";
+import { purseOf, brigandWorth, VALUE } from "../../games/crownless/rules/data/parties.js";
+import { worthOf } from "../../games/crownless/rules/data/troops.js";
 import {
   CAMPAIGN_V,
   readCampaign,
@@ -736,6 +764,629 @@ console.log("\n# Sight and fog (world.md §3)\n");
   );
 }
 
+// --- Brigands and wolves -------------------------------------------------------
+
+console.log("\n# Brigands and wolves (world.md §5)\n");
+const band = (troops) => troops.map(([type, n]) => ({ type, n }));
+{
+  check(
+    "a party's pace is 12 a day on foot, 16.2 all mounted, 13.8 half, 11.28 for 60 men",
+    near(partyPace({ troops: band([["levy", 13]]) }), 12) &&
+      near(partyPace({ troops: band([["wolf", 6]]) }), 16.2) &&
+      near(
+        partyPace({
+          troops: band([
+            ["levy", 2],
+            ["squire", 2],
+          ]),
+        }),
+        13.8,
+      ) &&
+      near(partyPace({ troops: band([["levy", 60]]) }), 11.28),
+  );
+  const realm = realmOf(fresh());
+  const plain = realm.terrain.indexOf(T.plains);
+  check(
+    "a plains hex takes a band 2 hours, a wolf pack 24 / 16.2",
+    near(partyHours(realm, { troops: band([["levy", 13]]) }, plain), 2) &&
+      near(partyHours(realm, { troops: band([["wolf", 6]]) }, plain), 24 / 16.2),
+  );
+  check(
+    "a band's worth is 8 + 2 a week, never past 60",
+    brigandWorth(0) === 8 &&
+      brigandWorth(5) === 18 &&
+      brigandWorth(26) === 60 &&
+      brigandWorth(99) === 60,
+  );
+  const small = bandOf(8);
+  check(
+    "a band worth 8: 9 looters, 2 brigands, 1 poacher (60/20/20 of 8 by worth, rounded)",
+    JSON.stringify(small) ===
+      JSON.stringify(
+        band([
+          ["levy", 9],
+          ["militia", 2],
+          ["bowman", 1],
+        ]),
+      ),
+    JSON.stringify(small),
+  );
+  const big = bandOf(60);
+  check(
+    "a band worth 60 brings raiders and deserters: 21, 20, 11, 6, 7",
+    JSON.stringify(big) ===
+      JSON.stringify(
+        band([
+          ["levy", 21],
+          ["militia", 20],
+          ["bowman", 11],
+          ["squire", 6],
+          ["footman", 7],
+        ]),
+      ),
+    JSON.stringify(big),
+  );
+  check("a purse is 20 gold and 3 a man: 65 men carry 215", purseOf(65) === 215);
+}
+{
+  const s = fresh();
+  const realm = realmOf(s);
+  const lairs = (k) => realm.places.filter((p) => p.kind === "lair" && p.lair === k).length;
+  const count = (k) => s.parties.filter((p) => p.kind === k).length;
+  check(
+    `a new campaign sends out a band per hideout (${lairs("hideout")}) and a pack per den (${lairs("den")})`,
+    count("brigands") === Math.min(12, lairs("hideout")) &&
+      count("wolves") === Math.min(4, lairs("den")),
+    `${count("brigands")} bands, ${count("wolves")} packs`,
+  );
+  const fair = s.parties
+    .filter((p) => p.kind === "brigands")
+    .every((p) => partyWorth(p) >= 8 * 0.8 - 1 && partyWorth(p) <= 8 * 1.2 + 1);
+  check("week 1's bands are worth 8 ± 20%, give or take a man", fair);
+  check(
+    "every band carries 20 gold and 3 a man; packs carry none",
+    s.parties.every((p) => p.gold === (p.kind === "brigands" ? purseOf(partyMen(p)) : 0)),
+  );
+  // Week 6: bands worth 20 × 0.8–1.2; only those at 24 or more have a chief.
+  const w6 = fresh();
+  w6.parties = [];
+  w6.t = 6 * HOURS_A_WEEK;
+  spawn(w6, realm);
+  const six = w6.parties.filter((p) => p.kind === "brigands");
+  check(
+    "week 6's bands (worth 16–24): a chief only for those worth 24 or more",
+    six.some((p) => partyWorth(p) >= 20 && partyWorth(p) < 24) &&
+      six.every((p) => !!p.chief === partyWorth(p) >= 24),
+    six.map((p) => partyWorth(p).toFixed(1) + (p.chief ? "*" : "")).join(" "),
+  );
+  for (let w = 1; w <= 12; w++) {
+    s.t = 8 + w * HOURS_A_WEEK;
+    spawn(s, realm);
+  }
+  check(
+    "weekly spawns stop at 12 bands and 4 packs",
+    count("brigands") === 12 && count("wolves") === 4,
+    `${count("brigands")} bands, ${count("wolves")} packs`,
+  );
+  check(
+    "a band worth 24 or more has a chief, and only those",
+    s.parties
+      .filter((p) => p.kind === "brigands")
+      .every((p) => !!p.chief === partyWorth(p) >= 24) && s.parties.some((p) => p.chief),
+  );
+}
+
+/** A party put down by hand on hex i, standing and waiting. */
+function putParty(s, i, kind, troops, extra = {}) {
+  const realm = realmOf(s);
+  const lair = realm.places.find(
+    (p) => p.kind === "lair" && p.lair === (kind === "wolves" ? "den" : "hideout"),
+  );
+  const party = {
+    id: s.nextParty++,
+    kind,
+    name: kind === "wolves" ? "Test wolves" : "Test band",
+    home: lair.id,
+    at: { i, to: -1, progress: 0 },
+    path: [],
+    goal: "wait",
+    until: s.t + 100,
+    troops: band(troops),
+    gold: kind === "brigands" ? purseOf(troops.reduce((m, [, n]) => m + n, 0)) : 0,
+    ...extra,
+  };
+  s.parties.push(party);
+  return party;
+}
+/** An open plains hex `d` from the start, with open plains between. */
+function plainsAway(s, d) {
+  const realm = realmOf(s);
+  const from = s.player.at.i;
+  return within(realm.grid, from, d).find((j) => {
+    if (dist(realm.grid, from, j) !== d || realm.placeAt[j] >= 0) return false;
+    const path = pathFor(realm, "wild", from, j);
+    return (
+      path &&
+      path.length === d + 1 &&
+      path.every((k) => k === from || [T.plains, T.farm].includes(realm.terrain[k]))
+    );
+  });
+}
+const hexPos = (realm, at) => {
+  const a = centre(realm.grid, at.i);
+  if (at.to < 0) return a;
+  const b = centre(realm.grid, at.to);
+  return { x: a.x + (b.x - a.x) * at.progress, y: a.y + (b.y - a.y) * at.progress };
+};
+const lone = () => {
+  const s = fresh();
+  s.parties = [];
+  return s;
+};
+{
+  check(
+    "closest approach: head-on moves meet (0); passing a hex apart, 1; side by side, 0.5",
+    near(closest({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 1, y: 0 }), 0) &&
+      near(closest({ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 1 }, { x: 0, y: 1 }), 1) &&
+      near(closest({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0.5 }, { x: 1, y: 0.5 }), 0.5),
+  );
+  const s = lone();
+  const realm = realmOf(s);
+  const j = plainsAway(s, 3);
+  const pt = putParty(s, j, "brigands", [["militia", 20]]);
+  const you = { hex: s.player.at.i, worth: yourWorth(s), shy: false, forest: false, truce: false };
+  think(s, realm, pt, you, false);
+  check(
+    `a band worth ${partyWorth(pt).toFixed(1)} sees you (${you.worth.toFixed(2)}) 3 hexes off and hunts`,
+    pt.goal === "hunt" && pt.path.at(-1) === s.player.at.i,
+  );
+  const weak = putParty(s, j, "brigands", [["levy", 4]]);
+  think(s, realm, weak, you, false);
+  check(
+    "a band worth 2.24 flees you instead, to a hex farther off",
+    weak.goal === "flee" &&
+      dist(realm.grid, weak.path.at(-1), s.player.at.i) > dist(realm.grid, j, s.player.at.i),
+  );
+  const shy = putParty(s, j, "brigands", [["militia", 20]]);
+  think(s, realm, shy, { ...you, shy: true }, false);
+  check("an outlaw no band has fought is left alone", shy.goal !== "hunt");
+  const hid = putParty(s, j, "brigands", [["militia", 20]]);
+  think(s, realm, hid, { ...you, forest: true }, false);
+  check(
+    "in a forest you're seen only within 2 hexes: the band 3 off doesn't come",
+    hid.goal !== "hunt",
+  );
+  const dark = putParty(s, plainsAway(s, 4), "brigands", [["militia", 20]]);
+  think(s, realm, dark, you, true);
+  check("at night a band sees 3 hexes: one 4 off doesn't come", dark.goal !== "hunt");
+  // A den for them where you stand: wolves stray no more than 8 from it.
+  const den = { home: realm.starts.vale };
+  const pack = putParty(s, j, "wolves", [["wolf", 9]], den);
+  think(s, realm, pack, you, false);
+  check(
+    "a pack of 9 (7.83) smells you 3 hexes off and comes: you're not half again as strong",
+    pack.goal === "hunt",
+  );
+  const cubs = putParty(s, j, "wolves", [["wolf", 6]], den);
+  think(s, realm, cubs, you, false);
+  check("a pack of 6 (5.22) runs from you (10.56)", cubs.goal === "flee");
+  const off = putParty(s, plainsAway(s, 4), "wolves", [["wolf", 20]], den);
+  think(s, realm, off, you, false);
+  check("wolves 4 hexes off don't smell you", off.goal !== "hunt");
+
+  // Rest beside it and let it come: contact within 0.6 of a hex.
+  s.parties = [pt];
+  rest(s);
+  let met = null;
+  for (let h = 0; h < 12 && !s.encounter; h++) {
+    const events = advance(s);
+    met = events.find((e) => e.k === "encounter") ?? met;
+  }
+  const gap = Math.hypot(
+    hexPos(realm, s.player.at).x - hexPos(realm, pt.at).x,
+    hexPos(realm, s.player.at).y - hexPos(realm, pt.at).y,
+  );
+  check(
+    "it catches you: they came for you, as they came within 0.6 of a hex, and time stops",
+    s.encounter?.party === pt.id &&
+      s.encounter.by === "them" &&
+      met?.id === pt.id &&
+      gap / Math.sqrt(3) > 0.45 &&
+      gap <= 0.6 * Math.sqrt(3) + 1e-9 &&
+      !busy(s) &&
+      !rest(s) &&
+      !travelTo(s, j),
+    `${(gap / Math.sqrt(3)).toFixed(2)} hex apart`,
+  );
+  const t0 = s.t;
+  check("while you're met, an hour won't pass", advance(s).length === 0 && s.t === t0);
+}
+{
+  // Pass by: a party that doesn't want you lets you walk right through.
+  const s = lone();
+  const realm = realmOf(s);
+  const j = plainsAway(s, 3);
+  putParty(s, plainsAway(s, 1), "brigands", [["levy", 3]], { until: s.t + 1000 });
+  s.parties[0].goal = "wait";
+  travelTo(s, j);
+  const events = play(s);
+  check(
+    "walking past a band that doesn't want you: no meeting",
+    !events.some((e) => e.k === "encounter") && s.player.at.i === j,
+  );
+}
+
+// --- Meetings ------------------------------------------------------------------
+
+console.log("\n# Meetings: Pay, Leave, a rearguard, a fight (world.md §5)\n");
+/** You met `troops` on the next hex, them coming for you, and the meeting's seed. */
+function meeting(troops, kind = "brigands", by = "them", seed = 99) {
+  const s = lone();
+  const pt = putParty(s, plainsAway(s, 1), kind, troops);
+  s.encounter = { party: pt.id, by, seed };
+  return { s, pt };
+}
+{
+  const { s, pt } = meeting([["militia", 20]]);
+  check(
+    "a band that came for you, on foot as you are: Pay a fifth of 500, or a rearguard",
+    JSON.stringify(choices(s)) ===
+      JSON.stringify({ leave: false, rearguard: true, pay: 100, faster: false }),
+    JSON.stringify(choices(s)),
+  );
+  const gold = pt.gold;
+  check(
+    "Pay: 100 gold goes from you to them",
+    payOff(s) && s.player.gold === 400 && pt.gold === gold + 100,
+  );
+  check(
+    "…and they leave you be for 3 days: no meeting, no hunt",
+    !s.encounter && s.paid[pt.id] === s.t + 72,
+  );
+  const deal = structuredClone(s);
+  pt.goal = "hunt";
+  rest(s);
+  let met = false;
+  for (let h = 0; h < 70; h++) {
+    if (!busy(s)) rest(s);
+    advance(s);
+    met ||= !!s.encounter;
+  }
+  check("70 hours on, side by side, they still haven't come", !met);
+  const t1 = deal.t;
+  const ok = attack(deal, pt.id);
+  for (let h = 0; h < 6 && !deal.encounter; h++) advance(deal);
+  check(
+    "but you may break the deal: Attack, and you meet at once",
+    ok &&
+      deal.encounter?.party === pt.id &&
+      deal.encounter.by === "you" &&
+      !(pt.id in deal.paid) &&
+      deal.t - t1 <= 2,
+    `${deal.t - t1} h`,
+  );
+
+  check(
+    "the payment is in the Journal",
+    s.journal.some((e) => e.k === "paid" && e.gold === 100),
+  );
+}
+{
+  const { s } = meeting([["militia", 20]], "brigands", "you");
+  const c = choices(s);
+  check("a band you came for: Leave, and no Pay", c.leave && !c.rearguard && c.pay === 0);
+  check("Leave: 6 hours' truce", leave(s) && !s.encounter && Object.values(s.truce)[0] === s.t + 6);
+}
+{
+  const { s } = meeting([["wolf", 10]], "wolves");
+  const c = choices(s);
+  check(
+    "wolves are faster and can't be paid: a rearguard only",
+    c.rearguard && !c.leave && c.pay === 0,
+  );
+  check("…and Leave is refused", leave(s) === false && !!s.encounter);
+}
+{
+  const { s } = meeting([["militia", 20]]);
+  s.player.party.troops = [{ type: "ulus:horseman", n: 12, xp: 0, wounded: 0 }];
+  check(
+    "an all-horse warband (16.2 a day) is faster than a band: Leave",
+    choices(s).leave && choices(s).faster,
+  );
+}
+{
+  const troops = [
+    { type: "vale:levy", n: 12, xp: 0, wounded: 0 },
+    { type: "vale:squire", n: 4, xp: 0, wounded: 0 },
+  ];
+  check(
+    "a rearguard from 12 levies and 4 squires (worth 12.04) is the slow levies: 4 of them",
+    JSON.stringify(rearguardOf(troops)) === JSON.stringify({ "vale:levy": 4 }),
+    JSON.stringify(rearguardOf(troops)),
+  );
+  troops[0].wounded = 6;
+  check(
+    "the wounded don't stand in it: 6 fit levies and 4 squires (9.22) leave 3",
+    JSON.stringify(rearguardOf(troops)) === JSON.stringify({ "vale:levy": 3 }),
+    JSON.stringify(rearguardOf(troops)),
+  );
+  const { s } = meeting([["militia", 20]]);
+  check(
+    "Sacrifice with 12 levies alone (5.64): 2 stay behind; 6 hours' truce",
+    sacrifice(s) &&
+      s.player.party.troops[0].n === 10 &&
+      !s.encounter &&
+      Object.values(s.truce)[0] === s.t + 6 &&
+      s.journal.at(-1).k === "rearguard" &&
+      s.journal.at(-1).men === 2,
+  );
+}
+{
+  // A fight you win: 14 footmen against a small band.
+  const { s, pt } = meeting(
+    [
+      ["levy", 9],
+      ["militia", 2],
+      ["bowman", 1],
+    ],
+    "brigands",
+    "you",
+    1,
+  );
+  s.player.party.troops = [{ type: "vale:footman", n: 14, xp: 0, wounded: 0 }];
+  const before = structuredClone(s);
+  const twin = structuredClone(s);
+  const gold = s.player.gold;
+  // The same battle, fought and counted with battle.js alone: what they lost.
+  const theirs = aftermath(autoFinish(encounterBattle(structuredClone(s))), {
+    worthOf,
+    medicine: [0, 0],
+  })[1];
+  let value = 0;
+  for (const m of [theirs.killed, theirs.captured])
+    for (const [t, n] of Object.entries(m)) value += n * VALUE[t];
+  const r = autoResolve(s);
+  const again = autoResolve(before);
+  check("the same meeting is the same fight", JSON.stringify(r) === JSON.stringify(again));
+  check(
+    "a win: the band is gone from the map, and you hear of it",
+    r.kind === "won" && !s.parties.includes(pt) && !s.encounter && s.result === r,
+  );
+  check(
+    `loot: the band's purse (${pt.gold}) and 15% of the ${value} gold its dead and taken were worth`,
+    r.loot === pt.gold + Math.round(0.15 * value) && s.player.gold === gold + r.loot,
+    `${r.loot} gold`,
+  );
+  const men = s.player.party.troops.reduce((m, t) => m + t.n, 0);
+  check(
+    "your dead leave the warband, your wounded stay in it",
+    r.killed > 0 &&
+      men === 14 - r.killed &&
+      s.player.party.troops.reduce((m, t) => m + t.wounded, 0) === r.wounded,
+    `${r.killed} killed, ${r.wounded} wounded`,
+  );
+  const held = s.player.party.prisoners.reduce((m, t) => m + t.n, 0);
+  check("their taken ride with you as prisoners", held === r.taken && held >= 2, `${held}`);
+  check("…and it's in the Journal", s.journal.at(-1).k === "won");
+  check("the result waits to be read; Continue clears it", !busy(s) && (dismiss(s), !s.result));
+
+  // With 10 prisoners already, the limit of 22 holds only 11.
+  twin.player.party.prisoners = [{ type: "levy", n: 10 }];
+  const full = autoResolve(twin);
+  check(
+    `prisoners ride along up to half your limit: 10 held, 1 more of ${r.taken} taken`,
+    full.taken === 1 && twin.player.party.prisoners.reduce((m, t) => m + t.n, 0) === 11,
+    `${full.taken} taken`,
+  );
+}
+{
+  // The banner's household are the hero's own (army.md §6): what it loses
+  // isn't the warband's. 12 levies lose to 40 brigands, the household's four
+  // footmen with them; only the levies count.
+  let found = null;
+  for (let seed = 1; seed <= 40 && !found; seed++) {
+    const { s } = meeting([["militia", 40]], "brigands", "them", seed);
+    const after = aftermath(autoFinish(encounterBattle(s)), { worthOf, medicine: [0, 0] })[0];
+    if (after.killed["vale:footman"] > 0) found = { s, levies: after.killed["vale:levy"] ?? 0 };
+  }
+  const r = autoResolve(found.s);
+  check(
+    `the household's dead aren't yours: you lost ${found.levies} levies, and that's all you're told`,
+    r.kind === "lost" && r.killed === found.levies,
+    `${r.killed} killed`,
+  );
+}
+{
+  // Wolves: no purse, no prisoners.
+  const { s } = meeting([["wolf", 8]], "wolves", "you");
+  s.player.party.troops = [{ type: "manatarms", n: 20, xp: 0, wounded: 0 }];
+  const gold = s.player.gold;
+  const r = autoResolve(s);
+  check(
+    "beating wolves brings no loot and no prisoners",
+    r.kind === "won" && r.loot === 0 && r.taken === 0 && s.player.gold === gold,
+    `${r.kind}`,
+  );
+}
+{
+  // A fight you lose: 12 levies against 40 brigands, two hexes out.
+  const { s, pt } = meeting([["militia", 40]]);
+  s.player.at.i = plainsAway(s, 2);
+  const gold = s.player.gold;
+  const r = autoResolve(s);
+  const realm = realmOf(s);
+  const village = realm.places.find((p) => p.name === r.at);
+  const nearest = Math.min(
+    ...realm.places.filter((p) => p.kind === "village").map((p) => dist(realm.grid, p.i, pt.at.i)),
+  );
+  check(
+    "a defeat: 12 fresh levies at the nearest village, your gold kept",
+    r.kind === "lost" &&
+      village?.kind === "village" &&
+      s.player.at.i === village.i &&
+      dist(realm.grid, village.i, pt.at.i) === nearest &&
+      JSON.stringify(s.player.party.troops) ===
+        JSON.stringify([{ type: "vale:levy", n: 12, xp: 0, wounded: 0 }]) &&
+      s.player.gold === gold,
+    r.at,
+  );
+  check(
+    "…and the band lets you be for a day",
+    s.truce[pt.id] === s.t + 24 && s.parties.includes(pt),
+  );
+  check("a band that's fought you no longer spares an outlaw", s.player.provoked === true);
+}
+{
+  // Chasing: Attack a band in sight and you catch it, unless it runs.
+  const s = lone();
+  const realm = realmOf(s);
+  const pt = putParty(s, plainsAway(s, 3), "brigands", [["levy", 17]], { until: s.t + 1000 });
+  check("Attack needs the party in sight", attack(s, 999) === false);
+  check("Attack: you set off after it", attack(s, pt.id) && busy(s) && s.player.chase === pt.id);
+  play(s, 48);
+  check(
+    "a band worth 9.52 to your 10.56 neither hunts nor runs: you catch it, and you came for them",
+    s.encounter?.party === pt.id && s.encounter.by === "you",
+    s.encounter ? "" : `t ${s.t}, at ${s.player.at.i}, them at ${pt.at.i} (${pt.goal})`,
+  );
+  const t = lone();
+  const runner = putParty(t, plainsAway(t, 3), "brigands", [["levy", 9]]);
+  attack(t, runner.id);
+  play(t, 24);
+  check(
+    "a band worth 5.04 runs, and on foot as you are, it keeps ahead for a day",
+    !t.encounter && runner.goal === "flee",
+    `${dist(realm.grid, t.player.at.i, runner.at.i)} hexes apart`,
+  );
+}
+{
+  // After a Leave, neither side can make contact for 6 hours, even chasing.
+  const u = lone();
+  const band2 = putParty(u, plainsAway(u, 2), "brigands", [["levy", 17]], { until: u.t + 1000 });
+  u.encounter = { party: band2.id, by: "you", seed: 5 };
+  leave(u);
+  const t0 = u.t;
+  attack(u, band2.id);
+  for (let h = 0; h < 12 && !u.encounter; h++) advance(u);
+  check(
+    "after a Leave you can go after them, but you meet only once the 6 hours are out",
+    u.encounter?.party === band2.id && u.t - t0 >= 6,
+    `met after ${u.t - t0} h`,
+  );
+}
+{
+  // Travel stops when something hostile comes into sight (world.md §2).
+  const s = lone();
+  const realm = realmOf(s);
+  const far = farTarget(s, 30);
+  travelTo(s, far.place.i);
+  // A strong band waiting 6 hexes along the way: out of sight at the start.
+  const ahead = far.r.path[6];
+  const pt = putParty(s, ahead, "brigands", [["militia", 30]], { until: s.t + 1000 });
+  const events = play(s);
+  const stop = events.find((e) => e.k === "stop");
+  check(
+    "travel stops itself when a stronger band comes into sight",
+    stop?.why === "spotted" &&
+      stop.id === pt.id &&
+      events.some((e) => e.k === "spotted" && e.id === pt.id) &&
+      !busy(s) &&
+      dist(realm.grid, s.player.at.i, ahead) <= 4 &&
+      dist(realm.grid, s.player.at.i, ahead) >= 3,
+    `${dist(realm.grid, s.player.at.i, ahead)} hexes off`,
+  );
+  travelTo(s, far.place.i);
+  const on = play(s, 2);
+  check("going on, the same band doesn't stop you twice", !on.some((e) => e.k === "stop"));
+}
+{
+  // The week turns: a hideout sends out a new band.
+  const s = fresh();
+  const realm = realmOf(s);
+  const bands = s.parties.filter((p) => p.kind === "brigands").length;
+  s.parties = s.parties.filter((p) => p.kind !== "brigands");
+  s.t = HOURS_A_WEEK - 1;
+  rest(s);
+  advance(s, realm);
+  check(
+    "at the turn of the week, the hideouts send their bands out again",
+    s.parties.filter((p) => p.kind === "brigands").length === bands,
+    `${bands}`,
+  );
+}
+{
+  // Pickups lie in the open and are taken in passing.
+  const s = lone();
+  const realm = realmOf(s);
+  const gold = realm.places.find((p) => p.kind === "pickup" && p.pickup === "gold");
+  const chest = realm.places.find((p) => p.kind === "pickup" && p.pickup === "chest");
+  const by = neighbours(realm.grid, gold.i).find((j) => realm.placeAt[j] < 0 && route(s, j));
+  s.player.at.i = by;
+  const g0 = s.player.gold;
+  travelTo(s, gold.i);
+  const events = play(s);
+  check(
+    `a pile of gold on the way: ${gold.amount} more gold, gone from the map, in the Journal`,
+    s.player.gold === g0 + gold.amount &&
+      s.gone.includes(gold.id) &&
+      events.some((e) => e.k === "pickup" && e.id === gold.id && !e.none) &&
+      s.journal.some((e) => e.k === "pickup" && e.id === gold.id),
+  );
+  travelTo(s, by);
+  play(s);
+  travelTo(s, gold.i);
+  play(s);
+  check("it's taken once", s.player.gold === g0 + gold.amount);
+  if (chest) {
+    const nb = neighbours(realm.grid, chest.i).find((j) => realm.placeAt[j] < 0 && route(s, j));
+    s.player.at = { i: nb, to: -1, progress: 0 };
+    travelTo(s, chest.i);
+    const ev = play(s);
+    check(
+      "a chest stays where it is (it waits for M3)",
+      !s.gone.includes(chest.id) && ev.some((e) => e.k === "pickup" && e.none),
+    );
+  }
+}
+{
+  // The wounded heal a tenth of each stack every midnight.
+  const s = lone();
+  s.player.party.troops[0].wounded = 5;
+  rest(s);
+  play(s);
+  check(
+    "5 wounded of 12 levies, one midnight later: 3 (ceil of 1.2 healed)",
+    s.player.party.troops[0].wounded === 3,
+  );
+}
+{
+  // The same orders on the same seed, a month on: the same world.
+  const run = () => {
+    const s = fresh();
+    const stops = realmOf(s).places.filter((p) => p.kind === "town");
+    let k = 0;
+    while (s.t < 8 + 24 * 30) {
+      if (s.encounter) autoResolve(s);
+      if (s.result) dismiss(s);
+      if (!busy(s)) travelTo(s, stops[k++ % stops.length].i) || rest(s);
+      advance(s);
+    }
+    return s;
+  };
+  const a = run();
+  check(
+    "a month of the same orders on seed 7 ends in the same world, parties and all",
+    JSON.stringify(a) === JSON.stringify(run()),
+    `${a.parties.length} parties, ${a.journal.filter((e) => ["won", "lost", "draw"].includes(e.k)).length} fights`,
+  );
+  const back = readCampaign(JSON.parse(JSON.stringify(makeCampaign(a))));
+  delete back.v;
+  check(
+    "its save loads back exactly, parties and truces included",
+    JSON.stringify(back) === JSON.stringify(a),
+  );
+}
+
 // --- The save ------------------------------------------------------------------
 
 console.log("\n# The campaign save (tech.md §4)\n");
@@ -783,6 +1434,9 @@ console.log("\n# The campaign save (tech.md §4)\n");
   const stops = realm.places.filter((p) => p.kind === "town" || p.kind === "castle");
   let k = 0;
   while (s.t < 8 + 24 * 14) {
+    // Whatever you meet on the way, fight it out.
+    if (s.encounter) autoResolve(s);
+    if (s.result) dismiss(s);
     travelTo(s, stops[k++ % stops.length].i);
     if (!busy(s)) rest(s);
     play(s, 24 * 14);
@@ -794,6 +1448,7 @@ console.log("\n# The campaign save (tech.md §4)\n");
   const home = jr.places[jr.starts.vale];
   const seat = jr.places[home.parent];
   for (let trip = 0; trip < 70; trip++) {
+    j.parties = []; // nothing on the road: this is about the Journal
     travelTo(j, trip % 2 ? home.i : seat.i);
     play(j);
   }

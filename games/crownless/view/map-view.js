@@ -483,8 +483,14 @@ export function placeIcon(ctx, p, x, y, s) {
   }
 }
 
-/** Your banner: a red shield with a star, gold-rimmed, your men beneath. */
-export function banner(ctx, x, y, s, label) {
+/** How the parties on the map look: grey brigands with knives, wolves with eyes. */
+export const PARTY_LOOKS = {
+  brigands: { color: "#8a8f98", dark: "#363a42", charge: "knives" },
+  wolves: { color: "#6e6458", dark: "#26211c", charge: "eyes" },
+};
+
+/** A party's shield, a count beneath it (the mockup's look for every party). */
+function shield(ctx, x, y, s, look, { rim = null, label = null } = {}) {
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,.45)";
   ctx.shadowBlur = 4;
@@ -496,19 +502,35 @@ export function banner(ctx, x, y, s, label) {
   ctx.quadraticCurveTo(x + s / 2, y + s * 0.45, x, y + s * 0.62);
   ctx.quadraticCurveTo(x - s / 2, y + s * 0.45, x - s / 2, y + s * 0.05);
   ctx.closePath();
-  ctx.fillStyle = YOU.color;
+  ctx.fillStyle = look.color;
   ctx.fill();
   ctx.restore();
-  ctx.lineWidth = 2.2;
-  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = rim ? 2.2 : 1.2;
+  ctx.strokeStyle = rim ?? look.dark;
   ctx.stroke();
-  charge(ctx, YOU.charge, x, y + s * 0.02, s * 0.62);
+  if (look.charge === "eyes") {
+    // Two slanted red eyes, as at the den.
+    ctx.fillStyle = "#e05a3a";
+    for (const k of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(x + k * s * 0.08, y + s * 0.02);
+      ctx.lineTo(x + k * s * 0.3, y - s * 0.1);
+      ctx.lineTo(x + k * s * 0.24, y + s * 0.08);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else charge(ctx, look.charge, x, y + s * 0.02, s * 0.62);
   if (label != null) {
     ctx.font = `700 11px ${FONT}`;
     const w = ctx.measureText(label).width + 10;
     pill(ctx, x - w / 2, y + s * 0.62 + 1, w, 15, "rgba(16,19,26,.88)");
     text(ctx, label, x, y + s * 0.62 + 9, { size: 11, weight: 700, align: "center" });
   }
+}
+
+/** Your banner: a red shield with a star, gold-rimmed, your men beneath. */
+export function banner(ctx, x, y, s, label) {
+  shield(ctx, x, y, s, YOU, { rim: GOLD, label });
 }
 
 // ---------------------------------------------------------------------------
@@ -682,10 +704,12 @@ export function createMapView() {
       ctx.fillRect(0, 0, L.W, L.viewH);
     }
 
-    // Labels on top of the fog's veil; where you stand, your banner says it.
+    // Labels on top of the fog's veil; where you or a party stand, the
+    // shield's count would cover the name, so it gives way.
+    const under = new Set((o.parties ?? []).map((pt) => pt.hex));
     for (const [i, x, y] of visible) {
       const id = realm.placeAt[i];
-      if (id < 0 || !seen(i) || i === o.here) continue;
+      if (id < 0 || !seen(i) || i === o.here || under.has(i)) continue;
       const p = realm.places[id];
       if (!p.name) continue;
       text(ctx, p.name, x, y + R * 0.78, {
@@ -757,6 +781,49 @@ export function createMapView() {
       ctx.strokeStyle = o.selOk ? ACCENT : "rgba(248,113,113,.9)";
       ctx.stroke();
     }
+
+    // Parties in sight; a dashed red line runs from any that's coming for
+    // you, partway towards you (the mockup's cue).
+    const you = o.party ? toScreen(L, cam, o.party.x, o.party.y) : null;
+    // A party right on top of you is drawn a little aside, so both show.
+    const spots = (o.parties ?? []).map((pt) => {
+      const q = toScreen(L, cam, pt.x, pt.y);
+      if (!you) return q;
+      const d = Math.hypot(q.x - you.x, q.y - you.y);
+      const min = R * 0.9;
+      if (d >= min) return q;
+      const ux = d > 0.01 ? (q.x - you.x) / d : -1;
+      const uy = d > 0.01 ? (q.y - you.y) / d : 0;
+      return { x: you.x + ux * min, y: you.y + uy * min };
+    });
+    (o.parties ?? []).forEach((pt, k) => {
+      const q = spots[k];
+      if (pt.hunting && you) {
+        ctx.strokeStyle = "rgba(248,113,113,.9)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(q.x, q.y);
+        ctx.lineTo(q.x + (you.x - q.x) * 0.45, q.y + (you.y - q.y) * 0.45);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    });
+    (o.parties ?? []).forEach((pt, k) => {
+      const q = spots[k];
+      const s = 20 * (R / 26);
+      if (pt.sel) {
+        ctx.beginPath();
+        ctx.arc(q.x, q.y - 1, s * 0.95, 0, Math.PI * 2);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = ACCENT;
+        ctx.stroke();
+      }
+      shield(ctx, q.x, q.y - 3, s, PARTY_LOOKS[pt.kind], {
+        rim: pt.hunting ? "rgba(248,113,113,.95)" : null,
+        label: pt.label,
+      });
+    });
 
     // You.
     if (o.party) {

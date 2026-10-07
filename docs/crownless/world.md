@@ -252,6 +252,39 @@ moves first; met again within a day, Leave is offered only if you are faster
 Battles between AI parties are fought by the same function out of sight, with
 no screen. (About 4 ms each; a Medium world has a few a day.)
 
+**As built in M2** (`rules/parties.js`, `rules/encounter.js`, numbers in
+`rules/data/parties.js`):
+
+- A party sees 4 hexes, 3 at night, and only 2 into a forest you stand in.
+  Brigands hunt you if they're 1.2× your worth and flee if you're 1.2× theirs;
+  otherwise they roam within 8 of their hideout, favouring roads. Wolves
+  roam within 6 of their den, off the roads, and hunt what comes within 3
+  hexes unless you're 1.5× them or they've strayed 8 from the den. Your worth, as they see it, is your fit men's
+  plus your banner's household. An outlaw nobody has fought is left alone.
+- Parties move 12 hexes a day × class × size, as you do but with no hero or
+  culture: brigands on foot match an unmounted warband (a band that runs
+  can't be caught; one that roams can), and wolves are fast (16.2).
+- Weekly, each hideout sends out a band and each den a pack, up to 12 and 4;
+  and every band grows to what a band is worth that week (8 + 2 a week,
+  each by its own 0.8–1.2 measure), making good its losses. A band worth 24
+  has a chief (a level-3 hero and up to six guards). A purse is 20 gold and
+  3 a man.
+- Travel stops when a party newly in sight is coming for you or is stronger.
+- **Pay**: brigands that came for you; they won't hunt you for 3 days, but
+  you may still Attack them (the deal is off). **Leave** (you came for them,
+  or you're faster) and a **rearguard** (your slowest fit men, worth 15%,
+  lost) end the meeting with 6 hours in which neither side can make contact,
+  even chasing. Talk and Surrender wait for lords and capture (M3+).
+- **Auto-resolve** keeps `battle.md` §11's aftermath. Won: your dead leave,
+  your wounded stay, loot is 15% of the value of their dead and taken plus
+  their whole purse, the taken ride as prisoners up to half your limit (none
+  from wolves), and the band is gone. Lost (until M3's capture): your
+  warband scatters and you start again at the nearest village with 12
+  levies and your gold, the band leaving you be for a day. Drawn: 6 hours.
+- Pickups: gold, iron and horses are taken in passing; a chest and abandoned
+  arms stay put until M3 can open them. Battles don't grow yet (there are no
+  allies to join), and AI parties don't fight each other.
+
 ## 6. Economy
 
 Three resources (README, D4): **gold** for everything, **iron** for armour and

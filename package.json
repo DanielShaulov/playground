@@ -16,6 +16,7 @@
     "test:crownless": "node tests/crownless/play.mjs",
     "test:crownless:rules": "node tests/crownless/rules.mjs",
     "test:crownless:world": "node tests/crownless/world.mjs",
+    "test:crownless:world-sim": "node tests/crownless/world-sim.mjs",
     "test:crownless:sim": "node tests/crownless/battle-sim.mjs",
     "test:crownless:shots": "node tests/crownless/shots.mjs",
     "test:crownless:campaign": "node tests/crownless/campaign.mjs"

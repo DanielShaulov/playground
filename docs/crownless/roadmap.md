@@ -140,9 +140,16 @@ Built so far, in three PRs worked beside M1's battle rework:
    `world.mjs` (seeds 1–50, travel and sight by hand-worked numbers) and
    `campaign.mjs` (a journey with a reload in the middle lands exactly where
    the unbroken one does).
-2. **Brigands**: parties, contact, the encounter sheet with odds, battle
-   terrain from the hex, loot; `world-sim.mjs`.
-3. **Places**: pickups, lairs, shrines, stones and camps worth stopping for.
+2. **Brigands and wolves** (done): bands and packs that spawn weekly, grow,
+   hunt the weak and flee the strong; contact along each move; the encounter
+   sheet with its odds, Auto-resolve, Pay, Leave and a rearguard; loot,
+   losses and prisoners; gold, iron and horse pickups. Checked by `world.mjs`
+   (each rule by hand, every check watched failing), `world-sim.mjs` (50
+   seeds × 200 days) and `campaign.mjs` (a meeting tapped through, its fight
+   the one Node fights).
+3. **Fight it yourself**: Fight on the encounter sheet opens M1's battle
+   screen and comes back to the map with the same aftermath Auto-resolve
+   applies; waits for the battle loop rework.
 
 ## M3 · The warband — 2–3 sessions
 

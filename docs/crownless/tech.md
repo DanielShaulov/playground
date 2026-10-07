@@ -32,11 +32,15 @@ games/crownless/
     data/troops.js    army.md §2–4 as data
     data/world.js     terrain, places, buildings, contracts
     data/hero.js      backgrounds, the starting hero, the party limit
+    data/parties.js   brigands and wolves: sizes, mixes, the rules of meeting
     battle.js         the battle (successor of the theory model, retired in M1)
     battle-ai.js      the plain AI and lord personalities
     battle-setup.js   parties → squads; deployment presets; terrain from hex
     worldgen.js       seed → map
-    world.js          world state, the tick, movement, encounters, the week
+    world.js          world state, the tick, movement, contact, the week
+    ground.js         what a hex costs a culture to cross; cached A* paths
+    parties.js        brigands and wolves: spawns, growth, hunt/flee/roam
+    encounter.js      a meeting: its battle, Pay/Leave/rearguard, auto-resolve
     party.js          recruiting, upgrades, XP, wages, wounded, prisoners
     lords.js          lord and faction AI
     standing.js       renown, relations, roles, your realm
@@ -57,7 +61,9 @@ games/crownless/
 tests/crownless/
   README.md           how to run, what each script proves
   rules.mjs           the battle rules, checked in Node
-  world.mjs           the map rules, checked in Node: worldgen, travel, sight
+  world.mjs           the map rules, checked in Node: worldgen, travel, sight,
+                      parties and meetings
+  world-sim.mjs       200 days × 50 seeds of the living map
   battle-sim.mjs      the theory model's report, on the real rules
   world-sim.mjs       AI-only realms for 200 days over many seeds
   harness.mjs         Playwright helpers: launch, tap via layout.js, read the save
@@ -113,10 +119,12 @@ returns events ("arrive", "discover", "dusk"; later "party X now at hex Y",
 between their old and new positions. The view runs one hour per 0.12 s.
 
 **The map builds battles through `battle-setup.js` only**, so the battle
-can change underneath it: `armySquads`, `bannerSquad`, `deploy`, `makeWoods`,
-`createBattle`, `oddsRun`, `summarizeOdds`, `autoFinish`, `aftermath`,
-`strength`, `worthOf` and `troop`. A change to one of those is a change to
-this contract; say so in both threads' PRs.
+can change underneath it: `armySquads`, `bannerSquad`, `skirmishHero` (a
+brigand chief), `deploy`, `makeWoods`, `createBattle`, `oddsRun`,
+`summarizeOdds`, `autoFinish`, `aftermath`, `strength`, `worthOf` and
+`troop`. Only `rules/encounter.js` imports them (the view takes the odds
+and strength through it). A change to one of those is a change to this
+contract; say so in both threads' PRs.
 
 ## 3. Determinism
 
@@ -190,7 +198,12 @@ again — ironman in name only.
 ```
 
 Only mutable fields are saved; everything static about a place regenerates
-from the seed. Paths are recomputed, not stored. Estimate on Medium: ~100 KB;
+from the seed. Your path is recomputed, not stored; an AI party keeps the
+hexes still ahead of it (`path`), because it re-plans only when it changes
+its mind, and a re-path is the tick's budget. As built in M2 the campaign
+save also keeps `truce` and `paid` (party id → the hour it ends), `spotted`
+(parties already in sight), `gone` (pickups taken), and the `encounter` and
+`result` waiting on you. Estimate on Medium: ~100 KB;
 budget 300 KB; `save.js` warns in the console above 200 KB.
 
 **Versions.** Any incompatible change bumps `SAVE_VERSION` (`CAMPAIGN_V` for
@@ -240,6 +253,14 @@ stand-in and inside a 60 fps frame: the ground is cached, each soldier is one
 arc in one path per colour, and the next saving would be fewer gradients for
 dust. A phone will say which matters.
 
+**Measured in M2** (`npm run test:crownless:world-sim`, Node, 50 seeds × 200
+days, 16 brigand and wolf parties and a player): an hour's tick has a median
+of 0.07 ms and a p99 of 0.6 ms; a day, auto-resolves included, a median of
+2.3 ms and a p99 of 9.5 ms. Re-paths are the tick's cost (about 0.05 ms
+each); A\*'s guess is the cheapest hex the realm has for that culture, not
+a loose bound, which took a third off the p99. There are 16 parties, not 80:
+lords (M4) are where the budget will be tested.
+
 **Don't cache the whole map** in an offscreen canvas: at DPR 2 a Medium map
 is ~60 MB of pixels. Draw the visible hexes each frame; cache only the small
 overview image.
@@ -281,6 +302,10 @@ honest way to set a number that says how hard the game is.
   60%); lords bankrupt or stuck; parties that can't path; the Hollow's
   strongholds by week (alone, it must end the realm between days 110 and 150
   on Normal); battles per day; ms per simulated day.
+  As built in M2 (v1): brigands and wolves, and a player walking from town
+  to town who fights whatever catches them. It fails on a party stuck in
+  place for a week, one standing where nothing can, the caps broken, or a
+  tick or a day over budget; it reports meetings and their outcomes.
 - `campaign-bot.mjs` (M8) — a scripted player policy (hunt what it can beat,
   recruit, upgrade, take contracts, go for the Regalia) checked against the
   pacing table in `world.md` §14.
