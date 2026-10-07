@@ -124,7 +124,15 @@ export const troopList = (troops) =>
 // Title
 // ---------------------------------------------------------------------------
 
-export function titleSheet({ canContinue, continueText, best, nudge, onContinue, onSkirmish }) {
+export function titleSheet({
+  canContinue,
+  continueText,
+  best,
+  nudge,
+  onContinue,
+  onSkirmish,
+  campaign,
+}) {
   return h(
     "div",
     { class: "cl-title" },
@@ -142,8 +150,14 @@ export function titleSheet({ canContinue, continueText, best, nudge, onContinue,
     h(
       "div",
       { class: "cl-stack" },
-      canContinue ? button(continueText, onContinue, { cls: "primary" }) : null,
-      button("Skirmish", onSkirmish, { cls: canContinue ? "" : "primary" }),
+      campaign.text ? button(campaign.text, campaign.onContinue, { cls: "primary" }) : null,
+      canContinue
+        ? button(continueText, onContinue, { cls: campaign.text ? "" : "primary" })
+        : null,
+      button("New campaign", campaign.onNew, {
+        cls: campaign.text || canContinue ? "" : "primary",
+      }),
+      button("Skirmish", onSkirmish),
     ),
     nudge
       ? h("p", { class: "cl-nudge" }, "Add to Home Screen to keep your games on this phone.")

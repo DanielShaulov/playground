@@ -1,0 +1,155 @@
+/* Crownless's campaign screen (ui.md §3–4): the context bar, the tab bar and
+   the map's sheets, on top of shared/style.css and style.css. Its own file so
+   the map and the battle can change their looks without touching each other. */
+
+.cl-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+/* --- The HUD's resources -------------------------------------------------- */
+
+.cl-res {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- The context bar ------------------------------------------------------ */
+
+.cl-ctx {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 14px;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--line);
+}
+
+.cl-ctx-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cl-ctx-title {
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cl-ctx-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cl-ctx .cl-btn {
+  flex: 0 0 auto;
+}
+
+.cl-ctx .cl-btn.primary {
+  min-width: 100px;
+  min-height: 52px;
+}
+
+.cl-ctx .cl-btn.square {
+  width: 48px;
+  min-height: 48px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- The tab bar ---------------------------------------------------------- */
+
+.cl-tabbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9;
+  height: 56px;
+  display: flex;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--line);
+}
+
+.cl-tabbtn {
+  flex: 1 1 0;
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+
+.cl-tabbtn.on {
+  color: var(--accent);
+}
+
+/* --- Sheets on the map ---------------------------------------------------- */
+
+.cl-seg-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.cl-seg-2 .cl-opt small {
+  white-space: normal;
+}
+
+.cl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.cl-list-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+}
+
+.cl-list-row span {
+  flex: 1 1 auto;
+}
+
+.cl-log-row {
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.cl-warn-line {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--gold);
+}

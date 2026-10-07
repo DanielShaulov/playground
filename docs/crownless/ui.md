@@ -68,6 +68,10 @@ between two plain AIs that plays behind it.
 **New campaign.** Four choices on one scrolling sheet: map size, difficulty,
 home culture (four cards with doctrine and trait), background (four cards),
 banner colour; an optional seed. **Begin**.
+As built in M2: home culture and background only, on Medium and Normal with
+a random seed; the realm being chosen shows behind the sheet. The title
+offers **Continue campaign — day N** above a Skirmish's Continue, because
+the two keep separate saves (`tech.md` §4).
 
 **Skirmish** (M1's whole game, kept forever as practice): pick two armies from
 presets or "random at worth N", a terrain, and fight. One sheet, a tab per
@@ -118,6 +122,17 @@ speed; reduce motion; haptics.
   overview: the whole realm fitted to the screen, territories coloured, tap
   anywhere to zoom back there.
 - **Tabs** open sheets over the map: Army, Hero, Realm, Log (the Journal).
+
+As built in M2 so far:
+
+- **Tapping the map while travelling** stops you at the next hex and selects
+  what you tapped, so changing your mind is one tap, then Go.
+- **Rest** sits on the bar whenever you stand still; tapping yourself makes
+  it the primary. Rest runs to 06:00, and Stop breaks camp.
+- **Toasts** sit at the top of the map, clear of the path and the thumb.
+- **Tabs** are Map, Army (read-only until M3), Log and **Menu**, which holds
+  Title screen until Hero and Realm exist. The HUD's ‹ still leaves for the
+  arcade; the campaign saves on the way out.
 
 ## 4. Sheets
 

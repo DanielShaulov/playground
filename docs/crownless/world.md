@@ -65,7 +65,9 @@ Every map comes from a seed, and the save stores only the seed for terrain
 1. **Crownhold** at the centre (±2 hexes), on a low plateau of ruins.
 2. **Four capitals** on a cross around it, 35–45% of the way to the edges,
    with the cultures assigned to the four arms in a random rotation. A seed
-   decides whether Kharum is north or east.
+   decides whether Kharum is north or east. Built: 11–14 rows north and
+   south, 8–10 columns east and west of Crownhold, nearer 40–50%; further out
+   and a region's outer castles and villages crowd into the sea.
 3. **Regions** grow from the five seats by weighted flood fill; their borders
    are the frontiers.
 4. **Terrain** from two octaves of value noise for height and wetness, biased
@@ -93,7 +95,9 @@ Every map comes from a seed, and the save stores only the seed for terrain
     sits within 5 hexes of the player's start. If not, try `seed + 1` and
     record the seed actually used.
 12. **Start** the player at a village of their home culture, near but not at
-    the capital.
+    the capital. Built: the capital's nearest village, kept 6+ hexes from
+    any lair for all four cultures, because the realm doesn't depend on which
+    you pick.
 
 ## 2. Time and movement
 
@@ -129,6 +133,10 @@ Travel **stops on its own** when:
 - something happens to you: an ally asks for help, a siege of your fief
   begins, the week turns with unpaid wages;
 - an event begins (the Hollow rising, a Regalia revealed).
+
+So far (M2) the only place worth a stop is a watchtower, climbed on the first
+visit; towns and lairs found on the way go in the Journal as you pass.
+**Stop** finishes the step into the next hex, so you always stand on one.
 
 **Waiting** ("Rest") passes time in place until tapped again, until morning,
 or until the wounded are healed. Resting in a friendly settlement heals

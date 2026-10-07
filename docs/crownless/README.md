@@ -24,7 +24,7 @@ end by listing what to try on the phone — what a headless run can't judge.
 | --------------------------------------------------- | ----------- |
 | M0 Design, battle theory model, mockups             | done        |
 | M1 Battle sandbox (Skirmish)                        | done        |
-| M2 World map, travel, bandits, saves                | not started |
+| M2 World map, travel, bandits, saves                | in progress |
 | M3 Army, economy, hero progression                  | not started |
 | M4 Factions, lords, strategic AI                    | not started |
 | M5 Sieges and fiefs                                 | not started |

@@ -132,6 +132,18 @@ Done when:
 - `world-sim` runs 200 days on 50 seeds with no party that can't path and no
   tick over budget.
 
+Built so far, in three PRs worked beside M1's battle rework:
+
+1. **A realm to walk** (done): worldgen, hex, travel, the clock, sight and
+   fog, watchtowers, the campaign save under its own key, the map screen with
+   its context bar and tabs, Continue and New campaign. Checked by
+   `world.mjs` (seeds 1–50, travel and sight by hand-worked numbers) and
+   `campaign.mjs` (a journey with a reload in the middle lands exactly where
+   the unbroken one does).
+2. **Brigands**: parties, contact, the encounter sheet with odds, battle
+   terrain from the hex, loot; `world-sim.mjs`.
+3. **Places**: pickups, lairs, shrines, stones and camps worth stopping for.
+
 ## M3 · The warband — 2–3 sessions
 
 Recruit, pay, upgrade, heal, level up. The economy exists.
