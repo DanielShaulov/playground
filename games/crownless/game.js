@@ -51,6 +51,8 @@ import {
 } from "./view/sheets.js";
 import { sideLook, squadName } from "./view/theme.js";
 import { readSave, makeSave } from "./rules/save.js";
+import { createCampaign } from "./view/campaign.js";
+import { dayOf } from "./rules/world.js";
 
 const shell = createShell({ title: "Crownless" });
 const { stage } = shell;
@@ -68,6 +70,17 @@ hudEl.append(hudRight);
 const ui = h("div", { class: "cl-ui" });
 stageEl.append(ui);
 
+// The campaign (M2) draws its own screen; this file keeps the title and the battle.
+const campaign = createCampaign({
+  stage,
+  ui,
+  hudLeft,
+  hudRight,
+  store,
+  onEnter: () => (scene = "campaign"),
+  onExit: () => toTitle(),
+});
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -80,7 +93,7 @@ const DEFAULT_SETUP = {
   ],
 };
 
-let scene = "title"; // title | setup | battle
+let scene = "title"; // title | setup | battle | campaign
 let b = null; // the battle being fought: exactly what the rules and the save hold
 let phase = "deploy"; // deploy | plan | play | over
 let shown = null; // {setup, odds} the battle was started from
@@ -580,11 +593,13 @@ function say(text) {
 // ---------------------------------------------------------------------------
 
 function render() {
+  if (scene === "campaign") return campaign.render();
   const chipsScroll = ui.querySelector(".cl-chips")?.scrollLeft ?? 0;
   ui.replaceChildren();
   renderHud();
   if (scene === "title") {
     const s = loadSave();
+    const campaignSave = campaign.saved();
     ui.append(
       titleSheet({
         canContinue: !!s && s.phase !== "over",
@@ -596,6 +611,11 @@ function render() {
         nudge: !(matchMedia("(display-mode: standalone)").matches || navigator.standalone),
         onContinue: () => resume(loadSave()),
         onSkirmish: toSetup,
+        campaign: {
+          text: campaignSave ? `Continue campaign — day ${dayOf(campaignSave.t)}` : null,
+          onContinue: () => campaign.resume(campaign.saved()),
+          onNew: () => campaign.openNew(),
+        },
       }),
     );
     return;
@@ -878,6 +898,10 @@ createLoop((raw) => {
   elapsed += dt;
   const { width: W, height: H } = stage;
   ctx.clearRect(0, 0, W, H);
+  if (scene === "campaign") {
+    campaign.frame(ctx, dt);
+    return;
+  }
 
   if (scene === "title" && demo) {
     // A battle between two plain AIs plays behind the title.

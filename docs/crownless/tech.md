@@ -23,13 +23,15 @@ tooling.
 games/crownless/
   index.html          from the template, plus a <link> to style.css
   style.css           sheets, tab bar, chips — on top of shared/style.css
+  campaign.css        the map screen's context bar, tab bar and sheets
   game.js             boot: shell, stage, loop, screen router, save/load
   rules/              pure: no DOM, no canvas, no storage, no Math.random
     rng.js            seeded streams; derive child seeds
-    hex.js            axial coordinates, neighbours, distance, A*
+    hex.js            odd-r offset grid (a hex is r × cols + c), neighbours,
+                      distance, A*, flood fill
     data/troops.js    army.md §2–4 as data
     data/world.js     terrain, places, buildings, contracts
-    data/hero.js      backgrounds, skills, abilities, items
+    data/hero.js      backgrounds, the starting hero, the party limit
     battle.js         the battle (successor of the theory model, retired in M1)
     battle-ai.js      the plain AI and lord personalities
     battle-setup.js   parties → squads; deployment presets; terrain from hex
@@ -40,11 +42,14 @@ games/crownless/
     standing.js       renown, relations, roles, your realm
     siege.js          the strategic siege
     hollow.js         the crisis
-    save.js           (de)serialise, version, size check
+    save.js           (de)serialise, version, size check (the Skirmish)
+    campaign-save.js  the campaign's save: its key, CAMPAIGN_V, size check
   view/
     layout.js         pure geometry: canvases, bars, chips, hit areas
     theme.js          palette, fonts, glyphs and banners
+    map-layout.js     pure geometry of the map screen: bars, camera, hex ⇄ tap
     map-view.js       camera, hexes, fog, places, parties, paths
+    campaign.js       the map screen: taps → orders, the hour clock, its sheets
     battle-view.js    field, soldiers, pennants, volleys, effects
     sheets.js         DOM bottom sheets: a tiny h() helper and each sheet
     input.js          tap, drag, long-press over shared createInput (M2: M1's
@@ -52,11 +57,13 @@ games/crownless/
 tests/crownless/
   README.md           how to run, what each script proves
   rules.mjs           the battle rules, checked in Node
+  world.mjs           the map rules, checked in Node: worldgen, travel, sight
   battle-sim.mjs      the theory model's report, on the real rules
   world-sim.mjs       AI-only realms for 200 days over many seeds
   harness.mjs         Playwright helpers: launch, tap via layout.js, read the save
   play.mjs            scripted sessions, one block per milestone
   shots.mjs           screenshots at 390×844 and 375×667
+  campaign.mjs        a campaign in the browser, a reload mid-journey, its shots
 ```
 
 **From the shared layer** it uses `createShell`, `createStage`,
@@ -100,9 +107,16 @@ into orders by `command`, both in `battle-ai.js`. The view animates the
 timeline over three seconds. Rules never wait on rendering, the view can't
 drift from the outcome, and a round can be skipped instantly.
 
-**The world tick** is the same idea: `advance(world, hours)` returns events
-("party X now at hex Y", "Greyford besieged", "week turned"), and the map
-view animates parties between their old and new positions.
+**The world tick** is the same idea: `advance(state)` passes one hour and
+returns events ("arrive", "discover", "dusk"; later "party X now at hex Y",
+"Greyford besieged", "week turned"), and the map view animates parties
+between their old and new positions. The view runs one hour per 0.12 s.
+
+**The map builds battles through `battle-setup.js` only**, so the battle
+can change underneath it: `armySquads`, `bannerSquad`, `deploy`, `makeWoods`,
+`createBattle`, `oddsRun`, `summarizeOdds`, `autoFinish`, `aftermath`,
+`strength`, `worthOf` and `troop`. A change to one of those is a change to
+this contract; say so in both threads' PRs.
 
 ## 3. Determinism
 
@@ -129,8 +143,10 @@ view animates parties between their old and new positions.
 
 ## 4. Saves
 
-One campaign, autosaved under `playground:crownless:save`. Settings and best
-scores have their own keys, so a broken save never loses them.
+One campaign, autosaved under `playground:crownless:campaign` (M2,
+`rules/campaign-save.js`); a Skirmish in progress keeps
+`playground:crownless:save`, so neither can overwrite the other. Settings and
+best scores have their own keys, so a broken save never loses them.
 
 **M1 saves a Skirmish** there (`rules/save.js`):
 `{ v, setup, odds, phase: "deploy" | "plan" | "over", battle, result }`, where
@@ -138,6 +154,13 @@ scores have their own keys, so a broken save never loses them.
 design — and `result` the result sheet's numbers once it ends. The best
 record is `playground:crownless:best`, the camera choice
 `playground:crownless:settings`.
+
+**M2 saves** `{ v, seed, size, difficulty, rng, t, explored, visited,
+player, journal }`: the shape below without lords, parties or the rest
+until they exist. `player.at` is `{ i, to, progress }`, a hex index rather
+than `q, r`; `player.dest` is where you're going (−1 standing) and
+`player.resting` whether you're camped. `visited` lists the places you have
+stood on. A fresh save is about 1 KB, two weeks in about 2.5 KB.
 
 **When to save.** After every map action; every 6 in-game hours while
 travelling and when travel stops; and on `pagehide`. In battle, **save the
@@ -170,7 +193,9 @@ Only mutable fields are saved; everything static about a place regenerates
 from the seed. Paths are recomputed, not stored. Estimate on Medium: ~100 KB;
 budget 300 KB; `save.js` warns in the console above 200 KB.
 
-**Versions.** Any incompatible change bumps `SAVE_VERSION`. A save from
+**Versions.** Any incompatible change bumps `SAVE_VERSION` (`CAMPAIGN_V` for
+the campaign; `tests/crownless/world.mjs` pins seed 1's realm by hash, so a
+worldgen change can't slip past it). A save from
 another version is not loaded: the title says so and offers a new campaign,
 keeping settings and best scores. During development (M2–M8) this will happen
 often and that is acceptable for a toy; from M8 on, write a migration instead.

@@ -7,10 +7,12 @@ harness is (`tests/checkwiz/README.md`, read it first).
 
 ```sh
 npm run test:crownless:rules  # rules — the battle rules, checked in Node (a second)
+npm run test:crownless:world  # world — the map rules, checked in Node (a few seconds)
 npm run test:crownless:sim    # sim   — battle.md §10, measured (a few minutes)
 npm start                     # then, in another terminal:
 npm run test:crownless        # play  — whole Skirmishes, tapped through in a browser
 npm run test:crownless:shots  # shots — every screen on a 390 × 844 and a 375 × 667 phone
+npm run test:crownless:campaign # campaign — a journey tapped out, reloaded midway; its shots
 ```
 
 `playwright-core` drives the Chromium already on the machine
@@ -48,6 +50,24 @@ throttled 4× — a stand-in for a phone, not a phone.
 game's buttons is under 44 px or off the screen. Look at the pictures: an
 assertion can't see a label cut off by its chip.
 
+**`world.mjs`** checks the map rules against `world.md`: the hex grid; that
+seeds 1–50 each make a valid realm in under 300 ms, the same one every time,
+with world.md's counts, every place reachable by land and every settlement by
+road, rivers crossable at least every 7 hexes and no lair within 5 of a start;
+pace and the hours a hex takes, by hand (2 h for plains at pace 12, 3.2 for
+forest, 24 / 10.8 for Kharum's hills); arriving in the hour the route
+promised, Stop, Rest, a watchtower; sight by day, night, hills and Scouting;
+and the save. Seed 1's realm is pinned by hash: if it changes, every saved
+campaign's map has changed with it, and `CAMPAIGN_V` must be bumped.
+
+**`campaign.mjs`** plays a campaign the same way, on the campaign's own save
+(`playground:crownless:campaign`): New campaign from the title, a step and a
+journey tapped out on the map from `map-layout.js`, a reload in the middle of
+the journey, then Rest, Stop, a tap on the road and the tabs. The journey's
+end is compared with the same journey played in Node without a break: same
+hex, hour, fog and Journal. Then it screenshots each campaign screen on both
+phones, with `shots.mjs`'s 44 px and on-screen checks.
+
 ## How the browser scripts talk to the game
 
 As in Checkwiz, the game has no test hooks:
@@ -69,7 +89,8 @@ computed.
 
 ## Every check has been seen failing
 
-Each check in `rules.mjs` and `play.mjs` was watched going red against a copy
+Each check in `rules.mjs`, `play.mjs`, `world.mjs` and `campaign.mjs` was
+watched going red against a copy
 of the game with the rule it guards broken (a mutation run: one sabotage per
 copy, the suite pointed at it). Seven of the first 56 rules sabotages slipped
 through, and each found a check that couldn't fail: a hero at level 10 gets
@@ -77,6 +98,13 @@ the same attributes from ⌊L/4⌋ and ⌊L/5⌋; a squad marching straight ahea
 keeps its facing whether or not the rule exists; a mirror match can end in a
 draw with one side quietly ahead. Those checks now test at values that tell
 the rules apart.
+
+Of 50 sabotages of the map rules, three slipped past `world.mjs` at first:
+the hours left when you are between two hexes, the Journal's cap of 60, and a
+validation step (a ranch per culture) that seeds 1–50 never need. The first
+two have checks now; the third changes nothing a seed makes. In the browser,
+dropping the `pagehide` save alone changes nothing, because
+`visibilitychange` saves too; dropping both turns the reload check red.
 
 The mirror check is worth knowing about. The theory model gave side 0 an
 83–13 record against its own mirror, because squads moved one at a time and
