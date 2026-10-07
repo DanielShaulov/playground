@@ -115,6 +115,16 @@ check(
   s.battle.squads.find((q) => q.side === 0 && q.banner).cmd.kind === "escort",
 );
 
+// Skip shows the rest of a round at once; the bar must come back with it.
+await press("Go ▶", 300);
+await press("Skip ▶▶", 400);
+s = await read();
+check(
+  "Skip ends the round at once and gives back Go",
+  (await game.can("Go ▶")) && s.phase === "plan" && s.battle.round === 1,
+  `round ${s.battle.round}`,
+);
+
 await press("Continuous");
 for (let i = 0; i < 80 && !(await resultShown()); i++) {
   // Continuous play stops on events that need you; Go carries on.
