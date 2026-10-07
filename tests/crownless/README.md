@@ -39,7 +39,8 @@ lives in git history (`docs/crownless/theory/`, removed in M1).
 **`play.mjs`** plays the game the way a thumb does: a Skirmish from the title
 screen to the result sheet through the bottom bar alone, then squads and
 ground tapped on the field, deployment, Valor spent, retreat, Auto finish, the
-best record, the long press that reads and never acts, and the save written
+best record, the long press on a squad or a button that reads and never
+acts, and the save written
 before a round is shown. Last, it measures a round and a frame with the CPU
 throttled 4× — a stand-in for a phone, not a phone.
 

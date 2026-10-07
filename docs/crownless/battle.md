@@ -51,8 +51,8 @@ Deep and Square (M5), terrain beyond woods (M2), sieges (§8) and the Hollow
 2. **Deploy.** Both armies appear in their deployment bands: yours at the
    bottom, theirs at the top. Your squads start in a formation preset; tap a
    squad, then tap a spot in your band to move it. A preset is one tap, and a
-   plan as well as a shape: it sets each squad's standing order, and says so
-   in a line when tapped (`PRESETS` in `battle-setup.js`).
+   plan as well as a shape: it sets each squad's standing order, and a long
+   press on it says what it does (`PRESETS` in `battle-setup.js`).
    - **Line**: foot in front, archers behind, horse on both wings; all hold.
    - **Refused** (a refused flank): the line shifts right and swings back
      about its right end. The right and the horse, massed on the right wing,

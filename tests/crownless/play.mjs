@@ -51,6 +51,18 @@ await press("Skirmish", 500);
 await page.waitForFunction(() => /Odds: \w+ \(\d of 8\)/.test(document.body.textContent), null, {
   timeout: 20000,
 });
+{
+  // Held, an option explains itself; Knights is not picked.
+  const tip = await game.hold(page.getByRole("button", { name: "Knights", exact: true }));
+  check(
+    "holding a doctrine says what it fields, and doesn't pick it",
+    tip === "Knights60% knights, 25% militia, 15% bowmen." &&
+      (await page
+        .getByRole("button", { name: "Knights", exact: true })
+        .getAttribute("aria-pressed")) === "false",
+    tip,
+  );
+}
 await press("Deploy ▶", 500);
 let s = await read();
 check(
@@ -75,15 +87,6 @@ check(
   "Hammer puts the horse on the right wing, ahead, charging",
   horse.length === 1 && horse[0].x === 93 && horse[0].y === 102 && horse[0].cmd.kind === "charge",
   horse.map((q) => `${q.x},${q.y} ${q.cmd.kind}`).join(),
-);
-const said = await page
-  .locator(".cl-toast")
-  .textContent({ timeout: 1000 })
-  .catch(() => null);
-check(
-  "and says what Hammer means",
-  said === "Hammer: The foot holds as the anvil; every horse, massed on the right, charges.",
-  said,
 );
 await press("Line");
 s = await read();
@@ -441,6 +444,66 @@ s = await read();
   const after = await read();
   check("and changes nothing", JSON.stringify(after.battle) === JSON.stringify(s.battle));
   check("nor selects it", (await game.chip(0).getAttribute("aria-pressed")) === "false");
+}
+
+// The same for every button: held, it explains itself and is not pressed.
+b = battle({
+  mine: [
+    { type: "footman", n: 24, x: 40, y: 112 },
+    { type: "horseman", n: 10, x: 10, y: 114 },
+  ],
+  theirs: [{ type: "militia", n: 30, x: 50, y: 20 }],
+  hero: 5,
+});
+await game.resume(saveOf(b, { phase: "deploy" }));
+{
+  const button = (name) => page.getByRole("button", { name, exact: true }).first();
+  s = await read();
+  let tip = await game.hold(button("Hammer"));
+  check(
+    "holding a preset says what it does",
+    tip === "HammerThe foot holds as the anvil; every horse, massed on the right, charges.",
+    tip,
+  );
+  let after = await read();
+  check(
+    "and doesn't deploy it",
+    JSON.stringify(after.battle) === JSON.stringify(s.battle),
+    after.battle.squads.map((q) => `${q.x},${q.y}`).join(" "),
+  );
+  await press("Begin ▶");
+  // A level-5 hero starts with 2 Valor; Rally costs 3, so it is greyed out.
+  tip = await game.hold(button("Rally"));
+  check(
+    "holding an ability you can't afford yet says what it does and why not",
+    tip?.startsWith("Rally, 3 Valor") && tip.includes("(Now: needs 3 Valor.)"),
+    tip,
+  );
+  s = await read();
+  tip = await game.hold(game.chip(0));
+  check("holding a chip shows its squad", tip?.startsWith("24 Footman"), tip);
+  after = await read();
+  check(
+    "and picks nothing",
+    (await game.chip(0).getAttribute("aria-pressed")) === "false" &&
+      JSON.stringify(after) === JSON.stringify(s),
+  );
+  tip = await game.hold(button("Charge"));
+  after = await read();
+  check(
+    "an order held is explained, not given",
+    tip?.startsWith("Charge") && after.battle.squads.every((q) => q.cmd?.kind !== "charge"),
+    tip,
+  );
+  await page.getByRole("button", { name: "Charge", exact: true }).tap();
+  await settle();
+  after = await read();
+  check(
+    "while a tap still gives it",
+    after.battle.squads
+      .filter((q) => q.side === 0 && !q.banner)
+      .every((q) => q.cmd.kind === "charge"),
+  );
 }
 
 // ---------------------------------------------------------------------------

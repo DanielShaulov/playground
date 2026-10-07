@@ -8,8 +8,8 @@
  */
 import { BAR } from "./layout.js";
 import { glyphSVG, squadName } from "./theme.js";
-import { CULTURES, troop } from "../rules/data/troops.js";
-import { DOCTRINES, PRESETS } from "../rules/battle-setup.js";
+import { CULTURES, troop, worthOf } from "../rules/data/troops.js";
+import { DOCTRINES, PRESETS, skirmishHero } from "../rules/battle-setup.js";
 import { ABILITIES } from "../rules/battle.js";
 
 /** createElement with props and children; `on*` props become listeners. */
@@ -31,15 +31,21 @@ export function h(tag, props = {}, ...children) {
   return el;
 }
 
-const button = (label, onClick, { cls = "", disabled = false, aria, title } = {}) =>
+/**
+ * A button. `tip` is what a long press on it says (ui.md §1.3). Disabled is
+ * aria-disabled rather than the attribute, so a long press still reaches a
+ * greyed-out button: that is when you most want to ask what it does.
+ */
+const button = (label, onClick, { cls = "", disabled = false, aria, title, tip } = {}) =>
   h(
     "button",
     {
       type: "button",
       class: `cl-btn ${cls}`,
-      disabled,
+      "aria-disabled": disabled ? "true" : null,
       "aria-label": aria,
       title,
+      "data-tip": tip,
       onClick: (e) => {
         e.stopPropagation();
         if (!disabled) onClick?.();
@@ -57,13 +63,14 @@ function choices(label, options, value, onPick) {
     h(
       "div",
       { class: "cl-seg", role: "group", "aria-label": label },
-      options.map(([v, text, sub]) =>
+      options.map(([v, text, sub, tip]) =>
         h(
           "button",
           {
             type: "button",
             class: `cl-opt${v === value ? " on" : ""}`,
             "aria-pressed": v === value ? "true" : "false",
+            "data-tip": tip,
             onClick: () => onPick(v),
           },
           h("span", {}, text),
@@ -72,6 +79,26 @@ function choices(label, options, value, onPick) {
       ),
     ),
   );
+}
+
+const ORDER_TIPS = {
+  advance: "Advance: march on the enemy. Archers stop once in range and shoot.",
+  hold: "Hold: stand your ground and fight what comes. Archers shoot from where they stand.",
+  charge: "Charge: run at the enemy. Horse hits hardest after a run-up.",
+  fallback: "Fall back: withdraw toward your own edge.",
+};
+
+const doctrineTip = (d) =>
+  `${d.name}: ${Object.entries(d.mix)
+    .map(([t, k]) => `${Math.round(k * 100)}% ${troopWord(t, 2)}`)
+    .join(", ")}.`;
+
+function heroTip(culture, level) {
+  if (!level) return "No hero: no banner, no Valor, no abilities.";
+  const hero = skirmishHero(culture, level);
+  return `Level ${level}: leads from the banner, steadies the squads near it, and knows ${hero.abilities
+    .map((a) => ABILITIES[a].name)
+    .join(", ")}. Higher levels fight better and steady more.`;
 }
 
 /** "7 footmen", "1 archer", "12 militia": a troop's name for a count of them. */
@@ -180,7 +207,12 @@ export function setupSheet({ setup, editing, preview, odds, onEdit, onChange, on
       h("div", { class: "cl-tabs" }, sideTab(0, "Your army"), sideTab(1, "Their army")),
       choices(
         "Culture",
-        Object.values(CULTURES).map((c) => [c.id, c.name]),
+        Object.values(CULTURES).map((c) => [
+          c.id,
+          c.name,
+          null,
+          `${c.name}: ${c.doctrine}. ${c.trait.name}: ${c.trait.text}. Its hero's own ability: ${ABILITIES[c.ability].name}.`,
+        ]),
         sd.culture,
         set("culture"),
       ),
@@ -191,27 +223,40 @@ export function setupSheet({ setup, editing, preview, odds, onEdit, onChange, on
       ),
       choices(
         "Doctrine",
-        [...Object.entries(DOCTRINES).map(([id, d]) => [id, d.name]), ["random", "Random"]],
+        [
+          ...Object.entries(DOCTRINES).map(([id, d]) => [id, d.name, null, doctrineTip(d)]),
+          ["random", "Random", null, "Random: a doctrine picked for you."],
+        ],
         sd.doctrine,
         set("doctrine"),
       ),
       choices(
         "Strength",
-        WORTHS.map((w) => [w, String(w)]),
+        WORTHS.map((w) => [
+          w,
+          String(w),
+          null,
+          `Strength ${w}: what the army is worth, about ${Math.round(w / worthOf("footman"))} footmen. Better troops cost more, so there are fewer of them.`,
+        ]),
         sd.worth,
         set("worth"),
       ),
       choices(
         "Hero level",
-        HEROES.map((l) => [l, l ? String(l) : "None"]),
+        HEROES.map((l) => [l, l ? String(l) : "None", null, heroTip(sd.culture, l)]),
         sd.hero,
         set("hero"),
       ),
       choices(
         "Field",
         [
-          ["open", "Open"],
-          ["woods", "Woods"],
+          ["open", "Open", null, "Open: a flat field, nothing in the way."],
+          [
+            "woods",
+            "Woods",
+            null,
+            "Woods: copses, mostly on the flanks. In them squads move at 60% pace, arrows hit half as often, and horse can't charge.",
+          ],
         ],
         setup.terrain,
         (v) => onChange(null, "terrain", v),
@@ -290,7 +335,13 @@ export function commandBar(o) {
   // Row 1: your squads, or theirs when picking a target.
   const chips = h("div", { class: "cl-row cl-chips" });
   if (o.mode === "target") {
-    chips.append(button("Any", o.onTargetAny, { cls: "cl-chip small", aria: "Any target" }));
+    chips.append(
+      button("Any", o.onTargetAny, {
+        cls: "cl-chip small",
+        aria: "Any target",
+        tip: "Any target: each squad goes for whatever suits it best.",
+      }),
+    );
     for (const { s, d } of o.enemies)
       chips.append(
         chip(s, {
@@ -300,12 +351,18 @@ export function commandBar(o) {
           onClick: () => o.onTarget(s.id),
         }),
       );
-    chips.append(button("Done", o.onTargetDone, { cls: "cl-chip small" }));
+    chips.append(
+      button("Done", o.onTargetDone, {
+        cls: "cl-chip small",
+        tip: "Done: stop picking a target.",
+      }),
+    );
   } else {
     chips.append(
       button("All", o.onAll, {
         cls: `cl-chip small${o.allSelected ? " sel" : ""}`,
         aria: "All squads",
+        tip: "All squads: pick every squad but the banner. With nothing picked, an order goes to them all anyway.",
       }),
     );
     for (const s of o.squads)
@@ -317,28 +374,34 @@ export function commandBar(o) {
   if (o.phase === "deploy") {
     for (const [id, p] of Object.entries(PRESETS))
       orders.append(
-        button(p.name, () => o.onPreset(id), { cls: o.preset === id ? "on" : "", title: p.text }),
+        button(p.name, () => o.onPreset(id), {
+          cls: o.preset === id ? "on" : "",
+          title: p.text,
+          tip: `${p.name}: ${p.text}`,
+        }),
       );
   } else {
     const k = o.current;
+    const order = (label, kind) =>
+      button(label, () => o.onOrder(kind), {
+        cls: k === kind ? "on" : "",
+        disabled: busy,
+        tip: ORDER_TIPS[kind],
+      });
     orders.append(
-      button("Advance", () => o.onOrder("advance"), {
-        cls: k === "advance" ? "on" : "",
-        disabled: busy,
-      }),
-      button("Hold", () => o.onOrder("hold"), { cls: k === "hold" ? "on" : "", disabled: busy }),
-      button("Charge", () => o.onOrder("charge"), {
-        cls: k === "charge" ? "on" : "",
-        disabled: busy,
-      }),
-      button("Fall back", () => o.onOrder("fallback"), {
-        cls: k === "fallback" ? "on" : "",
-        disabled: busy,
-      }),
+      order("Advance", "advance"),
+      order("Hold", "hold"),
+      order("Charge", "charge"),
+      order("Fall back", "fallback"),
     );
   }
   orders.append(
-    button("⋯", o.onMore, { cls: "narrow", aria: "More", disabled: busy && o.phase !== "deploy" }),
+    button("⋯", o.onMore, {
+      cls: "narrow",
+      aria: "More",
+      disabled: busy && o.phase !== "deploy",
+      tip: "More: formation, fire and charge orders for the picked squads; the camera; Retreat and Auto finish.",
+    }),
   );
 
   // Row 3: abilities, continuous play, Go.
@@ -351,18 +414,21 @@ export function commandBar(o) {
         { class: "cl-cost" },
         Array.from({ length: ABILITIES[a.id].cost }, () => h("i")),
       );
+      const ab = ABILITIES[a.id];
+      const off = busy || !a.ready;
       abil.append(
         h(
           "button",
           {
             type: "button",
             class: `cl-btn cl-ability${a.used ? " used" : ""}`,
-            disabled: busy || !a.ready,
-            title: `${ABILITIES[a.id].name}: ${a.why ?? ABILITIES[a.id].text}`,
-            "aria-label": ABILITIES[a.id].name,
+            "aria-disabled": off ? "true" : null,
+            title: `${ab.name}: ${a.why ?? ab.text}`,
+            "data-tip": `${ab.name}, ${ab.cost} Valor: ${ab.text}${a.why ? ` (Now: ${a.why}.)` : ""}`,
+            "aria-label": ab.name,
             onClick: (e) => {
               e.stopPropagation();
-              o.onAbility(a.id);
+              if (!off) o.onAbility(a.id);
             },
           },
           h("span", {}, a.used ? `✓ ${ABILITIES[a.id].short}` : ABILITIES[a.id].short),
@@ -377,6 +443,9 @@ export function commandBar(o) {
       button(o.continuous ? "⏸" : "⏯", o.onContinuous, {
         cls: `square${o.continuous ? " on" : ""}`,
         aria: o.continuous ? "Stop continuous" : "Continuous",
+        tip: o.continuous
+          ? "Stop continuous: stop after this round."
+          : "Continuous: play round after round, stopping whenever something needs you.",
       }),
     );
   const go = h(
@@ -384,6 +453,12 @@ export function commandBar(o) {
     {
       type: "button",
       class: "cl-btn cl-go",
+      "data-tip":
+        o.phase === "deploy"
+          ? "Begin: end deployment and start the battle."
+          : busy
+            ? "Skip: show the rest of this round at once."
+            : "Go: play the next three seconds, both sides at once.",
       onClick: (e) => {
         e.stopPropagation();
         o.onGo();
@@ -414,8 +489,18 @@ export function moreSheet(o) {
       choices(
         "Formation",
         [
-          ["line", "Line", "wraps"],
-          ["wide", "Wide", "can't be wrapped"],
+          [
+            "line",
+            "Line",
+            "wraps",
+            "Line: the usual formation. A line wider than its enemy wraps round its ends and hits the flanks.",
+          ],
+          [
+            "wide",
+            "Wide",
+            "can't be wrapped",
+            "Wide: half as deep, twice as wide, so a bigger enemy can't wrap round you; −5 morale, and flank attacks hurt more.",
+          ],
         ],
         all((s) => s.formation === "wide")
           ? "wide"
@@ -430,8 +515,8 @@ export function moreSheet(o) {
         choices(
           "Fire",
           [
-            ["will", "At will"],
-            ["hold", "Hold fire"],
+            ["will", "At will", null, "At will: shoot whatever is in range."],
+            ["hold", "Hold fire", null, "Hold fire: don't shoot until told to; the arrows keep."],
           ],
           all((s) => s.cmd?.fire === "hold") ? "hold" : "will",
           o.onFire,
@@ -443,6 +528,7 @@ export function moreSheet(o) {
           { class: "cl-field" },
           button("Skirmish", o.onSkirmish, {
             title: "keep 60–80% of range from enemy melee, shooting",
+            tip: "Skirmish: shoot, and back away from enemy foot and horse to keep them at range.",
           }),
         ),
       );
@@ -452,8 +538,13 @@ export function moreSheet(o) {
         choices(
           "Cycle charges",
           [
-            ["on", "On"],
-            ["off", "Off"],
+            [
+              "on",
+              "On",
+              null,
+              "Cycle charges on: after a round in a melee, horse pulls back and charges again; a charge hits hardest.",
+            ],
+            ["off", "Off", null, "Cycle charges off: horse stays in the melee once it is in."],
           ],
           all((s) => s.cmd?.cycle === false) ? "off" : "on",
           o.onCycle,
@@ -464,8 +555,8 @@ export function moreSheet(o) {
     choices(
       "Camera",
       [
-        ["fit", "Whole field"],
-        ["follow", "Follow"],
+        ["fit", "Whole field", null, "Whole field: see all of it, every man a dot."],
+        ["follow", "Follow", null, "Follow: closer in on the fighting, every man drawn."],
       ],
       o.camera,
       o.onCamera,
@@ -490,8 +581,15 @@ export function moreSheet(o) {
       button("Back", o.onBack),
       o.phase === "deploy"
         ? null
-        : button(o.retreatArmed ? "Retreat — sure?" : "Retreat", o.onRetreat, { cls: "danger" }),
-      o.phase === "deploy" ? null : button("Auto finish", o.onAuto),
+        : button(o.retreatArmed ? "Retreat — sure?" : "Retreat", o.onRetreat, {
+            cls: "danger",
+            tip: "Retreat: leave the field and lose. Squads in a melee lose a quarter of their men breaking off; if none has fought yet, a rearguard stays behind.",
+          }),
+      o.phase === "deploy"
+        ? null
+        : button("Auto finish", o.onAuto, {
+            tip: "Auto finish: let the AI fight the rest for you, at once.",
+          }),
     ),
   );
 }

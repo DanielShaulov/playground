@@ -36,7 +36,6 @@ import {
   summarizeOdds,
   strength,
   DOCTRINES,
-  PRESETS,
 } from "./rules/battle-setup.js";
 import { worthOf, troop, CULTURES } from "./rules/data/troops.js";
 import { layout, toField, squadAt, barHeight } from "./view/layout.js";
@@ -438,14 +437,23 @@ function showTip(px, py) {
   const list = battle.squads.filter(alive).map((s) => ({ s, at: view.at(s.id) }));
   const s = squadAt(L, list, px, py);
   if (!s) return;
-  const units = s.units.filter((u) => u.n > 0).map((u) => `${u.n} ${troop(u.type).name}`);
-  const order = describeOrder(battle, s);
   tip = h(
     "div",
     {
       class: "cl-tip",
       style: { left: `${Math.min(px, stage.width - 230)}px`, top: `${Math.max(4, py - 90)}px` },
     },
+    squadCard(battle, s),
+  );
+  ui.append(tip);
+  vibrate(8);
+}
+
+/** What a long press on a squad says, on the field or on its chip. */
+function squadCard(battle, s) {
+  const units = s.units.filter((u) => u.n > 0).map((u) => `${u.n} ${troop(u.type).name}`);
+  const order = describeOrder(battle, s);
+  return [
     h("b", {}, units.join(" · ")),
     h(
       "div",
@@ -454,10 +462,78 @@ function showTip(px, py) {
     ),
     s.ammo0 ? h("div", {}, `${s.ammo} volleys left`) : null,
     order ? h("div", {}, order) : null,
-  );
+  ];
+}
+
+/**
+ * A long press on a button says what it does, and never presses it: the
+ * click that ends the press is swallowed, tip or not. A chip says what its
+ * squad is.
+ */
+function showButtonTip(el) {
+  let body;
+  if (el.dataset.squad == null && el.dataset.tip == null) return;
+  if (el.dataset.squad != null) {
+    const s = (scene === "battle" ? b : preview)?.squads[Number(el.dataset.squad)];
+    if (!s) return;
+    body = squadCard(scene === "battle" ? b : preview, s);
+  } else {
+    const text = el.dataset.tip;
+    const at = text.indexOf(": ");
+    body = at > 0 ? [h("b", {}, text.slice(0, at)), h("div", {}, text.slice(at + 2))] : text;
+  }
+  hideTip();
+  tip = h("div", { class: "cl-tip" }, body);
   ui.append(tip);
+  // Above the button, or below it when there's no room above.
+  const box = stageEl.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  const left = r.left - box.left + r.width / 2 - tip.offsetWidth / 2;
+  let top = r.top - box.top - tip.offsetHeight - 8;
+  if (top < 4) top = r.bottom - box.top + 8;
+  tip.style.left = `${Math.max(4, Math.min(box.width - tip.offsetWidth - 4, left))}px`;
+  tip.style.top = `${top}px`;
   vibrate(8);
 }
+
+let held = null;
+let swallowClick = false;
+ui.addEventListener("pointerdown", (e) => {
+  const el = e.target.closest("button, [data-tip]");
+  if (!el) return;
+  const me = { x: e.clientX, y: e.clientY, shown: false };
+  me.timer = setTimeout(() => {
+    me.shown = true;
+    showButtonTip(el);
+  }, 400);
+  held = me;
+});
+ui.addEventListener("pointermove", (e) => {
+  if (held && !held.shown && Math.hypot(e.clientX - held.x, e.clientY - held.y) > 10) letGo();
+});
+function letGo() {
+  if (!held) return;
+  clearTimeout(held.timer);
+  if (held.shown) {
+    hideTip();
+    swallowClick = true;
+    setTimeout(() => (swallowClick = false), 400);
+  }
+  held = null;
+}
+ui.addEventListener("pointerup", letGo);
+ui.addEventListener("pointercancel", letGo);
+ui.addEventListener(
+  "click",
+  (e) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+  },
+  true,
+);
+ui.addEventListener("contextmenu", (e) => e.preventDefault());
 
 function describeOrder(battle, s) {
   const o = s.order;
@@ -621,7 +697,6 @@ function render() {
       onOrder,
       onPreset: (id) => {
         applyPreset(b, 0, id);
-        say(`${PRESETS[id].name}: ${PRESETS[id].text}`);
         persist();
         render();
       },

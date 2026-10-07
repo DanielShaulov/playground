@@ -74,6 +74,24 @@ export async function openGame({ device = "iPhone 13", headless = true, clear = 
       await settle(ms);
     },
 
+    /**
+     * Hold a press on an element for `ms` (a mouse, so the click that ends
+     * it is real) and return the tip it shows, or null.
+     */
+    async hold(locator, ms = 650) {
+      const r = await locator.boundingBox();
+      await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+      await page.mouse.down();
+      await settle(ms);
+      const tip = await page
+        .locator(".cl-tip")
+        .textContent({ timeout: 300 })
+        .catch(() => null);
+      await page.mouse.up();
+      await settle();
+      return tip;
+    },
+
     /** Is a button with this name on screen, and enabled? */
     async can(name) {
       const btn = page.getByRole("button", { name, exact: true }).first();
