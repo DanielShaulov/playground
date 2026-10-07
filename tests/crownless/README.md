@@ -23,7 +23,7 @@ server.
 **`rules.mjs`** checks that the rules do what `battle.md` and `army.md` say:
 the edge curve, the culture variants and their traits, the Skirmish hero and
 that it falls last, squads splitting by role, mixed squads, formations, orders,
-woods, each ability, determinism and save round-trips, the AI's split, the
+the deployment presets, woods, each ability, determinism and save round-trips, the AI's split, the
 aftermath — and that a mirror match with fortune off stays a mirror (below).
 
 **`battle-sim.mjs`** is the theory model's report, asked of the real rules:

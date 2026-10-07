@@ -68,11 +68,22 @@ check(
 await press("Hammer");
 s = await read();
 const horse = s.battle.squads.filter((q) => q.side === 0 && q.role === "cav");
-// Valemark Balanced at 100 fields one squad of horsemen; Hammer puts it 10 m in from the right edge.
+// Valemark Balanced at 100 fields one squad of 8 horsemen: 2 ranks, 4 abreast,
+// 6 m wide. Hammer masses it from 4 m in from the right edge (centre 93), 8 m
+// ahead of the line at 110, and sends it in.
 check(
-  "Hammer puts the horse on the right wing",
-  horse.length === 1 && horse[0].x === 90,
-  horse.map((q) => q.x).join(),
+  "Hammer puts the horse on the right wing, ahead, charging",
+  horse.length === 1 && horse[0].x === 93 && horse[0].y === 102 && horse[0].cmd.kind === "charge",
+  horse.map((q) => `${q.x},${q.y} ${q.cmd.kind}`).join(),
+);
+const said = await page
+  .locator(".cl-toast")
+  .textContent({ timeout: 1000 })
+  .catch(() => null);
+check(
+  "and says what Hammer means",
+  said === "Hammer: The foot holds as the anvil; every horse, massed on the right, charges.",
+  said,
 );
 await press("Line");
 s = await read();

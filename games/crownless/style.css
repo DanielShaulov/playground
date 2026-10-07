@@ -601,10 +601,13 @@
   transform: translateX(-50%);
   z-index: 6;
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: 14px;
   background: rgba(16, 19, 26, 0.88);
   border: 1px solid var(--line);
   font-size: 13px;
-  white-space: nowrap;
+  line-height: 1.35;
+  text-align: center;
+  width: max-content;
+  max-width: calc(100% - 32px);
   pointer-events: none;
 }

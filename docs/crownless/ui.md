@@ -247,7 +247,8 @@ about 390 × 560 px: 3.9 px a metre, a 40-man squad about 58 × 23 px.
 - Every squad of yours draws an arrow to where it's going or what it's
   attacking. With Tactics, enemy intents show as red dashes.
 - **Deployment** is the same screen with the band highlighted, formation
-  presets in the order row, and **Begin** where Go will be.
+  presets in the order row (a tap says in a line what the preset does), and
+  **Begin** where Go will be.
 
 ## 6. Look
 

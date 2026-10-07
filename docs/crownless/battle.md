@@ -50,9 +50,20 @@ Deep and Square (M5), terrain beyond woods (M2), sieges (§8) and the Hollow
    possible Leave, Pay or Talk.
 2. **Deploy.** Both armies appear in their deployment bands: yours at the
    bottom, theirs at the top. Your squads start in a formation preset; tap a
-   squad, then tap a spot in your band to move it. Presets are one tap: Line,
-   Refused flank, Hammer (all horse on one wing), Defensive (ranged in front of
-   a held line). Press **Begin**.
+   squad, then tap a spot in your band to move it. A preset is one tap, and a
+   plan as well as a shape: it sets each squad's standing order, and says so
+   in a line when tapped (`PRESETS` in `battle-setup.js`).
+   - **Line**: foot in front, archers behind, horse on both wings; all hold.
+   - **Refused** (a refused flank): the line shifts right and swings back
+     about its right end. The right and the horse, massed on the right wing,
+     advance; the left holds out of reach.
+   - **Hammer** (hammer and anvil): the foot holds as the anvil; every horse,
+     massed on the right 8 m ahead of the line, charges.
+   - **Defensive**: archers 12 m before the foot skirmish, shooting and falling
+     back as they are reached; the foot holds; the horse waits behind.
+
+   Press **Begin**.
+
 3. **Rounds.** Each round: give orders (or leave the standing ones), press
    **Go**, and watch three seconds of simulation for both sides. Then it
    pauses. The **⏯ Continuous** toggle plays rounds back to back and pauses
