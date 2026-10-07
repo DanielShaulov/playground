@@ -14,6 +14,7 @@ import {
 import {
   createBattle,
   deployLine,
+  frontage,
   playRound,
   standing,
   FIELD_W,
@@ -164,10 +165,19 @@ export function bannerSquad(hero, guards = []) {
 // ---------------------------------------------------------------------------
 
 export const PRESETS = {
-  line: { name: "Line", text: "foot in the middle, ranged behind, horse on both wings" },
-  refused: { name: "Refused", text: "left wing held back, horse massed on the right" },
-  hammer: { name: "Hammer", text: "the line, with every horse on the right wing" },
-  defensive: { name: "Defensive", text: "ranged in front of a held line, horse in reserve" },
+  line: { name: "Line", text: "Foot in front, archers behind, horse on both wings. All hold." },
+  refused: {
+    name: "Refused",
+    text: "The line steps back on the left. The right and the horse advance; the left holds.",
+  },
+  hammer: {
+    name: "Hammer",
+    text: "The foot holds as the anvil; every horse, massed on the right, charges.",
+  },
+  defensive: {
+    name: "Defensive",
+    text: "Archers out front shoot and fall back; the foot holds; the horse waits behind.",
+  },
 };
 
 /** Where a side may deploy: 45 m deep from its own end, 10 m more per Tactics rank. */
@@ -179,38 +189,83 @@ export function band(side, tactics = 0) {
 }
 
 const roleOf = (s) => s.role ?? troop((s.units ?? [s])[0].type).role;
+const isHorse = (s) => !s.banner && (roleOf(s) === "cav" || roleOf(s) === "ha");
 
-/** Lay out a side's squad specs by a preset. */
-export function deploy(list, side, preset = "line") {
+/**
+ * Lay out a side's squad specs by a preset, each with the standing order the
+ * preset starts it on (`cmd`, battle-ai.js). A preset is a plan, not just a
+ * shape: Line holds everywhere, the others put some squads in motion.
+ */
+export function deploy(list, side, preset = "line", tactics = 0) {
   const out = deployLine(list, side);
   const back = side === 0 ? 1 : -1;
   const y0 = side === 0 ? FIELD_H - 30 : 30;
-  const horse = out.filter((s) => !s.banner && (roleOf(s) === "cav" || roleOf(s) === "ha"));
-  const rightWing = (s, k) => ({ ...s, x: FIELD_W - 10 - k * 12, y: y0 + back * 4 });
+  const horse = out.filter(isHorse);
+  const line = out.filter((s) => !s.banner && !isHorse(s));
+  for (const s of out) {
+    s.cmd = s.banner ? { kind: "escort" } : { kind: "hold" };
+    s.fx = 0;
+    s.fy = -back;
+  }
+
   if (preset === "refused" || preset === "hammer") {
-    let k = 0;
-    for (let i = 0; i < out.length; i++) {
-      if (horse.includes(out[i])) out[i] = rightWing(out[i], k++);
+    // Every horse massed on the right wing, 8 m ahead of the line, side by
+    // side from the edge; a row that reaches the middle starts another
+    // further forward.
+    let right = FIELD_W - 4;
+    let row = 0;
+    for (const s of horse) {
+      const w = frontage(s);
+      if (right < FIELD_W - 4 && right - w < FIELD_W / 2) {
+        right = FIELD_W - 4;
+        row++;
+      }
+      s.x = right - w / 2;
+      s.y = y0 - back * (8 + 7 * row);
+      s.cmd = { kind: preset === "hammer" ? "charge" : "advance" };
+      right -= w + 3;
     }
   }
-  if (preset === "refused") {
-    // Pull the left of the line back, more the further left it stands.
-    for (const s of out) {
-      const r = roleOf(s);
-      if (s.banner || r === "cav" || r === "ha") continue;
-      if (s.x < FIELD_W / 2) s.y += back * ((FIELD_W / 2 - s.x) / (FIELD_W / 2)) * 16;
+  if (preset === "refused" && line.length) {
+    // The weight goes right: the line shifts toward the horse and swings
+    // back about its right end, banner and all, so its left stands back and
+    // every squad keeps its spacing. What stood right of the middle
+    // advances; the rest holds.
+    const xs = line.map((s) => s.x);
+    const lo = Math.min(...xs);
+    const hi = Math.max(...xs);
+    const shift = Math.max(0, Math.min(14, FIELD_W - 26 - hi));
+    const turn = Math.min(0.45, Math.atan2(16, Math.max(1, hi - lo))) * back;
+    const c = Math.cos(turn);
+    const sn = Math.sin(turn);
+    for (const s of [...line, ...out.filter((s) => s.banner)]) {
+      const dx = s.x - hi;
+      const dy = s.y - y0;
+      if (!s.banner && s.x >= (lo + hi) / 2) s.cmd = { kind: "advance" };
+      s.x = hi + shift + dx * c + dy * sn;
+      s.y = y0 - dx * sn + dy * c;
+      s.fx = -back * sn;
+      s.fy = -back * c;
     }
   }
   if (preset === "defensive") {
-    for (const s of out) {
-      const r = roleOf(s);
-      if (s.banner) continue;
-      if (r === "ranged") s.y = y0 - back * 4;
-      else if (r === "cav" || r === "ha") s.y = y0 + back * 14;
-      else s.y = y0 + back * 6;
+    // Archers 8 m before the foot, who stand 4 m back; horse either side
+    // of the banner.
+    for (const s of line) {
+      if (roleOf(s) === "ranged") {
+        s.y -= back * 18;
+        s.cmd = { kind: "skirmish" };
+      } else s.y += back * 4;
     }
+    horse.forEach((s, k) => {
+      s.x = FIELD_W / 2 + (k % 2 ? 1 : -1) * (14 + Math.floor(k / 2) * 12);
+      s.y = y0 + back * 16;
+    });
   }
-  for (const s of out) clampTo(s, band(side, 3));
+  for (const s of out) {
+    if (roleOf(s) === "cav") s.cmd.cycle = true;
+    clampTo(s, band(side, tactics));
+  }
   return out;
 }
 
@@ -224,11 +279,14 @@ export function applyPreset(b, side, preset) {
   if (b.round > 0) return;
   const mine = b.squads.filter((s) => s.side === side);
   const specs = mine.map((s) => ({ units: s.units, role: s.role, banner: s.banner, id: s.id }));
-  const placed = deploy(specs, side, preset);
+  const placed = deploy(specs, side, preset, b.sides[side].hero?.tactics ?? 0);
   for (const p of placed) {
     const s = b.squads[p.id];
     s.x = p.x;
     s.y = p.y;
+    s.fx = p.fx;
+    s.fy = p.fy;
+    if (!b.sides[side].ai) s.cmd = p.cmd;
   }
   b.sides[side].preset = preset;
 }
@@ -284,7 +342,7 @@ export function skirmish(s) {
       hero,
       ai: sd.ai ?? side === 1,
       place: true,
-      squads: deploy(specs, side, sd.preset ?? "line"),
+      squads: deploy(specs, side, sd.preset ?? "line", hero?.tactics ?? 0),
     };
   });
   const b = createBattle({

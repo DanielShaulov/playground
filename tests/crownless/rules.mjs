@@ -27,6 +27,8 @@ import {
   skirmish,
   oddsWord,
   band,
+  deploy,
+  applyPreset,
 } from "../../games/crownless/rules/battle-setup.js";
 import { troop, cultureTroop, worthOf } from "../../games/crownless/rules/data/troops.js";
 import { give } from "../../games/crownless/rules/battle-ai.js";
@@ -301,6 +303,108 @@ check(
   "your band is 45 m deep, 10 m more a Tactics rank",
   band(0, 0).y0 === 95 && band(0, 2).y0 === 75 && band(1, 1).y1 === 55,
 );
+
+// --- Deployment presets --------------------------------------------------------
+
+console.log("\n# Deployment presets (battle.md §1)\n");
+
+{
+  // Two squads of 30 foot (4 ranks: 12 m wide, 4 m apart, centres 42 and
+  // 58), 20 archers behind at 50, two squads of 20 horse (2 ranks: 15 m
+  // wide) and a banner. The line stands at y 110.
+  const specs = [
+    { type: "footman", n: 30 },
+    { type: "footman", n: 30 },
+    { type: "archer", n: 20 },
+    { type: "horseman", n: 20 },
+    { type: "horseman", n: 20 },
+    bannerSquad(skirmishHero("vale", 1)),
+  ].map((s, id) => ({ ...s, id }));
+  const by = (list) => Object.fromEntries(list.map((s) => [s.id, s]));
+  const kinds = (list) => list.map((s) => s.cmd.kind).join(" ");
+
+  let d = by(deploy(specs, 0, "line"));
+  check(
+    "Line: every squad holds, the banner keeps behind",
+    kinds(Object.values(d)) === "hold hold hold hold hold escort",
+    kinds(Object.values(d)),
+  );
+  check("Line: a horse squad on each wing", d[3].x === 10 && d[4].x === 90);
+
+  d = by(deploy(specs, 0, "hammer"));
+  // Massed from 4 m in, 3 m apart: centres 96 − 7.5 and 96 − 15 − 3 − 7.5.
+  check(
+    "Hammer: both horse squads side by side on the right, 8 m ahead of the line",
+    d[3].x === 88.5 && d[4].x === 70.5 && d[3].y === 102 && d[4].y === 102,
+    `${d[3].x},${d[3].y} ${d[4].x},${d[4].y}`,
+  );
+  check(
+    "Hammer: the horse charges, the foot holds",
+    kinds([d[3], d[4], d[0], d[1], d[2]]) === "charge charge hold hold hold",
+    kinds([d[3], d[4], d[0], d[1], d[2]]),
+  );
+
+  d = by(deploy(specs, 0, "refused"));
+  // The line shifts 14 m right and swings 0.45 rad back about its right end:
+  // the left squad, 16 m along, drops 16 × sin 0.45 = 6.96 m.
+  check(
+    "Refused: the right of the line moves over, the left stands back",
+    d[1].x === 72 && d[1].y === 110 && Math.abs(d[0].y - 116.96) < 0.01,
+    `${d[1].x},${d[1].y} ${d[0].y.toFixed(2)}`,
+  );
+  check(
+    "Refused: the line faces half-left, along the swing",
+    Math.abs(d[0].fx + 0.435) < 0.001 && Math.abs(d[0].fy + 0.9) < 0.001,
+    `${d[0].fx.toFixed(3)},${d[0].fy.toFixed(3)}`,
+  );
+  check(
+    "Refused: the right and the horse advance, the left holds",
+    kinds([d[1], d[2], d[3], d[4], d[0]]) === "advance advance advance advance hold",
+    kinds([d[1], d[2], d[3], d[4], d[0]]),
+  );
+
+  d = by(deploy(specs, 0, "defensive"));
+  check(
+    "Defensive: archers 12 m before the foot, horse either side of the banner behind",
+    d[2].y === 102 && d[0].y === 114 && d[3].x === 36 && d[4].x === 64 && d[3].y === 126,
+    `${d[2].y} ${d[0].y} ${d[3].x},${d[3].y} ${d[4].x}`,
+  );
+  check(
+    "Defensive: the archers skirmish, everyone else holds",
+    kinds(Object.values(d)) === "hold hold skirmish hold hold escort",
+    kinds(Object.values(d)),
+  );
+
+  const b = skirmish({
+    seed: 3,
+    terrain: "open",
+    sides: [
+      { culture: "vale", doctrine: "balanced", worth: 100, hero: 5 },
+      { culture: "fen", doctrine: "yeomen", worth: 100, hero: 5 },
+    ],
+  });
+  check(
+    "the AI's squads take no orders from its deployment",
+    b.squads.every((s) => s.side === 0 || s.cmd === null),
+  );
+  applyPreset(b, 1, "hammer");
+  check(
+    "nor from a preset",
+    b.squads.every((s) => s.side === 0 || s.cmd === null),
+  );
+  applyPreset(b, 0, "refused");
+  check(
+    "a preset turns the battle's squads as well as moving them",
+    b.squads.some((s) => s.side === 0 && s.fx < -0.1),
+  );
+  applyPreset(b, 0, "line");
+  const mine = b.squads.filter((s) => s.side === 0);
+  check(
+    "a preset taken back puts orders and facing back too",
+    mine.every((s) => s.cmd.kind === (s.banner ? "escort" : "hold") && s.fx === 0 && s.fy === -1),
+    kinds(mine),
+  );
+}
 
 // --- Abilities -------------------------------------------------------------------
 

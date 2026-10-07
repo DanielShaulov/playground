@@ -36,6 +36,7 @@ import {
   summarizeOdds,
   strength,
   DOCTRINES,
+  PRESETS,
 } from "./rules/battle-setup.js";
 import { worthOf, troop, CULTURES } from "./rules/data/troops.js";
 import { layout, toField, squadAt, barHeight } from "./view/layout.js";
@@ -494,7 +495,8 @@ createInput(stage, {
 });
 
 function say(text) {
-  toast = { text, life: 2.2 };
+  // Long enough to read: a couple of seconds, more for a longer line.
+  toast = { text, life: Math.max(2.2, text.length / 18) };
 }
 
 // ---------------------------------------------------------------------------
@@ -619,6 +621,7 @@ function render() {
       onOrder,
       onPreset: (id) => {
         applyPreset(b, 0, id);
+        say(`${PRESETS[id].name}: ${PRESETS[id].text}`);
         persist();
         render();
       },

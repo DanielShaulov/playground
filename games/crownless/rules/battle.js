@@ -230,8 +230,8 @@ export function makeSquad(b, id, side, spec) {
     banner: !!spec.banner,
     x: spec.x,
     y: spec.y,
-    fx: 0,
-    fy: side === 0 ? -1 : 1,
+    fx: spec.fx ?? 0,
+    fy: spec.fy ?? (side === 0 ? -1 : 1),
     speedNow: 0,
     runUp: 0, // seconds spent moving at speed; a charge needs CHARGE_RUNUP of it
     engagedFor: 0, // seconds continuously in melee
@@ -242,7 +242,8 @@ export function makeSquad(b, id, side, spec) {
     luck: 1,
     state: "ok", // ok | wavering | routing | fled | dead
     order: { kind: "advance", target: null }, // this round's order, from the AI or a command
-    cmd: null, // the player's standing command (battle-ai.js), when a person commands this side
+    // The player's standing command (battle-ai.js), when a person commands this side.
+    cmd: spec.cmd ? { ...spec.cmd } : null,
     reload: 0,
     ammo: shooters.length ? Math.min(...shooters.map((t) => t.ammo)) : 0,
     contacts: [], // ids in contact last step, for charge detection
@@ -261,6 +262,14 @@ export function makeSquad(b, id, side, spec) {
 }
 
 /** Line abreast: infantry centre, spears beside, ranged behind, horse on the wings. */
+/** How wide a squad spec stands in its default ranks, in metres. */
+export function frontage(s) {
+  const t = troop((s.units ?? [s])[0].type);
+  const n = s.units ? s.units.reduce((m, u) => m + u.n, 0) : s.n;
+  const role = s.role ?? t.role;
+  return Math.ceil(n / (t.ranks ?? DEFAULT_RANKS[role])) * (t.spacing ?? SPACING);
+}
+
 export function deployLine(list, side, { wrap = true } = {}) {
   const y0 = side === 0 ? FIELD_H - 30 : 30;
   const back = side === 0 ? 1 : -1;
@@ -272,11 +281,7 @@ export function deployLine(list, side, { wrap = true } = {}) {
   const front = sorted.filter((s) => ["inf", "spear", "monster"].includes(roleOf(s)));
   const rear = sorted.filter((s) => roleOf(s) === "ranged");
   const wings = sorted.filter((s) => ["cav", "ha"].includes(roleOf(s)));
-  const width = (s) => {
-    const t = troop((s.units ?? [s])[0].type);
-    const n = s.units ? s.units.reduce((m, u) => m + u.n, 0) : s.n;
-    return Math.ceil(n / (t.ranks ?? DEFAULT_RANKS[roleOf(s)])) * (t.spacing ?? SPACING);
-  };
+  const width = frontage;
   const lay = (row, y) => {
     const total = row.reduce((w, s) => w + width(s) + 4, -4);
     let x = FIELD_W / 2 - total / 2;
@@ -360,11 +365,14 @@ export function createBattle(setup) {
       b.squads.push(s);
     }
   });
-  // A commanded side starts holding, banner keeping behind the line.
+  // A commanded side starts as its deployment says (battle-setup.js), or
+  // holding, banner keeping behind the line.
   for (const s of b.squads) {
-    if (b.sides[s.side].ai) continue;
-    s.cmd = s.banner ? { kind: "escort" } : { kind: "hold" };
-    if (s.role === "cav") s.cmd.cycle = true;
+    if (b.sides[s.side].ai) s.cmd = null;
+    else if (!s.cmd) {
+      s.cmd = s.banner ? { kind: "escort" } : { kind: "hold" };
+      if (s.role === "cav") s.cmd.cycle = true;
+    }
   }
   return b;
 }
