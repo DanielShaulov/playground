@@ -84,12 +84,18 @@
   touch-action: manipulation;
 }
 
-.cl-btn:active:not(:disabled) {
+.cl-btn:active:not(:disabled):not([aria-disabled="true"]) {
   transform: scale(0.97);
 }
 
-.cl-btn:disabled {
+.cl-btn:disabled,
+.cl-btn[aria-disabled="true"] {
   opacity: 0.42;
+}
+
+/* A long press explains a button (ui.md §1.3): no iOS callout over it. */
+.cl-ui button {
+  -webkit-touch-callout: none;
 }
 
 .cl-btn.primary {
@@ -580,7 +586,7 @@
 .cl-tip {
   position: absolute;
   z-index: 9;
-  max-width: 220px;
+  max-width: 240px;
   padding: 8px 10px;
   border-radius: 10px;
   background: rgba(16, 19, 26, 0.94);
