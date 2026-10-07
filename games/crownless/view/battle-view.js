@@ -46,6 +46,7 @@ export function createBattleView({ onImpact = () => {} } = {}) {
   let clock = 0; // battle seconds the view has shown, for fading the fallen
   let fired = 0; // events already triggered
   let lastStep = 0;
+  let skipping = false; // finish the round on the next update
   let fallen = [];
   let volleys = [];
   let floats = [];
@@ -111,6 +112,7 @@ export function createBattleView({ onImpact = () => {} } = {}) {
   function play(timeline) {
     tl = timeline;
     t = 0;
+    skipping = false;
     fired = 0;
     lastStep = 0;
     tl.lost = b.squads.map((s, id) => {
@@ -133,7 +135,7 @@ export function createBattleView({ onImpact = () => {} } = {}) {
     dust = dust.filter((d) => (d.life -= dt) > 0);
     if (!tl) return false;
     const before = t;
-    t = Math.min(ROUND_S, t + dt * speed);
+    t = skipping ? ROUND_S : Math.min(ROUND_S, t + dt * speed);
     clock += t - before;
     const stepNow = Math.min(STEPS, Math.floor(t / DT + 1e-9));
     // Men who fell between the frames we just passed.
@@ -158,10 +160,12 @@ export function createBattleView({ onImpact = () => {} } = {}) {
     return false;
   }
 
-  /** Jump to the end of the round being played. */
+  /**
+   * Jump to the end of the round being played. The next update() finishes it
+   * and returns true, so the round still ends where the caller looks for it.
+   */
   function skip() {
-    if (!tl) return;
-    update(ROUND_S - t + 0.001, 1);
+    if (tl) skipping = true;
   }
 
   function finish() {
