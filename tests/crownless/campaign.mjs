@@ -1,7 +1,8 @@
 /**
  * The campaign in a real browser: New campaign from the title, a journey
  * tapped out on the map, a reload in the middle of it, Rest and Stop, the
- * tabs — then screenshots of each campaign screen on both phones.
+ * tabs, brigands and wolves met on the road — then screenshots of each
+ * campaign screen on both phones.
  *
  *     npm start                      # then, in another terminal:
  *     npm run test:crownless:campaign
@@ -27,11 +28,14 @@ import {
   explored,
   dayOf,
   hourOf,
+  partiesInSight,
 } from "../../games/crownless/rules/world.js";
+import { autoResolve, choices } from "../../games/crownless/rules/encounter.js";
 import { CAMPAIGN_V, makeCampaign } from "../../games/crownless/rules/campaign-save.js";
 import { TERRAIN } from "../../games/crownless/rules/data/world.js";
 import { neighbours } from "../../games/crownless/rules/hex.js";
-import { mapLayout, cameraOn, hexScreen } from "../../games/crownless/view/map-layout.js";
+import { mapLayout, cameraOn, hexScreen, toScreen } from "../../games/crownless/view/map-layout.js";
+import { partyAt } from "../../games/crownless/view/map-view.js";
 
 const KEY = "playground:crownless:campaign";
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "shots");
@@ -71,6 +75,58 @@ function targetOnScreen(s, L, lo, hi) {
     if (!best || r.hours > best.r.hours) best = { i, r, p, end };
   }
   return best;
+}
+
+const payable = (p, s) => p.kind === "brigands" && choices(s).pay > 0;
+
+/**
+ * A round of the towns on seed 7 until a meeting `want` accepts; the hour
+ * before it, and the meeting. Meetings it doesn't want are walked away from.
+ * Setup: found with the rules.
+ */
+function hourBefore(want) {
+  const s = newCampaign({ seed: 7, culture: "vale", background: "sellsword" });
+  const realm = realmOf(s);
+  const towns = realm.places.filter((p) => p.kind === "town" || p.kind === "castle");
+  let k = 0;
+  for (let h = 0; h < 24 * 120; h++) {
+    if (!busy(s)) travelTo(s, towns[k++ % towns.length].i);
+    const before = structuredClone(s);
+    advance(s);
+    if (!s.encounter) continue;
+    const party = s.parties.find((p) => p.id === s.encounter.party);
+    if (want(party, s)) return { before, met: s, party };
+    s.truce[party.id] = s.t + 6;
+    s.encounter = null;
+  }
+  return null;
+}
+
+/** Where a party's shield is drawn, standing where `s` has it, the camera on you. */
+function shieldAt(s, party, L) {
+  const realm = realmOf(s);
+  const cam = cameraOn(L, realm.grid, s.player.at.i);
+  const w = partyAt(realm, party.at, L.R);
+  return toScreen(L, cam, w.x, w.y - 3);
+}
+
+/** The first time a party comes into sight and stops you on seed 7 (setup). */
+function inSight() {
+  const s = newCampaign({ seed: 7, culture: "vale", background: "sellsword" });
+  const realm = realmOf(s);
+  const towns = realm.places.filter((p) => p.kind === "town" || p.kind === "castle");
+  let k = 0;
+  for (let h = 0; h < 24 * 120; h++) {
+    if (s.encounter) {
+      s.truce[s.encounter.party] = s.t + 6;
+      s.encounter = null;
+    }
+    if (!busy(s)) travelTo(s, towns[k++ % towns.length].i);
+    const ev = advance(s);
+    const pt = partiesInSight(s)[0];
+    if (!busy(s) && !s.encounter && pt && ev.some((e) => e.k === "spotted")) return { s, pt };
+  }
+  return null;
 }
 
 async function seedCampaign(game, save) {
@@ -314,6 +370,120 @@ const continueBtn = (page) => page.getByRole("button", { name: /^Continue campai
     (await continueBtn(page).count()) === 0 && (await game.can("New campaign")),
   );
 
+  console.log("\n# Brigands and wolves\n");
+  // A band that comes for you, and what the sheet lets you do about it.
+  const hunt = hourBefore(payable);
+  await seedCampaign(game, makeCampaign(hunt.before));
+  await continueBtn(page).tap();
+  const sheetE = page.getByRole("dialog", { name: "Encounter" });
+  await sheetE.waitFor({ timeout: 10000 });
+  const metSave = await readSave(page);
+  check(
+    `travelling on, ${hunt.party.name} catch you: the sheet opens and the meeting is saved`,
+    metSave.encounter?.party === hunt.party.id &&
+      metSave.encounter.by === "them" &&
+      metSave.t === hunt.met.t &&
+      (await sheetE.textContent()).includes(hunt.party.name),
+    `t ${metSave.t}`,
+  );
+  await page.waitForFunction(
+    () => /\(\d of 8\)/.test(document.querySelector(".cl-odds")?.textContent ?? ""),
+    null,
+    { timeout: 10000 },
+  );
+  check(
+    "the odds come in from eight auto-resolves",
+    /^Odds: \w+ \(\d of 8\)/.test(await page.locator(".cl-odds").textContent()),
+    await page.locator(".cl-odds").textContent(),
+  );
+  const pay = choices(hunt.met).pay;
+  check(
+    `it offers Pay ${pay}, a rearguard (they're as fast as you) and Auto`,
+    (await game.can(`Pay ${pay}`)) && (await game.can("Rearguard")) && (await game.can("Auto ▶")),
+  );
+  await page.reload({ waitUntil: "load" });
+  await settle(400);
+  await continueBtn(page).tap();
+  await settle(500);
+  check(
+    "a reload brings the meeting back, still waiting on you",
+    (await sheetE.count()) === 1 &&
+      JSON.stringify(await readSave(page)) === JSON.stringify(metSave),
+  );
+  await press(`Pay ${pay}`, 400);
+  const paid = await readSave(page);
+  check(
+    `Pay: ${pay} gold gone, the band leaves you be for 3 days, the map back`,
+    paid.player.gold === hunt.met.player.gold - pay &&
+      paid.paid[hunt.party.id] === hunt.met.t + 72 &&
+      !paid.encounter &&
+      (await sheetE.count()) === 0 &&
+      (await page.locator(".cl-ctx").count()) === 1,
+  );
+
+  // Auto-resolve: the browser's fight is Node's fight.
+  await seedCampaign(game, makeCampaign(hunt.met));
+  await continueBtn(page).tap();
+  await sheetE.waitFor({ timeout: 5000 });
+  await press("Auto ▶", 500);
+  const fought = await readSave(page);
+  const node = structuredClone(hunt.met);
+  const expect = autoResolve(node);
+  const sheetR = page.locator(".cl-sheet");
+  check(
+    `Auto ▶: the fight is the one Node fights (${expect.kind}), and its result waits on screen`,
+    JSON.stringify(fought.result) === JSON.stringify(expect) &&
+      (await sheetR.textContent()).includes(
+        expect.kind === "lost" ? "Defeat" : expect.kind === "won" ? "Victory" : "draw",
+      ),
+    `${expect.kind}: ${expect.killed} of yours killed`,
+  );
+  await page.reload({ waitUntil: "load" });
+  await settle(400);
+  await continueBtn(page).tap();
+  await settle(400);
+  check(
+    "a reload keeps the result on screen",
+    (await page.getByRole("button", { name: "Continue", exact: true }).count()) === 1,
+  );
+  await press("Continue", 400);
+  const after = await readSave(page);
+  delete after.v;
+  node.result = null;
+  check(
+    "Continue: back on the map, the save exactly Node's",
+    JSON.stringify(after) === JSON.stringify(node) && (await page.locator(".cl-ctx").count()) === 1,
+  );
+  await press("Log", 300);
+  check(
+    "the Log tells of the fight",
+    (await page.getByRole("dialog", { name: "Log" }).textContent()).includes(hunt.party.name),
+  );
+  await press("Log", 200);
+
+  // A party in sight: its card, and Attack.
+  const look = inSight();
+  await seedCampaign(game, makeCampaign(look.s));
+  await continueBtn(page).tap();
+  await settle(700);
+  const at = shieldAt(look.s, look.pt, L);
+  await game.tap(at.x, at.y);
+  await settle(300);
+  const card = await ctxText(page);
+  check(
+    `a tap on ${look.pt.name}'s shield shows its card, with Attack`,
+    card.title === look.pt.name &&
+      card.sub.startsWith(`${look.pt.troops.reduce((m, t) => m + t.n, 0)} men`) &&
+      (await game.can("Attack ▶")),
+    `${card.title} · ${card.sub}`,
+  );
+  await press("Attack ▶", 100);
+  const chasing = await readSave(page);
+  check(
+    "Attack: you go after it",
+    chasing.player.chase === look.pt.id || chasing.encounter?.party === look.pt.id,
+  );
+
   check("the console stayed clean", game.errors.length === 0, game.errors.join(" | "));
   await game.close();
 }
@@ -376,6 +546,25 @@ for (const device of ["iPhone 13", "iPhone SE"]) {
     await press(tab, 300);
     await shot(tab.toLowerCase());
   }
+  const look = inSight();
+  await seedCampaign(game, makeCampaign(look.s));
+  await continueBtn(page).tap();
+  await settle(700);
+  const at = shieldAt(look.s, look.pt, L);
+  await game.tap(at.x, at.y);
+  await settle(300);
+  await shot("party");
+  const hunt = hourBefore(payable);
+  await seedCampaign(game, makeCampaign(hunt.met));
+  await continueBtn(page).tap();
+  await page.waitForFunction(
+    () => /\(\d of 8\)/.test(document.querySelector(".cl-odds")?.textContent ?? ""),
+    null,
+    { timeout: 10000 },
+  );
+  await shot("encounter");
+  await press("Auto ▶", 500);
+  await shot("result");
   check(
     `${device}: every button at least 44 px and on screen`,
     problems.length === 0,

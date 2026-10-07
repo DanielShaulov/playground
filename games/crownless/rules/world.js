@@ -1,6 +1,7 @@
 /**
- * The campaign on the map (world.md §2–3): the clock, your party's pace and
- * path, travel hour by hour, resting, sight and the fog.
+ * The campaign on the map (world.md §2–3, §5): the clock, your party's pace
+ * and path, travel hour by hour, resting, sight and the fog, and the
+ * brigands and wolves you meet on the way (parties.js decides for them).
  *
  * The state is plain JSON and is exactly what the save holds (tech.md §4).
  * The realm it plays on is rebuilt from `state.seed` by worldgen and never
@@ -8,22 +9,17 @@
  * and returns events for the view to show (tech.md §2): it never waits on
  * drawing, and the view never decides an outcome.
  */
-import { findPath, within } from "./hex.js";
+import { within, dist, centre, SQ3 } from "./hex.js";
 import { generate } from "./worldgen.js";
-import { derive } from "./rng.js";
-import {
-  TERRAIN,
-  T,
-  ROAD,
-  FORD,
-  BRIDGE,
-  ROAD_COST,
-  FORD_COST,
-  BRIDGE_COST,
-  CULTURE_TRAVEL,
-} from "./data/world.js";
+import { derive, roll } from "./rng.js";
+import { hexCost, pathFor } from "./ground.js";
+import { spawn, think, moveParty, walk, hexOf, partyWorth, HOURS_A_WEEK } from "./parties.js";
+import { TERRAIN, T, CULTURE_TRAVEL } from "./data/world.js";
 import { START, BACKGROUNDS, startingHero, partyLimit } from "./data/hero.js";
-import { troop, cultureTroop } from "./data/troops.js";
+import { troop, cultureTroop, worthOf } from "./data/troops.js";
+import { CONTACT, HEAL } from "./data/parties.js";
+
+export { hexCost, pathFor };
 
 /** The hour a campaign begins: day 1, 08:00. */
 export const START_HOUR = 8;
@@ -94,7 +90,17 @@ export function newCampaign({ seed, culture, background }) {
       at: { i: -1, to: -1, progress: 0 },
       dest: -1,
       resting: false,
+      chase: null,
+      provoked: false,
     },
+    parties: [],
+    nextParty: 0,
+    truce: {},
+    paid: {},
+    spotted: [],
+    gone: [],
+    encounter: null,
+    result: null,
     journal: [],
   };
   const realm = realmOf(state);
@@ -104,6 +110,8 @@ export function newCampaign({ seed, culture, background }) {
   state.visited.push(start.id);
   log(state, "start", start.id);
   look(state, realm);
+  spawn(state, realm);
+  state.spotted = partiesInSight(state, realm).map((pt) => pt.id);
   return state;
 }
 
@@ -133,35 +141,19 @@ export function pace(player) {
   return 12 * cls * size * wounded * limit * extra * CULTURE_TRAVEL[player.culture].pace;
 }
 
-/** What crossing into hex i costs a party of `culture`, in cost-1 hexes. */
-export function hexCost(realm, i, culture) {
-  const t = realm.terrain[i];
-  const f = realm.flags[i];
-  let c;
-  if (t === T.river) c = f & BRIDGE ? BRIDGE_COST : f & FORD ? FORD_COST : Infinity;
-  else {
-    c = TERRAIN[t].cost;
-    const adj = CULTURE_TRAVEL[culture].cost[TERRAIN[t].id];
-    if (adj === "plains") c = TERRAIN[T.plains].cost;
-    else if (adj) c += adj;
-  }
-  return f & ROAD ? c * ROAD_COST : c;
+/**
+ * What you'd bring to a fight, as a party sees it: your fit men's worth and
+ * your banner's household of four footmen (army.md §6).
+ */
+export function yourWorth(state) {
+  const p = state.player;
+  const fit = p.party.troops.reduce((m, t) => m + (t.n - t.wounded) * worthOf(t.type), 0);
+  return fit + 4 * worthOf(cultureTroop(p.culture, "footman"));
 }
 
 /** Hours to cross into hex i at the player's pace. */
 export const hoursInto = (realm, player, i) =>
   (24 / pace(player)) * hexCost(realm, i, player.culture);
-
-/** The cheapest hexes from `from` to `to` for a culture, cached per realm. */
-export function pathFor(realm, culture, from, to) {
-  const key = `${culture}:${from}>${to}`;
-  if (realm.paths.has(key)) return realm.paths.get(key);
-  const found = findPath(realm.grid, from, to, (i) => hexCost(realm, i, culture), 0.5 * ROAD_COST);
-  const path = found ? found.path : null;
-  if (realm.paths.size > 400) realm.paths.clear();
-  realm.paths.set(key, path);
-  return path;
-}
 
 /**
  * Where you'd go and how long it would take: the hexes from where you are
@@ -183,12 +175,32 @@ export function route(state, dest, realm = realmOf(state)) {
 // Orders
 // ---------------------------------------------------------------------------
 
+/** Nothing can be ordered while a meeting or its outcome is on screen. */
+const held = (state) => !!(state.encounter || state.result);
+
 /** Set off for `dest`. Returns false if there is no way there. */
 export function travelTo(state, dest) {
   const p = state.player;
-  if (dest === p.at.i && p.at.to < 0) return false;
+  if (held(state) || (dest === p.at.i && p.at.to < 0)) return false;
   if (!route(state, dest)) return false;
   p.dest = dest;
+  p.resting = false;
+  p.chase = null;
+  return true;
+}
+
+/** Go after a party you can see, wherever it goes (ui.md §3: Attack). */
+export function attack(state, id, realm = realmOf(state)) {
+  const p = state.player;
+  const party = state.parties.find((pt) => pt.id === id);
+  if (held(state) || !party || !partiesInSight(state, realm).includes(party)) return false;
+  const at = hexOf(party.at);
+  if (at !== p.at.i && !route(state, at, realm)) return false;
+  // Going after a band you paid off ends the deal; a truce still keeps you
+  // apart until it runs out (world.md §5: the one that withdrew moves first).
+  delete state.paid[id];
+  p.chase = id;
+  p.dest = at;
   p.resting = false;
   return true;
 }
@@ -197,71 +209,195 @@ export function travelTo(state, dest) {
 export function stop(state) {
   const p = state.player;
   p.resting = false;
+  p.chase = null;
   p.dest = p.at.to >= 0 ? p.at.to : -1;
 }
 
 /** Rest in place until morning, or until stopped (world.md §2). */
 export function rest(state) {
   const p = state.player;
-  if (p.at.to >= 0) return false;
+  if (held(state) || p.at.to >= 0) return false;
   p.dest = -1;
+  p.chase = null;
   p.resting = true;
   return true;
 }
 
-/** Is time passing? Only while you travel or rest. */
-export const busy = (state) => state.player.dest >= 0 || state.player.resting;
+/** Is time passing? Only while you travel or rest, and nothing waits on you. */
+export const busy = (state) =>
+  !held(state) && (state.player.dest >= 0 || state.player.resting || state.player.chase != null);
 
 // ---------------------------------------------------------------------------
 // The hour
 // ---------------------------------------------------------------------------
 
 /**
- * One hour passes: your party moves along its path or rests, the clock
- * turns, and you see what's around you. Returns what happened.
+ * One hour passes. The parties decide what to do; then you and they move a
+ * quarter of an hour at a time, and wherever you pass within 0.6 of a hex
+ * of a party that means to fight, you meet (world.md §2). The clock turns,
+ * the wounded heal at midnight, the week brings new bands, and you see
+ * what's around you. Returns what happened.
  */
 export function advance(state, realm = realmOf(state)) {
   const p = state.player;
   const events = [];
+  if (held(state)) return events;
   const wasNight = isNight(state.t);
-  let left = 1;
-  while (left > 0 && p.dest >= 0) {
-    if (p.at.to < 0) {
-      if (p.at.i === p.dest) {
-        arrive(state, realm, events);
-        break;
-      }
-      const path = pathFor(realm, p.culture, p.at.i, p.dest);
-      if (!path) {
-        p.dest = -1;
-        events.push({ k: "lost" });
-        break;
-      }
-      p.at.to = path[1];
-      p.at.progress = 0;
-    }
-    const step = hoursInto(realm, p, p.at.to);
-    const need = (1 - p.at.progress) * step;
-    if (need <= left) {
-      left -= need;
-      p.at.i = p.at.to;
-      p.at.to = -1;
-      p.at.progress = 0;
-      enter(state, realm, events);
-      if (p.at.i === p.dest) arrive(state, realm, events);
-    } else {
-      p.at.progress += left / step;
-      left = 0;
-    }
+  const you = {
+    hex: hexOf(p.at),
+    worth: yourWorth(state),
+    shy: p.background === "outlaw" && !p.provoked,
+  };
+  you.forest = realm.terrain[you.hex] === T.forest;
+  for (const party of state.parties)
+    think(state, realm, party, { ...you, truce: spares(state, party) }, wasNight);
+  if (p.chase != null) follow(state, realm, events);
+
+  for (let q = 0; q < 4 && !state.encounter; q++) {
+    const me0 = spot(realm, p.at);
+    const them0 = state.parties.map((pt) => spot(realm, pt.at));
+    if (p.dest >= 0) walkYou(state, realm, 0.25, events);
+    for (const party of state.parties) moveParty(realm, party, 0.25);
+    const me1 = spot(realm, p.at);
+    state.parties.forEach((party, k) => {
+      if (state.encounter || !wantsFight(state, party)) return;
+      if (closest(me0, me1, them0[k], spot(realm, party.at)) <= CONTACT * SQ3)
+        meet(state, party, p.chase === party.id ? "you" : "them", events);
+    });
   }
+
   state.t += 1;
   if (p.resting && hourOf(state.t) === MORNING) {
     p.resting = false;
     events.push({ k: "rested" });
   }
   if (isNight(state.t) !== wasNight) events.push({ k: wasNight ? "dawn" : "dusk" });
+  if (hourOf(state.t) === 0) heal(state);
+  if (state.t % HOURS_A_WEEK === 0) spawn(state, realm);
   look(state, realm, events);
+  watch(state, realm, events);
   return events;
+}
+
+/** You on your way: one stretch of `hours` along the path to `dest`. */
+function walkYou(state, realm, hours, events) {
+  const p = state.player;
+  if (p.at.to < 0 && p.at.i === p.dest) {
+    if (p.chase == null) arrive(state, realm, events);
+    return;
+  }
+  walk(
+    p.at,
+    hours,
+    () => {
+      const path = pathFor(realm, p.culture, p.at.i, p.dest);
+      if (path) return path[1];
+      p.dest = -1;
+      p.chase = null;
+      events.push({ k: "lost" });
+      return -1;
+    },
+    (i) => hoursInto(realm, p, i),
+    () => {
+      enter(state, realm, events);
+      if (p.at.i === p.dest) {
+        if (p.chase == null) arrive(state, realm, events);
+        return false;
+      }
+      return p.dest >= 0;
+    },
+  );
+}
+
+/** Chasing: head for where the party is now, while you can still see it. */
+function follow(state, realm, events) {
+  const p = state.player;
+  const party = state.parties.find((pt) => pt.id === p.chase);
+  if (!party || !partiesInSight(state, realm).includes(party)) {
+    p.chase = null;
+    events.push({ k: "lost-track", id: party?.id ?? null });
+    if (p.dest >= 0 && p.at.to < 0 && p.at.i === p.dest) p.dest = -1;
+    return;
+  }
+  const at = hexOf(party.at);
+  if (at === p.dest) return;
+  if (at === p.at.i || route(state, at, realm)) p.dest = at;
+  else {
+    p.chase = null;
+    events.push({ k: "lost-track", id: party.id });
+  }
+}
+
+/** No contact with this party yet: after a Leave, a rearguard, a fight (battle.md §11). */
+export const truced = (state, party) => (state.truce[party.id] ?? -1) > state.t;
+
+/** This party lets you be: under a truce, or paid off for three days. */
+export const spares = (state, party) =>
+  truced(state, party) || (state.paid[party.id] ?? -1) > state.t;
+
+/** Contact needs one side to mean it, a party hunting you or you after it, and no truce. */
+const wantsFight = (state, party) =>
+  !truced(state, party) && (party.goal === "hunt" || state.player.chase === party.id);
+
+/** Where a party is, in hex units. */
+function spot(realm, at) {
+  const a = centre(realm.grid, at.i);
+  if (at.to < 0) return a;
+  const b = centre(realm.grid, at.to);
+  return { x: a.x + (b.x - a.x) * at.progress, y: a.y + (b.y - a.y) * at.progress };
+}
+
+/** How close two straight moves over the same time come (world.md §2). */
+export function closest(a0, a1, b0, b1) {
+  const dx = b0.x - a0.x;
+  const dy = b0.y - a0.y;
+  const vx = b1.x - a1.x - dx;
+  const vy = b1.y - a1.y - dy;
+  const vv = vx * vx + vy * vy;
+  const s = vv > 0 ? Math.max(0, Math.min(1, -(dx * vx + dy * vy) / vv)) : 0;
+  return Math.hypot(dx + vx * s, dy + vy * s);
+}
+
+/** You meet a party: travel stops, and the meeting waits for your answer. */
+function meet(state, party, by, events) {
+  const p = state.player;
+  state.encounter = { party: party.id, by, seed: Math.floor(roll(state) * 2 ** 32) >>> 0 };
+  p.chase = null;
+  p.resting = false;
+  p.dest = p.at.to >= 0 ? p.at.to : -1;
+  party.path = [];
+  party.goal = "wait";
+  party.until = state.t + 1;
+  events.push({ k: "encounter", id: party.id });
+}
+
+/** The wounded heal a tenth of each stack a day (world.md §7). */
+function heal(state) {
+  for (const t of state.player.party.troops)
+    t.wounded = Math.max(0, t.wounded - Math.ceil(HEAL * t.n));
+}
+
+/**
+ * A party newly in sight that is coming for you, or stronger than you,
+ * stops your travel or your rest (world.md §2).
+ */
+function watch(state, realm, events) {
+  const p = state.player;
+  const now = partiesInSight(state, realm);
+  const mine = yourWorth(state);
+  for (const party of now) {
+    if (state.spotted.includes(party.id) || p.chase === party.id) continue;
+    const danger = (party.goal === "hunt" && !spares(state, party)) || partyWorth(party) > mine;
+    if (!danger || state.encounter) continue;
+    events.push({ k: "spotted", id: party.id });
+    if (p.dest >= 0 || p.resting) {
+      p.resting = false;
+      p.chase = null;
+      p.dest = p.at.to >= 0 ? p.at.to : -1;
+      events.push({ k: "stop", why: "spotted", id: party.id });
+    }
+  }
+  state.spotted = now.map((pt) => pt.id);
 }
 
 function arrive(state, realm, events) {
@@ -279,6 +415,7 @@ function enter(state, realm, events) {
   if (id < 0 || state.visited.includes(id)) return;
   state.visited.push(id);
   const place = realm.places[id];
+  if (place.kind === "pickup") pickUp(state, place, events);
   if (place.kind === "tower") {
     reveal(state, realm, within(realm.grid, place.i, TOWER_SIGHT));
     log(state, "tower", id);
@@ -288,6 +425,21 @@ function enter(state, realm, events) {
       events.push({ k: "stop", why: "tower", id });
     }
   }
+}
+
+/** What lies in the open is yours as you pass (world.md §4); chests and arms wait for M3. */
+function pickUp(state, place, events) {
+  const p = state.player;
+  if (place.pickup === "gold") p.gold += place.amount;
+  else if (place.pickup === "iron") p.iron += place.amount;
+  else if (place.pickup === "horses") p.horses += place.amount;
+  else {
+    events.push({ k: "pickup", id: place.id, none: true });
+    return;
+  }
+  state.gone.push(place.id);
+  log(state, "pickup", place.id);
+  events.push({ k: "pickup", id: place.id });
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +458,16 @@ export function sightRange(state, realm = realmOf(state)) {
 /** The hexes in sight right now. */
 export const inSight = (state, realm = realmOf(state)) =>
   within(realm.grid, state.player.at.i, sightRange(state, realm));
+
+/** The parties you can see: in sight, and within 2 hexes if they're in forest. */
+export function partiesInSight(state, realm = realmOf(state)) {
+  const sight = new Set(inSight(state, realm));
+  const me = state.player.at.i;
+  return state.parties.filter((pt) => {
+    const h = hexOf(pt.at);
+    return sight.has(h) && (realm.terrain[h] !== T.forest || dist(realm.grid, h, me) <= 2);
+  });
+}
 
 /** Mark what you can see as explored, and say which places you just found. */
 function look(state, realm, events = []) {
@@ -341,8 +503,8 @@ export function explored(state, realm = realmOf(state)) {
 // The Journal and the bitset
 // ---------------------------------------------------------------------------
 
-function log(state, k, id) {
-  state.journal.push({ t: state.t, k, id });
+export function log(state, k, id, extra = null) {
+  state.journal.push({ t: state.t, k, id, ...extra });
   if (state.journal.length > JOURNAL) state.journal.splice(0, state.journal.length - JOURNAL);
 }
 

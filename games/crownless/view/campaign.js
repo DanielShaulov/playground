@@ -26,8 +26,28 @@ import {
   dayOf,
   clock,
   isNight,
+  attack,
+  partiesInSight,
+  yourWorth,
+  spares,
   MORNING,
 } from "../rules/world.js";
+import { partyMen, partyWorth, hexOf } from "../rules/parties.js";
+import {
+  foeOf,
+  troopName,
+  encounterBattle,
+  choices,
+  leave as walkAway,
+  payOff,
+  sacrifice,
+  rearguardOf,
+  autoResolve,
+  dismiss,
+  oddsRun,
+  summarizeOdds,
+  strength,
+} from "../rules/encounter.js";
 import { readCampaign, makeCampaign } from "../rules/campaign-save.js";
 import { TERRAIN, PLACES, LAIRS, PICKUPS, GREAT_LAIRS, CULTURE_IDS } from "../rules/data/world.js";
 import { BACKGROUNDS, partyLimit } from "../rules/data/hero.js";
@@ -38,16 +58,21 @@ import {
   hexUnder,
   hexUnderOverview,
   cameraOn,
+  toScreen,
   TABS_H,
 } from "./map-layout.js";
 import { createMapView, partyAt } from "./map-view.js";
-import { h } from "./sheets.js";
+import { h, troopList } from "./sheets.js";
 import { dist } from "../rules/hex.js";
 
 /** An hour of travel on screen, in seconds (world.md §2); ⏩ runs at 3×. */
 export const HOUR_S = 0.12;
 /** Save this often while time runs, in in-game hours (tech.md §4). */
 const SAVE_EVERY = 6;
+/** Auto-resolves behind the odds on the encounter sheet, one a frame (battle.md §12). */
+const ODDS_RUNS = 8;
+/** A party's shield answers taps this far from its centre, in CSS pixels. */
+const PARTY_HIT = 26;
 
 const ICONS = {
   gold: '<svg viewBox="-7 -7 14 14" width="14" height="14" aria-hidden="true"><circle r="6" fill="#fbbf24" stroke="#a36d05" stroke-width="1.2"/><circle r="3.3" fill="none" stroke="#a36d05" stroke-width="1.2"/></svg>',
@@ -104,6 +129,25 @@ export function describePlace(p) {
   };
 }
 
+/** "60 gold", "3 iron", "2 horses": what a pickup held. */
+const pickupWords = (p) =>
+  p.pickup === "gold"
+    ? `${p.amount} gold`
+    : p.pickup === "iron"
+      ? `${p.amount} iron`
+      : `${p.amount} horses`;
+
+/** "9 looters, 6 brigands", "14 wolves": a party's men in its own words. */
+function partyList(party) {
+  return party.troops
+    .map((t) => {
+      if (t.type === "wolf") return `${t.n} ${t.n === 1 ? "wolf" : "wolves"}`;
+      const name = troopName(party, t.type).toLowerCase();
+      return `${t.n} ${t.n === 1 || name === "militia" ? name : `${name}s`}`;
+    })
+    .join(", ");
+}
+
 export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, onExit }) {
   const view = createMapView();
   let active = false;
@@ -119,6 +163,10 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
   let acc = 0;
   let sinceSave = 0;
   let prev = null; // where the party was before the last hour, for drawing between
+  let prevParties = null; // the same for everyone else on the map, by id
+  let drawn = []; // parties as last drawn, in screen pixels, for taps
+  let selParty = null; // the party whose card is on the context bar
+  let odds = null; // the encounter sheet's odds: {seed, b, base, runs, done}
   let toast = null;
   let els = {}; // what the hourly refresh rewrites in place
 
@@ -178,8 +226,11 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
     mode = "map";
     sheet = null;
     sel = -1;
+    selParty = null;
     follow = true;
     prev = null;
+    prevParties = null;
+    odds = null;
     acc = 0;
     cam = cameraOn(layoutNow(), realm.grid, state.player.at.i);
     onEnter();
@@ -218,6 +269,47 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       acc = 0;
       save();
     }
+    render();
+  }
+
+  /** Go after the party on the card (ui.md §3: Attack). */
+  function onAttack() {
+    if (selParty == null || !attack(state, selParty, realm)) return;
+    selParty = null;
+    sel = -1;
+    follow = true;
+    acc = 0;
+    save();
+    render();
+  }
+
+  /** An answer to the encounter sheet; the map goes on from where it stood. */
+  function answer(fn, message) {
+    const foe = foeOf(state);
+    if (!foe || !fn(state, realm)) return;
+    odds = null;
+    selParty = null;
+    save();
+    if (message) say(message(foe));
+    vibrate(10);
+    render();
+  }
+
+  const onPay = () => {
+    const cost = choices(state).pay;
+    answer(payOff, () => `Paid ${cost} gold. They'll let you be for three days`);
+  };
+  const onLeave = () => answer(walkAway, () => "You slip away");
+  const onRearguard = () => {
+    const lost = troopList(rearguardOf(state.player.party.troops));
+    answer(sacrifice, () => `Your rearguard of ${lost} holds them off`);
+  };
+  const onAuto = () => answer(autoResolve, null);
+
+  function onContinue() {
+    dismiss(state);
+    follow = true;
+    save();
     render();
   }
 
@@ -274,6 +366,21 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       render();
       return;
     }
+    if (state.encounter || state.result) return;
+    const hit = partyUnder(x, y);
+    if (hit != null) {
+      if (busy(state)) stop(state);
+      if (hit === selParty && !busy(state)) {
+        onAttack();
+        return;
+      }
+      selParty = hit;
+      sel = -1;
+      vibrate(6);
+      render();
+      return;
+    }
+    selParty = null;
     const i = hexUnder(L, cam, realm.grid, x, y);
     if (i < 0) return;
     if (busy(state)) {
@@ -292,6 +399,17 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
     render();
   }
 
+  /** The party drawn nearest a tap, if one is near enough. */
+  function partyUnder(x, y) {
+    let best = null;
+    let bd = PARTY_HIT;
+    for (const d of drawn) {
+      const k = Math.hypot(d.x - x, d.y - y);
+      if (k < bd) [bd, best] = [k, d.id];
+    }
+    return best;
+  }
+
   // -------------------------------------------------------------------------
   // The frame
   // -------------------------------------------------------------------------
@@ -305,6 +423,7 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       while (acc >= HOUR_S && busy(state) && n++ < 10) {
         acc -= HOUR_S;
         prev = partyAt(realm, state.player.at, L.R);
+        prevParties = new Map(state.parties.map((pt) => [pt.id, partyAt(realm, pt.at, L.R)]));
         const events = advance(state, realm);
         sinceSave++;
         shown(events);
@@ -313,22 +432,43 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       if (!busy(state)) {
         acc = 0;
         prev = null;
+        prevParties = null;
         save();
         render();
       } else refresh();
-    } else prev = null;
-
-    let party = partyAt(realm, state.player.at, L.R);
-    if (prev) {
-      const f = Math.min(1, acc / HOUR_S);
-      party = { x: prev.x + (party.x - prev.x) * f, y: prev.y + (party.y - prev.y) * f };
+    } else {
+      prev = null;
+      prevParties = null;
     }
+    if (mode !== "new" && state.encounter) workOdds();
+
+    const f = Math.min(1, acc / HOUR_S);
+    const between = (a, b) => (a ? { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f } : b);
+    let party = partyAt(realm, state.player.at, L.R);
+    if (prev) party = between(prev, party);
+    const parties = mode === "map" ? partiesInSight(state, realm) : [];
+    const onMap = parties.map((pt) => ({
+      id: pt.id,
+      kind: pt.kind,
+      hex: hexOf(pt.at),
+      label: String(partyMen(pt)),
+      hunting: pt.goal === "hunt" && !spares(state, pt),
+      sel: pt.id === selParty,
+      ...between(prevParties?.get(pt.id), partyAt(realm, pt.at, L.R)),
+    }));
     if (follow) {
       const k = Math.min(1, dt * 4);
-      const want = clampCamera(L, realm.grid, party);
+      // A sheet over the map's lower half: keep the meeting above it.
+      const held = state.encounter || state.result;
+      const want = clampCamera(
+        L,
+        realm.grid,
+        held ? { x: party.x, y: party.y + L.viewH * 0.28 } : party,
+      );
       cam = { x: cam.x + (want.x - cam.x) * k, y: cam.y + (want.y - cam.y) * k };
     }
     cam = clampCamera(L, realm.grid, cam);
+    drawn = onMap.map((pt) => ({ id: pt.id, ...toScreen(L, cam, pt.x, pt.y - 3) }));
 
     const seen = explored(state, realm);
     if (mode === "overview")
@@ -346,6 +486,8 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
         plan: planToDraw(),
         night: isNight(state.t),
         men: String(menOf(state.player.party)),
+        parties: onMap,
+        gone: (id) => state.gone.includes(id),
       });
     if (mode === "new") {
       ctx.fillStyle = "rgba(16,19,26,.35)";
@@ -357,6 +499,7 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
   /** The path drawn on the map: where you're going, or where you'd go. */
   function planToDraw() {
     const p = state.player;
+    if (state.encounter || state.result) return null;
     const dest = p.dest >= 0 ? p.dest : sel;
     if (dest < 0 || (dest === p.at.i && p.at.to < 0)) return null;
     const r = route(state, dest, realm);
@@ -381,7 +524,42 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
         say(p ? `Reached ${describePlace(p).title}` : "Arrived");
         vibrate(10);
       } else if (e.k === "rested") say("Morning");
+      else if (e.k === "pickup") {
+        say(
+          !e.none
+            ? `Picked up ${pickupWords(p)}`
+            : p.pickup === "chest"
+              ? "A chest, locked fast. It will keep"
+              : "Abandoned arms, and no recruits to give them to",
+        );
+        vibrate(10);
+      } else if (e.k === "spotted") {
+        const pt = state.parties.find((x) => x.id === e.id);
+        if (pt) say(pt.goal === "hunt" ? `${pt.name}, coming for you` : `${pt.name} sighted`);
+        vibrate(15);
+      } else if (e.k === "lost-track") say("You've lost track of them");
+      else if (e.k === "encounter") {
+        follow = true;
+        sel = -1;
+        selParty = null;
+        vibrate([20, 40, 20]);
+      }
     }
+  }
+
+  /** The encounter sheet's odds: one auto-resolve a frame, summarized at the end. */
+  function workOdds() {
+    const seed = state.encounter.seed;
+    if (!odds || odds.seed !== seed) {
+      const b = encounterBattle(state, realm);
+      odds = { seed, b, base: JSON.stringify(b), runs: [], done: null };
+      return;
+    }
+    if (odds.done) return;
+    odds.runs.push(oddsRun(odds.b, odds.runs.length, odds.base));
+    if (odds.runs.length < ODDS_RUNS) return;
+    odds.done = summarizeOdds(odds.runs);
+    render();
   }
 
   function drawToast(dt) {
@@ -447,6 +625,31 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
         sub: `until ${clock(MORNING)} · tap Stop to break camp`,
         kind: "rest",
       };
+    if (p.chase != null) {
+      const pt = state.parties.find((x) => x.id === p.chase);
+      const d = pt ? dist(realm.grid, p.at.i, pt.at.i) : 0;
+      return {
+        title: `After ${pt?.name ?? "them"}`,
+        sub: d > 0 ? `${d} ${d === 1 ? "hex" : "hexes"} ahead · Stop to give up` : "Closing in",
+        kind: "travel",
+      };
+    }
+    if (selParty != null) {
+      const pt = state.parties.find((x) => x.id === selParty);
+      if (pt && partiesInSight(state, realm).includes(pt)) {
+        const theirs = partyWorth(pt);
+        const mine = yourWorth(state);
+        return {
+          title: pt.name,
+          sub: doing(pt)
+            ? `${partyMen(pt)} men · ${doing(pt)}`
+            : `${partyMen(pt)} men · strength ${Math.round(theirs)} · you ${Math.round(mine)}`,
+          kind: "party",
+          vs: mine / (mine + theirs),
+        };
+      }
+      selParty = null;
+    }
     if (p.dest >= 0) {
       const r = route(state, p.dest, realm);
       const place = placeAt(p.dest);
@@ -483,6 +686,15 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
     };
   }
 
+  /** What a party seems to be about: you see a hunt; the rest takes Scouting (ui.md §3). */
+  function doing(pt) {
+    if (pt.goal === "hunt" && !spares(state, pt)) return "coming for you";
+    if (spares(state, pt)) return "letting you be";
+    if (!state.player.hero.scouting) return "";
+    if (pt.goal === "flee") return "running from you";
+    return pt.goal === "roam" ? "on the move" : "waiting";
+  }
+
   function render() {
     if (!active) return;
     ui.replaceChildren();
@@ -490,6 +702,14 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
     renderHud();
     if (mode === "new") {
       ui.append(newSheet());
+      return;
+    }
+    if (state.result) {
+      ui.append(resultSheet());
+      return;
+    }
+    if (state.encounter) {
+      ui.append(encounterSheet());
       return;
     }
     const c = context();
@@ -515,6 +735,13 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       ];
     else if (c.kind === "rest")
       actions = [btn("Stop", onStop, { cls: "primary", tip: "Stop: break camp now." })];
+    else if (c.kind === "party")
+      actions = [
+        btn("Attack ▶", onAttack, {
+          cls: "primary",
+          tip: "Attack: go after them, wherever they run. Stop gives up.",
+        }),
+      ];
     else if (c.kind === "pick")
       actions = [
         centreBtn,
@@ -538,7 +765,7 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       h(
         "div",
         { class: "cl-ctx", style: { bottom: `${TABS_H}px` } },
-        h("div", { class: "cl-ctx-text" }, els.title, els.sub),
+        h("div", { class: "cl-ctx-text" }, els.title, els.sub, c.vs != null ? vsBar(c.vs) : null),
         actions,
       ),
     );
@@ -592,6 +819,138 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       render();
     });
 
+  /** You against them, as a two-coloured bar: your share of the strength on the left. */
+  const vsBar = (share) =>
+    h(
+      "div",
+      { class: "cl-vs", role: "img", "aria-label": `you ${Math.round(share * 100)}%` },
+      h("i", { style: { width: `${Math.round(share * 100)}%` } }),
+    );
+
+  /** Meeting a party (ui.md §4): both sides, the odds, and what you may do. */
+  function encounterSheet() {
+    const p = state.player;
+    const foe = foeOf(state);
+    const c = choices(state);
+    if (!odds || odds.seed !== state.encounter.seed) workOdds();
+    const mine = strength(odds.b, 0);
+    const theirs = strength(odds.b, 1);
+    const fit = p.party.troops.reduce((m, t) => m + t.n - t.wounded, 0);
+    const came = state.encounter.by === "you" ? "You caught them" : "They came for you";
+    let oddsLine;
+    if (!odds.done) oddsLine = h("p", { class: "cl-odds" }, "Odds: working them out…");
+    else {
+      // Only what you'd lose of your own: the banner's household are the hero's.
+      const own = new Set(p.party.troops.map((t) => t.type));
+      const lose = troopList(
+        Object.fromEntries(Object.entries(odds.done.losses).filter(([t]) => own.has(t))),
+      );
+      oddsLine = h(
+        "p",
+        { class: "cl-odds" },
+        "Odds: ",
+        h("b", {}, odds.done.word),
+        ` (${odds.done.wins} of ${odds.done.runs})`,
+        lose ? ` · you'd lose about ${lose}` : " · you'd lose almost no one",
+      );
+    }
+    const away = c.leave
+      ? c.faster
+        ? "You're faster: you can leave."
+        : "You came for them: you can leave."
+      : `You can't outrun them. A rearguard of ${troopList(rearguardOf(p.party.troops))} would hold them.`;
+    const actions = [];
+    if (c.pay)
+      actions.push(
+        btn(`Pay ${c.pay}`, onPay, {
+          tip: `Pay: ${c.pay} gold, a fifth of yours, and they leave you alone for three days.`,
+        }),
+      );
+    if (c.leave)
+      actions.push(
+        btn("Leave", onLeave, { tip: "Leave: walk away. They can't catch you for 6 hours." }),
+      );
+    else if (c.rearguard)
+      actions.push(
+        btn("Rearguard", onRearguard, {
+          tip: "Rearguard: leave your slowest men behind to hold them; they are lost, the rest get away.",
+        }),
+      );
+    actions.push(
+      btn("Auto ▶", onAuto, {
+        cls: "primary",
+        tip: "Auto-resolve: the battle, fought out at once by both sides' plain AI.",
+      }),
+    );
+    return h(
+      "div",
+      { class: "cl-sheet cl-meet", role: "dialog", "aria-label": "Encounter" },
+      h(
+        "div",
+        { class: "cl-body" },
+        h("h2", {}, foe.name),
+        h(
+          "div",
+          { class: "cl-army" },
+          h("b", {}, "Them"),
+          ` · ${came.toLowerCase()}`,
+          foe.kind === "wolves" ? "" : ` · ${partyMen(foe)} men`,
+          ` · strength ${Math.round(theirs.worth)}`,
+          foe.chief ? " · a chief leads them" : "",
+          h("div", { class: "cl-dim" }, partyList(foe)),
+        ),
+        h(
+          "div",
+          { class: "cl-army" },
+          h("b", {}, "You"),
+          ` · ${fit} men · strength ${Math.round(mine.worth)}`,
+          h(
+            "div",
+            { class: "cl-dim" },
+            troopList(Object.fromEntries(p.party.troops.map((t) => [t.type, t.n - t.wounded]))),
+          ),
+        ),
+        vsBar(mine.worth / (mine.worth + theirs.worth || 1)),
+        oddsLine,
+        h("p", { class: "cl-dim cl-away" }, away),
+      ),
+      h("div", { class: "cl-actions" }, actions),
+    );
+  }
+
+  /** What came of it, read before the map goes on. */
+  function resultSheet() {
+    const r = state.result;
+    const heading = r.kind === "won" ? "Victory" : r.kind === "lost" ? "Defeat" : "A draw";
+    const them = r.foe === "wolves" ? "the pack" : "the band";
+    const lines = [];
+    if (r.kind === "won") lines.push(`You broke ${them}; it is gone from the map.`);
+    else if (r.kind === "draw") lines.push(`Neither side gave way, and ${them} draws off for now.`);
+    else
+      lines.push(
+        `Your warband is scattered. You gather 12 levies at ${r.at} and start again, gold in hand.`,
+      );
+    lines.push(
+      r.killed || r.wounded
+        ? `Of yours, ${r.killed} killed${r.wounded ? ` and ${r.wounded} wounded` : ""}.`
+        : "You lost no one.",
+    );
+    lines.push(`They lost ${r.theirDead}.`);
+    if (r.taken) lines.push(`You took ${r.taken} prisoners.`);
+    if (r.loot) lines.push(`Loot: ${r.loot} gold.`);
+    return h(
+      "div",
+      { class: "cl-sheet", role: "dialog", "aria-label": heading },
+      h(
+        "div",
+        { class: "cl-body" },
+        h("h2", {}, `${heading} · ${r.name}`),
+        lines.map((t) => h("p", { class: "cl-army" }, t)),
+      ),
+      h("div", { class: "cl-actions" }, btn("Continue", onContinue, { cls: "primary" })),
+    );
+  }
+
   function armySheet() {
     const p = state.player;
     const men = menOf(p.party);
@@ -628,15 +987,27 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
   function logSheet() {
     const lines = [...state.journal].reverse().map((e) => {
       const p = realm.places[e.id];
-      const name = describePlace(p).title;
+      const name = p ? describePlace(p).title : "";
       const text =
-        e.k === "start"
-          ? `You set out from ${name}.`
-          : e.k === "arrive"
-            ? `Reached ${name}.`
-            : e.k === "tower"
-              ? `Climbed the watchtower near ${nearestName(p.i)}.`
-              : `Found ${name}${p.kind === "town" || p.kind === "castle" ? `, a ${CULTURES[p.culture].name} ${p.kind}` : ""}.`;
+        e.k === "won"
+          ? `Beat ${e.name}${e.loot ? `: ${e.loot} gold in loot` : ""}.`
+          : e.k === "lost"
+            ? `Beaten by ${e.name}. Your warband scattered.`
+            : e.k === "draw"
+              ? `Fought ${e.name} to a standstill.`
+              : e.k === "paid"
+                ? `Paid ${e.name} ${e.gold} gold to let you be.`
+                : e.k === "rearguard"
+                  ? `Left ${e.men} men behind to hold off ${e.name}.`
+                  : e.k === "pickup"
+                    ? `Picked up ${pickupWords(p)} near ${nearestName(p.i)}.`
+                    : e.k === "start"
+                      ? `You set out from ${name}.`
+                      : e.k === "arrive"
+                        ? `Reached ${name}.`
+                        : e.k === "tower"
+                          ? `Climbed the watchtower near ${nearestName(p.i)}.`
+                          : `Found ${name}${p.kind === "town" || p.kind === "castle" ? `, a ${CULTURES[p.culture].name} ${p.kind}` : ""}.`;
       return h(
         "div",
         { class: "cl-log-row" },

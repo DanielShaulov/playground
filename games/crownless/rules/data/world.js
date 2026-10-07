@@ -56,6 +56,8 @@ export const CULTURE_TRAVEL = {
   fen: { pace: 1, cost: { forest: -0.6, marsh: -0.6 } },
   hold: { pace: 0.9, cost: { hills: "plains", pass: "plains" } },
   ulus: { pace: 1.15, cost: {} },
+  // Brigands and wolves: no culture's ways.
+  wild: { pace: 1, cost: {} },
 };
 
 /** Settlement names by culture; the first is the capital. */
