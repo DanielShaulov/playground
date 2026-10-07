@@ -21,7 +21,7 @@ import { createBattle, autoFinish, aftermath } from "./battle.js";
 import { dist } from "./hex.js";
 import { troop, worthOf, cultureTroop } from "./data/troops.js";
 import { T } from "./data/world.js";
-import { START, partyLimit } from "./data/hero.js";
+import { CAPTIVE_DAYS, ESCAPE } from "./data/warband.js";
 import {
   BRIGAND_NAMES,
   VALUE,
@@ -35,6 +35,8 @@ import {
 } from "./data/parties.js";
 import { realmOf, pace, log } from "./world.js";
 import { partyPace, hexOf } from "./parties.js";
+import { fightXp, cheer, takePrisoners } from "./warband.js";
+import { roll, rollInt } from "./rng.js";
 
 /** The odds and the strengths, for the sheet: battle's own, passed through. */
 export { oddsRun, summarizeOdds, strength };
@@ -108,7 +110,8 @@ const householdOf = (state, party, side) =>
 
 /**
  * What the sheet offers (world.md §5): Leave if you came for them or you're
- * the faster; otherwise a rearguard; Pay a brigand band that came for you.
+ * the faster; otherwise a rearguard, if you have fit men to leave; Pay a
+ * brigand band that came for you.
  */
 export function choices(state) {
   const p = state.player;
@@ -116,8 +119,9 @@ export function choices(state) {
   const faster = pace(p) > partyPace(party);
   const yours = state.encounter.by === "you";
   const leave = yours || faster;
+  const fit = p.party.troops.some((t) => t.n > t.wounded);
   const pay = party.kind === "brigands" && !yours ? Math.floor(PAY_SHARE * p.gold) : 0;
-  return { leave, rearguard: !leave, pay, faster };
+  return { leave, rearguard: !leave && fit, pay, faster };
 }
 
 const end = (state, party, hours) => {
@@ -184,14 +188,18 @@ const sum = (m) => Object.values(m).reduce((a, b) => a + b, 0);
 
 /**
  * Fight it out with the plain AI on both sides (battle.md §12) and keep the
- * aftermath: your dead and wounded, their dead and captured, the loot. Sets
- * `state.result` for the sheet that tells you, and returns it.
+ * aftermath: your dead and wounded, their dead and captured, the loot, your
+ * men's XP and the party's morale. Lose to brigands and you are taken; lose
+ * to wolves and you get away alone (world.md §7). Sets `state.result` for
+ * the sheet that tells you, and returns it.
  */
 export function autoResolve(state, realm = realmOf(state)) {
   const p = state.player;
   const party = foeOf(state);
   if (!party) return null;
   const b = encounterBattle(state, realm);
+  const fielded = [strength(b, 0).worth, strength(b, 1).worth];
+  const fought = Object.fromEntries(p.party.troops.map((t) => [t.type, t.n - t.wounded]));
   autoFinish(b);
   const [ours, theirs] = aftermath(b, { worthOf, medicine: [p.hero.medicine ?? 0, 0] });
   withoutHousehold(b, 0, ours, householdOf(state, party, 0));
@@ -217,7 +225,9 @@ export function autoResolve(state, realm = realmOf(state)) {
     theirDead: sum(theirDead),
     taken: 0,
     loot: 0,
+    xp: 0,
     at: null,
+    held: 0,
   };
   if (!lost) {
     for (const t of p.party.troops) {
@@ -226,6 +236,14 @@ export function autoResolve(state, realm = realmOf(state)) {
       t.wounded = Math.min(t.n, t.wounded + (ours.wounded[t.type] ?? 0));
     }
     p.party.troops = p.party.troops.filter((t) => t.n > 0);
+    // Beaten: all of them if you won, else those they lost (army.md §3).
+    let beaten = fielded[1];
+    if (!won) {
+      beaten = 0;
+      for (const m of [theirs.killed, theirs.wounded, theirs.captured])
+        for (const [t, n] of Object.entries(m)) beaten += n * worthOf(t);
+    }
+    result.xp = fightXp(p, { fought, killed: ours.killed, beaten, fielded: fielded[0], won });
   }
   if (won) {
     // Loot: 15% of the value of the dead and the taken, and the whole purse.
@@ -234,26 +252,36 @@ export function autoResolve(state, realm = realmOf(state)) {
       for (const [t, n] of Object.entries(m)) value += n * (VALUE[troop(t).type] ?? 0);
     result.loot = Math.round(LOOT_SHARE * value) + party.gold;
     p.gold += result.loot;
-    if (party.kind !== "wolves") result.taken = takePrisoners(p, ours.taken);
+    if (party.kind !== "wolves") result.taken = takePrisoners(state, ours.taken);
     state.parties = state.parties.filter((pt) => pt !== party);
     state.encounter = null;
+    cheer(p, "won");
   } else if (lost) {
-    // Until M3's capture and ransom: the warband scatters, and you gather
-    // twelve new levies at the nearest village (the M2 plan's default).
+    // The warband scatters and your prisoners go free. Brigands hold you
+    // 3–10 days and let you go near the nearest village, ransomed or
+    // escaped; wolves leave you to get there alone (world.md §7).
     const village = nearestVillage(realm, hexOf(p.at));
-    p.party.troops = [
-      { type: cultureTroop(p.culture, "levy"), n: START.levies, xp: 0, wounded: 0 },
-    ];
+    p.party.troops = [];
     p.party.prisoners = [];
     p.at = { i: village.i, to: -1, progress: 0 };
     p.dest = -1;
     result.at = village.name;
+    if (party.kind === "brigands") {
+      result.held = rollInt(state, CAPTIVE_DAYS[0], CAPTIVE_DAYS[1]);
+      p.captive = {
+        by: party.name,
+        until: state.t + 24 * result.held,
+        ransom: roll(state) >= ESCAPE,
+      };
+    }
+    cheer(p, "lost");
     end(state, party, DISENGAGE * 4);
   } else end(state, party, DISENGAGE);
   log(state, result.kind, null, {
     name: party.name,
     loot: result.loot,
     lost: result.killed,
+    held: result.held,
   });
   state.result = result;
   return result;
@@ -283,23 +311,6 @@ function withoutHousehold(b, side, ours, type) {
     }
     ours.fled[u.type] = Math.max(0, (ours.fled[u.type] ?? 0) - u.n);
   }
-}
-
-/** Prisoners ride along up to half your party limit (world.md §7). */
-function takePrisoners(p, taken) {
-  const cap = Math.floor(partyLimit(p.hero, p.renown) / 2);
-  let held = p.party.prisoners.reduce((m, t) => m + t.n, 0);
-  let added = 0;
-  for (const [type, n] of Object.entries(taken)) {
-    const k = Math.min(n, cap - held);
-    if (k <= 0) break;
-    const stack = p.party.prisoners.find((t) => t.type === type);
-    if (stack) stack.n += k;
-    else p.party.prisoners.push({ type, n: k });
-    held += k;
-    added += k;
-  }
-  return added;
 }
 
 function nearestVillage(realm, i) {

@@ -31,6 +31,7 @@ import {
   partiesInSight,
 } from "../../games/crownless/rules/world.js";
 import { autoResolve, choices } from "../../games/crownless/rules/encounter.js";
+import { wagesOf } from "../../games/crownless/rules/warband.js";
 import { CAMPAIGN_V, makeCampaign } from "../../games/crownless/rules/campaign-save.js";
 import { TERRAIN } from "../../games/crownless/rules/data/world.js";
 import { neighbours } from "../../games/crownless/rules/hex.js";
@@ -127,6 +128,31 @@ function inSight() {
     if (!busy(s) && !s.encounter && pt && ev.some((e) => e.k === "spotted")) return { s, pt };
   }
   return null;
+}
+
+/**
+ * You on seed 7, walked to `place` (so the map around it is explored) with
+ * nobody else on the map, then given `troops` and `gold`. Setup.
+ */
+function standing(place, troops, gold = 500) {
+  const s = newCampaign({ seed: 7, culture: "vale", background: "sellsword" });
+  for (let k = 0; k < 10 && (s.player.at.i !== place.i || s.player.at.to >= 0); k++) {
+    s.parties = [];
+    s.encounter = null;
+    s.result = null;
+    travelTo(s, place.i);
+    playOut(s);
+  }
+  s.parties = [];
+  s.spotted = [];
+  s.player.party.troops = troops.map(([type, n, xp = 0, wounded = 0]) => ({
+    type,
+    n,
+    xp,
+    wounded,
+  }));
+  s.player.gold = gold;
+  return s;
 }
 
 async function seedCampaign(game, save) {
@@ -484,6 +510,131 @@ const continueBtn = (page) => page.getByRole("button", { name: /^Continue campai
     chasing.player.chase === look.pt.id || chasing.encounter?.party === look.pt.id,
   );
 
+  console.log("\n# The warband: recruit, upgrade, wages\n");
+  // Recruit at the village you start in.
+  await seedCampaign(game, makeCampaign(s0));
+  await continueBtn(page).tap();
+  await settle(500);
+  await press("Visit ▶", 300);
+  const place = page.getByRole("dialog", { name: "Place" });
+  check(
+    `Visit opens ${startB.name}: 12 levies at 10 gold, room for 10`,
+    (await place.count()) === 1 &&
+      (await place.textContent()).includes("12 here · 10 gold each") &&
+      (await game.can("+10")),
+  );
+  await press("+10", 300);
+  const hired = await readSave(page);
+  const levies = hired.player.party.troops.find((t) => t.type === "vale:levy");
+  check(
+    "+10: ten levies join, 100 gold paid, 2 left in the village, all in the save",
+    levies?.n === 22 &&
+      hired.player.gold === s0.player.gold - 100 &&
+      hired.stock[startB.id]?.["vale:levy"] === 2 &&
+      (await place.textContent()).includes("2 here"),
+  );
+  await press("Back", 200);
+
+  // Upgrade at a town: levies with the XP for it become militia.
+  const town = realmB.places.find((p) => p.kind === "town" && p.culture === "vale");
+  const atTown = standing(town, [["vale:levy", 12, 240]], 500);
+  await seedCampaign(game, makeCampaign(atTown));
+  await continueBtn(page).tap();
+  await settle(500);
+  await press("Army", 300);
+  check(
+    "the Army sheet: 12 levies, all 12 ready to train, ▲ Militia ×12",
+    (await page.getByRole("dialog", { name: "Army" }).textContent()).includes("12 of 12 ready") &&
+      (await game.can("▲ Militia ×12")),
+  );
+  await press("▲ Militia ×12", 300);
+  const trained = await readSave(page);
+  check(
+    "▲ Militia ×12: twelve militia, 240 gold paid, the XP spent",
+    JSON.stringify(trained.player.party.troops) ===
+      JSON.stringify([{ type: "vale:militia", n: 12, xp: 0, wounded: 0 }]) &&
+      trained.player.gold === 260,
+  );
+  await press("Army", 200);
+  await press("Visit ▶", 300);
+  await press("+1", 300); // the first +1 is the town's militia
+  await page
+    .getByRole("dialog", { name: "Place" })
+    .getByRole("button", { name: "+5", exact: true })
+    .tap();
+  await settle(300);
+  const shopped = await readSave(page);
+  check(
+    "at the town: a militia recruit for 30, and the market's 5 iron for 150",
+    shopped.player.party.troops[0].n === 13 &&
+      shopped.player.iron === 5 &&
+      shopped.player.gold === 80,
+    `gold ${shopped.player.gold}, iron ${shopped.player.iron}`,
+  );
+
+  // The week's turn: wages leave, the hour before midnight on day 7.
+  const payday = standing(startB, [["vale:levy", 22]], 300);
+  payday.t = 167;
+  await seedCampaign(game, makeCampaign(payday));
+  await continueBtn(page).tap();
+  await settle(400);
+  await press("Visit ▶", 300);
+  await press("Rest here", 100);
+  await waitStill(page);
+  const paidDay = await readSave(page);
+  const week = paidDay.journal.find((e) => e.k === "week");
+  check(
+    `resting through the week's turn: ${wagesOf(payday.player)} gold in wages leaves, and the Journal says so`,
+    week?.due === 22 && week.paid === 22 && week.t === 168 && paidDay.player.gold === 278,
+    `gold ${paidDay.player.gold}`,
+  );
+  await press("Log", 300);
+  check(
+    "the Log: the week's wages",
+    (await page.getByRole("dialog", { name: "Log" }).textContent()).includes(
+      "The week's wages: 22 of 22 gold paid.",
+    ),
+  );
+  await press("Log", 200);
+
+  // Prisoners sold at a town's broker.
+  const broker = standing(town, [["vale:militia", 10]], 100);
+  broker.player.party.prisoners = [{ type: "militia", n: 6, since: broker.t }];
+  await seedCampaign(game, makeCampaign(broker));
+  await continueBtn(page).tap();
+  await settle(400);
+  await press("Visit ▶", 300);
+  await press("Sell · 60", 300);
+  const sold = await readSave(page);
+  check(
+    "the ransom broker buys 6 brigands for 60",
+    sold.player.gold === 160 && sold.player.party.prisoners.length === 0,
+  );
+  await press("Back", 200);
+
+  // Taken: the days pass on their own, and you're let go.
+  const taken = standing(startB, [], 500);
+  taken.player.captive = { by: "Brigands of the Test", until: taken.t + 30, ransom: true };
+  const nodeFree = playOut(structuredClone(taken));
+  await seedCampaign(game, makeCampaign(taken));
+  await continueBtn(page).tap();
+  await settle(200);
+  check(
+    "held: the bar says by whom and until when, and the hours run",
+    (await ctxText(page)).title === "Held by Brigands of the Test",
+  );
+  await page.waitForFunction((k) => !JSON.parse(localStorage.getItem(k)).player.captive, KEY, {
+    timeout: 15000,
+  });
+  await settle(300);
+  const free = await readSave(page);
+  delete free.v;
+  check(
+    "…then you're ransomed for a fifth of your gold, as in Node",
+    JSON.stringify(free) === JSON.stringify(nodeFree) && free.player.gold === 400,
+    `gold ${free.player.gold}`,
+  );
+
   check("the console stayed clean", game.errors.length === 0, game.errors.join(" | "));
   await game.close();
 }
@@ -565,6 +716,36 @@ for (const device of ["iPhone 13", "iPhone SE"]) {
   await shot("encounter");
   await press("Auto ▶", 500);
   await shot("result");
+  const realm = realmOf(s0);
+  const town = realm.places.find((p) => p.kind === "town" && p.culture === "vale");
+  const shop = standing(
+    town,
+    [
+      ["vale:militia", 10, 400, 3],
+      ["vale:levy", 6, 60],
+      ["vale:bowman", 4, 0],
+    ],
+    420,
+  );
+  shop.player.party.prisoners = [
+    { type: "militia", n: 4, since: shop.t - 100 },
+    { type: "squire", n: 2, since: shop.t },
+  ];
+  await seedCampaign(game, makeCampaign(shop));
+  await continueBtn(page).tap();
+  await settle(500);
+  await press("Visit ▶", 400);
+  await shot("town");
+  await press("Back", 200);
+  await press("Army", 400);
+  await shot("warband");
+  await press("Army", 200);
+  const held = standing(realm.places[realm.starts.vale], [], 500);
+  held.player.captive = { by: "Brigands of the Test", until: held.t + 24 * 6, ransom: false };
+  await seedCampaign(game, makeCampaign(held));
+  await continueBtn(page).tap();
+  await settle(600);
+  await shot("held");
   check(
     `${device}: every button at least 44 px and on screen`,
     problems.length === 0,

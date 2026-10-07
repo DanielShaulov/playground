@@ -130,7 +130,7 @@ As built in M2 so far:
 - **Rest** sits on the bar whenever you stand still; tapping yourself makes
   it the primary. Rest runs to 06:00, and Stop breaks camp.
 - **Toasts** sit at the top of the map, clear of the path and the thumb.
-- **Tabs** are Map, Army (read-only until M3), Log and **Menu**, which holds
+- **Tabs** are Map, Army, Log and **Menu**, which holds
   Title screen until Hero and Realm exist. The HUD's ‹ still leaves for the
   arcade; the campaign saves on the way out.
 - **Parties** are the mockup's shields with their men beneath: grey with
@@ -213,6 +213,24 @@ returns to the map. A meeting or a result waiting on you survives a reload.
 A row is one troop type: icon, count, wounded, XP bar toward the next tier,
 and the upgrade button that pays gold, iron and horses in one tap. **Squads**
 switches to the grouping view: drag-free, tap a troop then tap a squad.
+
+As built in M3 so far:
+
+- **Place** opens when you arrive at a village, town, castle or camp, from
+  **Visit ▶** on the context bar while you stand there, or by tapping your
+  own hex. It has **Recruit** (Hire at a camp): one row a troop, its pool and
+  price, **+1** and **+N** for all you can afford and fit, or a greyed Hire
+  that says why not; a town's **Market** for iron and horses the same way; the
+  **Ransom broker** in a town when you hold prisoners (Sell · gold); then
+  Back and Rest here. Tavern, contracts and smith wait for their milestones.
+- **Army** is a list, highest tier first: count, wounded, an XP bar for the
+  share of the stack ready to go up, and a button per branch, **▲ Footman
+  ×6**, on its own line under the row; a greyed one says what's short (XP,
+  gold, iron, horses, fit men, the limit). The header line has morale, wages,
+  the wounded and pace. Prisoners show Free and **Take ×N** once ready. Squads
+  and Garrison wait for the battle rework and M5.
+- **Held**: the context bar reads "Held by Brigands of Baatar" over "free
+  day 9 · 14:00", with the speed button, and the map runs on its own.
 
 **Level up** is a modal of two big cards, the two skills on offer, and a line
 saying which attribute rose. One tap picks.

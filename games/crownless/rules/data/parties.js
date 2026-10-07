@@ -43,32 +43,8 @@ export const CHIEF_GUARDS = 6;
 /** A band's purse: 20 gold plus 3 a man (army.md §5). */
 export const purseOf = (men) => 20 + 3 * men;
 
-/**
- * A troop's value, everything paid in gold from a recruit up: the Value
- * column of army.md §3, by generic type. Loot is a share of it.
- */
-export const VALUE = {
-  levy: 10,
-  militia: 30,
-  bowman: 30,
-  footman: 70,
-  spearman: 70,
-  archer: 70,
-  manatarms: 150,
-  pikeman: 150,
-  crossbow: 150,
-  longbow: 240,
-  hearthguard: 300,
-  warden: 390,
-  squire: 55,
-  horseman: 125,
-  knight: 270,
-  horsearcher: 220,
-  bannerknight: 540,
-  keshig: 470,
-  wolf: 0,
-  troll: 0,
-};
+/** A troop's value (army.md §3): its home is the warband data. Loot is a share of it. */
+export { VALUE } from "./warband.js";
 
 /** Loot: 15% of the value of enemies killed or taken, and a brigand's whole purse (world.md §6). */
 export const LOOT_SHARE = 0.15;

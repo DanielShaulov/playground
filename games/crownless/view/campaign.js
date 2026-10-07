@@ -48,9 +48,30 @@ import {
   summarizeOdds,
   strength,
 } from "../rules/encounter.js";
+import {
+  placeHere,
+  offersAt,
+  recruit,
+  marketAt,
+  buy,
+  upgradesOf,
+  upgradeRoom,
+  upgrade,
+  xpNext,
+  xpTo,
+  wagesOf,
+  moraleOf,
+  limitOf,
+  ransomOf,
+  sellPrisoners,
+  releasePrisoners,
+  prisonerRoom,
+  recruitPrisoners,
+} from "../rules/warband.js";
 import { readCampaign, makeCampaign } from "../rules/campaign-save.js";
+import { BRIGAND_NAMES } from "../rules/data/parties.js";
 import { TERRAIN, PLACES, LAIRS, PICKUPS, GREAT_LAIRS, CULTURE_IDS } from "../rules/data/world.js";
-import { BACKGROUNDS, partyLimit } from "../rules/data/hero.js";
+import { BACKGROUNDS } from "../rules/data/hero.js";
 import { CULTURES, troop } from "../rules/data/troops.js";
 import {
   mapLayout,
@@ -62,7 +83,7 @@ import {
   TABS_H,
 } from "./map-layout.js";
 import { createMapView, partyAt } from "./map-view.js";
-import { h, troopList } from "./sheets.js";
+import { h, troopList, troopWord } from "./sheets.js";
 import { dist } from "../rules/hex.js";
 
 /** An hour of travel on screen, in seconds (world.md §2); ⏩ runs at 3×. */
@@ -136,6 +157,59 @@ const pickupWords = (p) =>
     : p.pickup === "iron"
       ? `${p.amount} iron`
       : `${p.amount} horses`;
+
+/** Why a button can't do more, in words (warband.js's reasons). */
+const WHY = {
+  gold: "not enough gold",
+  iron: "not enough iron",
+  horses: "not enough horses",
+  room: "your party is full",
+  limit: "your party is over its limit",
+  left: "none left this week",
+  xp: "not enough XP yet",
+  wounded: "no fit men to train",
+  days: "they haven't been held long enough",
+};
+
+/** The same, in a word or two under a greyed upgrade. */
+const NEEDS = {
+  gold: "needs gold",
+  iron: "needs iron",
+  horses: "needs horses",
+  limit: "over the limit",
+  xp: "needs XP",
+  wounded: "no fit men",
+};
+
+/** "40 gold, 1 iron", "55 gold, 1 horse": what one of something costs. */
+function costText(c) {
+  const parts = [`${c.gold} gold`];
+  if (c.iron) parts.push(`${c.iron} iron`);
+  if (c.horses) parts.push(`${c.horses} ${c.horses === 1 ? "horse" : "horses"}`);
+  return parts.join(", ");
+}
+
+/** "Footman", "Lancer": a troop's own name, without its culture. */
+const shortName = (id) => {
+  const w = troopWord(id, 1);
+  return w[0].toUpperCase() + w.slice(1);
+};
+
+/** "6 brigands", "2 raiders": prisoners in their band's words, or a troop's. */
+function prisonerWords(type, n) {
+  const name = BRIGAND_NAMES[type]?.toLowerCase();
+  if (!name) return `${n} ${troopWord(type, n)}`;
+  return `${n} ${n === 1 ? name : `${name}s`}`;
+}
+
+/** "5 levies are militia now": what abandoned arms did. */
+const armsWords = (up) =>
+  up
+    .map(
+      ([from, to, k]) =>
+        `${k} ${troopWord(from, k)} ${k === 1 ? "is" : "are"} ${troopWord(to, k)} now`,
+    )
+    .join(", ");
 
 /** "9 looters, 6 brigands", "14 wolves": a party's men in its own words. */
 function partyList(party) {
@@ -306,6 +380,64 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
   };
   const onAuto = () => answer(autoResolve, null);
 
+  /** A deal in a settlement or on the Army sheet: done, saved, said. */
+  function deal(fn, message) {
+    const r = fn();
+    if (!r) return;
+    save();
+    if (message) say(message(r));
+    vibrate(8);
+    render();
+  }
+  const onRecruit = (type, n) =>
+    deal(
+      () => recruit(state, realm, type, n),
+      (k) => `${k} ${troopWord(type, k)} join you`,
+    );
+  const onBuy = (what, n) =>
+    deal(
+      () => buy(state, realm, what, n),
+      (k) => `Bought ${k} ${what === "iron" ? "iron" : k === 1 ? "horse" : "horses"}`,
+    );
+  const onSell = (k) => {
+    const s = state.player.party.prisoners[k];
+    const words = prisonerWords(s.type, s.n);
+    deal(
+      () => sellPrisoners(state, realm, k),
+      (gold) => `Sold ${words} for ${gold} gold`,
+    );
+  };
+  const onRelease = (k) => {
+    const s = state.player.party.prisoners[k];
+    const words = prisonerWords(s.type, s.n);
+    deal(
+      () => releasePrisoners(state, k),
+      () => `You let ${words} go`,
+    );
+  };
+  const onTakeOn = (k) => {
+    const as = prisonerRoom(state, k).as;
+    deal(
+      () => recruitPrisoners(state, k),
+      (n) => `${n} ${troopWord(as, n)} join you`,
+    );
+  };
+  const onUpgrade = (type, to) =>
+    deal(
+      () => upgrade(state, type, to),
+      (n) => `${n} ${troopWord(type, n)} ${n === 1 ? "is" : "are"} ${troopWord(to, n)} now`,
+    );
+
+  /** The settlement you stand in, opened (ui.md §4: Place). */
+  function openPlace() {
+    if (!placeHere(state, realm)) return;
+    sel = -1;
+    selParty = null;
+    sheet = "place";
+    vibrate(6);
+    render();
+  }
+
   function onContinue() {
     dismiss(state);
     follow = true;
@@ -392,6 +524,10 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
     }
     if (i === sel && i !== state.player.at.i && route(state, i)) {
       go(i);
+      return;
+    }
+    if (i === state.player.at.i && placeHere(state, realm)) {
+      openPlace();
       return;
     }
     sel = i;
@@ -522,17 +658,31 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       else if (e.k === "tower") say("From the watchtower you see the land for miles around");
       else if (e.k === "arrive") {
         say(p ? `Reached ${describePlace(p).title}` : "Arrived");
+        // Arriving at a settlement opens it: what you came for is in there.
+        if (placeHere(state, realm)) sheet = "place";
         vibrate(10);
       } else if (e.k === "rested") say("Morning");
       else if (e.k === "pickup") {
         say(
-          !e.none
-            ? `Picked up ${pickupWords(p)}`
-            : p.pickup === "chest"
-              ? "A chest, locked fast. It will keep"
-              : "Abandoned arms, and no recruits to give them to",
+          e.up
+            ? `Abandoned arms: ${armsWords(e.up)}`
+            : !e.none
+              ? `Picked up ${pickupWords(p)}`
+              : p.pickup === "chest"
+                ? "A chest, locked fast. It will keep"
+                : "Abandoned arms, and nobody to give them to",
         );
         vibrate(10);
+      } else if (e.k === "week") {
+        if (e.paid < e.due)
+          say(
+            `Short of wages: paid ${e.paid} of ${e.due}${e.deserted ? `. ${e.deserted} deserted` : ""}`,
+          );
+        else if (e.due || e.deserted)
+          say(`Paid ${e.due} gold in wages${e.deserted ? `. ${e.deserted} deserted` : ""}`);
+      } else if (e.k === "freed") {
+        say(e.gold ? `Ransomed for ${e.gold} gold. You're free` : "You slip away. You're free");
+        vibrate([20, 40, 20]);
       } else if (e.k === "spotted") {
         const pt = state.parties.find((x) => x.id === e.id);
         if (pt) say(pt.goal === "hunt" ? `${pt.name}, coming for you` : `${pt.name} sighted`);
@@ -619,6 +769,12 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
   function context() {
     const p = state.player;
     const placeAt = (i) => (realm.placeAt[i] >= 0 ? realm.places[realm.placeAt[i]] : null);
+    if (p.captive)
+      return {
+        title: `Held by ${p.captive.by}`,
+        sub: `free ${when(p.captive.until, state.t)}`,
+        kind: "captive",
+      };
     if (p.resting)
       return {
         title: "Resting",
@@ -676,6 +832,7 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       return { title: d.title, sub: d.sub ? `${d.sub} · ${way}` : way, kind: "pick", ok: !!r };
     }
     const d = here(p.at.i);
+    if (placeHere(state, realm)) return { title: d.title, sub: d.sub, kind: "place" };
     return {
       title: d.title,
       sub:
@@ -735,6 +892,25 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       ];
     else if (c.kind === "rest")
       actions = [btn("Stop", onStop, { cls: "primary", tip: "Stop: break camp now." })];
+    else if (c.kind === "captive")
+      actions = [
+        btn(
+          speed === 1 ? "⏩ 1×" : "⏩ 3×",
+          () => {
+            speed = speed === 1 ? 3 : 1;
+            render();
+          },
+          { aria: "Speed", tip: "Speed: the days you're held pass; ⏩ makes them go faster." },
+        ),
+      ];
+    else if (c.kind === "place")
+      actions = [
+        centreBtn,
+        btn("Visit ▶", openPlace, {
+          cls: "primary",
+          tip: "Visit: recruit, trade and rest here.",
+        }),
+      ];
     else if (c.kind === "party")
       actions = [
         btn("Attack ▶", onAttack, {
@@ -770,6 +946,11 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
       ),
     );
     ui.append(tabBar());
+    if (sheet === "place") {
+      const el = placeSheet();
+      if (el) ui.append(el);
+      else sheet = null;
+    }
     if (sheet === "army") ui.append(armySheet());
     if (sheet === "log") ui.append(logSheet());
     if (sheet === "menu") ui.append(menuSheet());
@@ -926,10 +1107,11 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
     const lines = [];
     if (r.kind === "won") lines.push(`You broke ${them}; it is gone from the map.`);
     else if (r.kind === "draw") lines.push(`Neither side gave way, and ${them} draws off for now.`);
-    else
+    else if (r.held)
       lines.push(
-        `Your warband is scattered. You gather 12 levies at ${r.at} and start again, gold in hand.`,
+        `You are taken. Your warband is scattered and your prisoners go free. They'll hold you ${r.held} days near ${r.at}.`,
       );
+    else lines.push(`Your warband is scattered. You make it to ${r.at} alone, gold in hand.`);
     lines.push(
       r.killed || r.wounded
         ? `Of yours, ${r.killed} killed${r.wounded ? ` and ${r.wounded} wounded` : ""}.`
@@ -938,6 +1120,7 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
     lines.push(`They lost ${r.theirDead}.`);
     if (r.taken) lines.push(`You took ${r.taken} prisoners.`);
     if (r.loot) lines.push(`Loot: ${r.loot} gold.`);
+    if (r.xp) lines.push(`Each of your men who fought and lived gained ${r.xp} XP.`);
     return h(
       "div",
       { class: "cl-sheet", role: "dialog", "aria-label": heading },
@@ -951,37 +1134,191 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
     );
   }
 
+  /** A row on the place and Army sheets: what it is, a line under it, its buttons. */
+  const row = (title, sub, buttons) =>
+    h(
+      "div",
+      { class: "cl-trade" },
+      h("div", { class: "cl-trade-text" }, h("b", {}, title), sub ? h("small", {}, sub) : null),
+      h("div", { class: "cl-trade-btns" }, buttons.filter(Boolean)),
+    );
+  /** A troop on the Army sheet: name and count, a line, its XP, and its upgrades under it. */
+  const unit = (title, count, sub, bar, buttons) =>
+    h(
+      "div",
+      { class: "cl-unit" },
+      h("div", { class: "cl-unit-head" }, h("b", {}, title), h("b", {}, count)),
+      h("small", {}, sub),
+      bar,
+      buttons.length ? h("div", { class: "cl-unit-btns" }, buttons) : null,
+    );
+  const label = (text) => h("div", { class: "cl-label cl-section" }, text);
+
+  /** The settlement you stand in (ui.md §4): recruits, the market, the broker. */
+  function placeSheet() {
+    const place = placeHere(state, realm);
+    if (!place) return null;
+    const p = state.player;
+    const d = describePlace(place);
+    const body = [
+      h("h2", {}, d.title),
+      h(
+        "p",
+        { class: "cl-dim cl-note" },
+        `${d.sub || "Sellswords for hire"} · your party ${menOf(p.party)} / ${limitOf(p)}`,
+      ),
+      label(place.kind === "camp" ? "Hire" : "Recruit"),
+    ];
+    for (const o of offersAt(state, realm, place)) {
+      const name = troop(o.type).name;
+      const each = costText(o.cost);
+      body.push(
+        row(
+          name,
+          `${o.left} here · ${each} each${o.n > 0 ? "" : ` · ${WHY[o.why]}`}`,
+          o.n > 0
+            ? [
+                btn("+1", () => onRecruit(o.type, 1), { tip: `Hire one ${name} for ${each}.` }),
+                o.n > 1
+                  ? btn(`+${o.n}`, () => onRecruit(o.type, o.n), {
+                      cls: "on",
+                      tip: `Hire ${o.n}, all you can now, for ${o.n * o.cost.gold} gold.`,
+                    })
+                  : null,
+              ]
+            : [btn("Hire", null, { disabled: true, tip: `Hire: ${WHY[o.why]}.` })],
+        ),
+      );
+    }
+    const market = marketAt(state, realm, place);
+    if (market.length) {
+      body.push(label("Market"));
+      for (const m of market) {
+        const name = m.what === "iron" ? "Iron" : "Horses";
+        body.push(
+          row(
+            name,
+            `${m.left} for sale · ${m.price} gold each${m.n > 0 ? "" : ` · ${WHY[m.why]}`}`,
+            m.n > 0
+              ? [
+                  btn("+1", () => onBuy(m.what, 1), { tip: `Buy one for ${m.price} gold.` }),
+                  m.n > 1
+                    ? btn(`+${m.n}`, () => onBuy(m.what, m.n), {
+                        cls: "on",
+                        tip: `Buy ${m.n}, all you can now, for ${m.n * m.price} gold.`,
+                      })
+                    : null,
+                ]
+              : [btn("Buy", null, { disabled: true, tip: `Buy: ${WHY[m.why]}.` })],
+          ),
+        );
+      }
+    }
+    if (place.kind === "town" && p.party.prisoners.length) {
+      body.push(label("Ransom broker"));
+      p.party.prisoners.forEach((pr, k) => {
+        const each = ransomOf(p, pr.type);
+        body.push(
+          row(prisonerWords(pr.type, pr.n), `${each} gold each`, [
+            btn(`Sell · ${each * pr.n}`, () => onSell(k), {
+              tip: `Sell: the broker pays ${each * pr.n} gold for all ${pr.n}.`,
+            }),
+          ]),
+        );
+      });
+    }
+    return sheetBox("Place", body, [
+      back(),
+      btn(
+        "Rest here",
+        () => {
+          sheet = null;
+          onRest();
+        },
+        { tip: `Rest here until ${clock(MORNING)}. The wounded heal faster in a settlement.` },
+      ),
+    ]);
+  }
+
+  /** Your warband (ui.md §4): men, wounded, XP toward the next tier, upgrades, prisoners. */
   function armySheet() {
     const p = state.player;
     const men = menOf(p.party);
-    const limit = partyLimit(p.hero, p.renown);
     const wounded = p.party.troops.reduce((m, t) => m + t.wounded, 0);
-    return sheetBox(
-      "Army",
-      [
-        h("h2", {}, `Army · ${men} / ${limit}`),
-        h(
-          "p",
-          { class: "cl-dim" },
-          `${BACKGROUNDS[p.background].name} of ${CULTURES[p.culture].name}, level ${p.hero.level}` +
-            ` · ${wounded} wounded · ${Math.round(pace(p) * 10) / 10} hexes a day`,
-        ),
-        h(
-          "div",
-          { class: "cl-list" },
-          p.party.troops.map((t) =>
-            h(
-              "div",
-              { class: "cl-list-row" },
-              h("span", {}, troop(t.type).name),
-              h("b", {}, `${t.n}`),
-              t.wounded ? h("small", { class: "cl-dim" }, ` (${t.wounded} wounded)`) : null,
-            ),
-          ),
-        ),
-      ],
-      [back()],
+    const body = [
+      h("h2", {}, `Army · ${men} / ${limitOf(p)}`),
+      h(
+        "p",
+        { class: "cl-dim cl-note" },
+        `${BACKGROUNDS[p.background].name} of ${CULTURES[p.culture].name}, level ${p.hero.level}` +
+          ` · morale ${moraleOf(p)} · wages ${wagesOf(p)} a week` +
+          `${wounded ? ` · ${wounded} wounded` : ""} · ${Math.round(pace(p) * 10) / 10} hexes a day`,
+      ),
+    ];
+    if (!men)
+      body.push(h("p", { class: "cl-army" }, "No men. Recruit at a village, a town or a castle."));
+    else if (men > limitOf(p))
+      body.push(
+        h("p", { class: "cl-warn-line" }, "Over the party limit: no recruiting or training."),
+      );
+    const troops = [...p.party.troops].sort(
+      (a, b) => troop(b.type).tier - troop(a.type).tier || b.n - a.n,
     );
+    for (const t of troops) {
+      const need = xpNext(t.type);
+      const ready = need ? Math.min(t.n, Math.floor(t.xp / need)) : 0;
+      const sub = [
+        t.wounded ? `${t.wounded} wounded` : "",
+        need ? `${ready} of ${t.n} ready to train` : "the top of the line",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const ups = upgradesOf(t.type).map((to) => {
+        const r = upgradeRoom(state, t.type, to);
+        const name = shortName(to);
+        const tip = `${name}: ${xpTo(to)} XP a man and ${costText(r.cost)} each.`;
+        return r.n > 0
+          ? btn(`▲ ${name} ×${r.n}`, () => onUpgrade(t.type, to), { cls: "on", tip })
+          : btn(h("span", {}, `▲ ${name}`, h("small", {}, NEEDS[r.why])), null, {
+              disabled: true,
+              tip: `${tip} Not now: ${WHY[r.why]}.`,
+            });
+      });
+      const bar = need
+        ? h(
+            "div",
+            { class: "cl-xp", role: "img", "aria-label": `${ready} of ${t.n} ready` },
+            h("i", { style: { width: `${Math.round(Math.min(1, t.xp / (t.n * need)) * 100)}%` } }),
+          )
+        : null;
+      body.push(unit(troop(t.type).name, String(t.n), sub, bar, ups));
+    }
+    if (p.party.prisoners.length) {
+      body.push(label("Prisoners"));
+      p.party.prisoners.forEach((pr, k) => {
+        const r = prisonerRoom(state, k);
+        const as = shortName(r.as).toLowerCase();
+        const sub =
+          r.why === "days"
+            ? `will join you from ${when(r.ready, state.t)}`
+            : `would join as ${as}s for ${costText(r.cost)} each`;
+        body.push(
+          row(prisonerWords(pr.type, pr.n), sub, [
+            btn("Free", () => onRelease(k), { tip: "Free: let them go. Prisoners slow you down." }),
+            r.n > 0
+              ? btn(`Take ×${r.n}`, () => onTakeOn(k), {
+                  cls: "on",
+                  tip: `Take them on: ${r.n} join you as ${as}s for ${costText(r.cost)} each.`,
+                })
+              : btn("Take", null, {
+                  disabled: true,
+                  tip: `Take them on: ${WHY[r.why]}. Sell them at a town's broker.`,
+                }),
+          ]),
+        );
+      });
+    }
+    return sheetBox("Army", body, [back()]);
   }
 
   function logSheet() {
@@ -992,22 +1329,32 @@ export function createCampaign({ stage, ui, hudLeft, hudRight, store, onEnter, o
         e.k === "won"
           ? `Beat ${e.name}${e.loot ? `: ${e.loot} gold in loot` : ""}.`
           : e.k === "lost"
-            ? `Beaten by ${e.name}. Your warband scattered.`
-            : e.k === "draw"
-              ? `Fought ${e.name} to a standstill.`
-              : e.k === "paid"
-                ? `Paid ${e.name} ${e.gold} gold to let you be.`
-                : e.k === "rearguard"
-                  ? `Left ${e.men} men behind to hold off ${e.name}.`
-                  : e.k === "pickup"
-                    ? `Picked up ${pickupWords(p)} near ${nearestName(p.i)}.`
-                    : e.k === "start"
-                      ? `You set out from ${name}.`
-                      : e.k === "arrive"
-                        ? `Reached ${name}.`
-                        : e.k === "tower"
-                          ? `Climbed the watchtower near ${nearestName(p.i)}.`
-                          : `Found ${name}${p.kind === "town" || p.kind === "castle" ? `, a ${CULTURES[p.culture].name} ${p.kind}` : ""}.`;
+            ? e.held
+              ? `Beaten by ${e.name} and taken. Your warband scattered.`
+              : `Beaten by ${e.name}. Your warband scattered.`
+            : e.k === "week"
+              ? `The week's wages: ${e.paid} of ${e.due} gold paid${e.deserted ? `; ${e.deserted} deserted` : ""}.`
+              : e.k === "freed"
+                ? e.gold
+                  ? `Ransomed for ${e.gold} gold, and let go near ${name}.`
+                  : `Escaped, near ${name}.`
+                : e.k === "arms"
+                  ? `Took up abandoned arms near ${nearestName(p.i)}.`
+                  : e.k === "draw"
+                    ? `Fought ${e.name} to a standstill.`
+                    : e.k === "paid"
+                      ? `Paid ${e.name} ${e.gold} gold to let you be.`
+                      : e.k === "rearguard"
+                        ? `Left ${e.men} men behind to hold off ${e.name}.`
+                        : e.k === "pickup"
+                          ? `Picked up ${pickupWords(p)} near ${nearestName(p.i)}.`
+                          : e.k === "start"
+                            ? `You set out from ${name}.`
+                            : e.k === "arrive"
+                              ? `Reached ${name}.`
+                              : e.k === "tower"
+                                ? `Climbed the watchtower near ${nearestName(p.i)}.`
+                                : `Found ${name}${p.kind === "town" || p.kind === "castle" ? `, a ${CULTURES[p.culture].name} ${p.kind}` : ""}.`;
       return h(
         "div",
         { class: "cl-log-row" },

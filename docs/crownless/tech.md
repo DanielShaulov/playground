@@ -33,6 +33,7 @@ games/crownless/
     data/world.js     terrain, places, buildings, contracts
     data/hero.js      backgrounds, the starting hero, the party limit
     data/parties.js   brigands and wolves: sizes, mixes, the rules of meeting
+    data/warband.js   the troop tree, prices, XP, pools, markets, morale
     battle.js         the battle (successor of the theory model, retired in M1)
     battle-ai.js      the plain AI and lord personalities
     battle-setup.js   parties → squads; deployment presets; terrain from hex
@@ -41,7 +42,7 @@ games/crownless/
     ground.js         what a hex costs a culture to cross; cached A* paths
     parties.js        brigands and wolves: spawns, growth, hunt/flee/roam
     encounter.js      a meeting: its battle, Pay/Leave/rearguard, auto-resolve
-    party.js          recruiting, upgrades, XP, wages, wounded, prisoners
+    warband.js        recruiting, upgrades, XP, wages, wounded, prisoners
     lords.js          lord and faction AI
     standing.js       renown, relations, roles, your realm
     siege.js          the strategic siege
@@ -203,7 +204,9 @@ hexes still ahead of it (`path`), because it re-plans only when it changes
 its mind, and a re-path is the tick's budget. As built in M2 the campaign
 save also keeps `truce` and `paid` (party id → the hour it ends), `spotted`
 (parties already in sight), `gone` (pickups taken), and the `encounter` and
-`result` waiting on you. Estimate on Medium: ~100 KB;
+`result` waiting on you; M3 adds `stock` (what's left in each pool and
+market once touched; a full one drops out), the player's `mood` and
+`captive`, and each prisoner stack's `since`. Estimate on Medium: ~100 KB;
 budget 300 KB; `save.js` warns in the console above 200 KB.
 
 **Versions.** Any incompatible change bumps `SAVE_VERSION` (`CAMPAIGN_V` for
@@ -212,6 +215,8 @@ worldgen change can't slip past it). A save from
 another version is not loaded: the title says so and offers a new campaign,
 keeping settings and best scores. During development (M2–M8) this will happen
 often and that is acceptable for a toy; from M8 on, write a migration instead.
+The first is in already: version 3 (M3's warband) reads a version 2 save by
+filling in the warband's new fields (`fromV2` in `campaign-save.js`).
 
 **Eviction.** Safari may clear the storage of a site that isn't on the home
 screen after about a week unused. The repo README already says to Add to Home

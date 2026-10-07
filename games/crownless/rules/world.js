@@ -17,7 +17,8 @@ import { spawn, think, moveParty, walk, hexOf, partyWorth, HOURS_A_WEEK } from "
 import { TERRAIN, T, CULTURE_TRAVEL } from "./data/world.js";
 import { START, BACKGROUNDS, startingHero, partyLimit } from "./data/hero.js";
 import { troop, cultureTroop, worthOf } from "./data/troops.js";
-import { CONTACT, HEAL } from "./data/parties.js";
+import { CONTACT } from "./data/parties.js";
+import { dayTurn, weekTurn, freeArms, release } from "./warband.js";
 
 export { hexCost, pathFor };
 
@@ -92,11 +93,14 @@ export function newCampaign({ seed, culture, background }) {
       resting: false,
       chase: null,
       provoked: false,
+      mood: 0,
+      captive: null,
     },
     parties: [],
     nextParty: 0,
     truce: {},
     paid: {},
+    stock: {},
     spotted: [],
     gone: [],
     encounter: null,
@@ -175,8 +179,8 @@ export function route(state, dest, realm = realmOf(state)) {
 // Orders
 // ---------------------------------------------------------------------------
 
-/** Nothing can be ordered while a meeting or its outcome is on screen. */
-const held = (state) => !!(state.encounter || state.result);
+/** Nothing can be ordered while a meeting or its outcome is on screen, or while you're held. */
+const held = (state) => !!(state.encounter || state.result || state.player.captive);
 
 /** Set off for `dest`. Returns false if there is no way there. */
 export function travelTo(state, dest) {
@@ -223,9 +227,10 @@ export function rest(state) {
   return true;
 }
 
-/** Is time passing? Only while you travel or rest, and nothing waits on you. */
+/** Is time passing? While you travel, rest or are held, and nothing waits on you. */
 export const busy = (state) =>
-  !held(state) && (state.player.dest >= 0 || state.player.resting || state.player.chase != null);
+  !!state.player.captive ||
+  (!held(state) && (state.player.dest >= 0 || state.player.resting || state.player.chase != null));
 
 // ---------------------------------------------------------------------------
 // The hour
@@ -241,7 +246,7 @@ export const busy = (state) =>
 export function advance(state, realm = realmOf(state)) {
   const p = state.player;
   const events = [];
-  if (held(state)) return events;
+  if (state.encounter || state.result) return events;
   const wasNight = isNight(state.t);
   const you = {
     hex: hexOf(p.at),
@@ -250,7 +255,7 @@ export function advance(state, realm = realmOf(state)) {
   };
   you.forest = realm.terrain[you.hex] === T.forest;
   for (const party of state.parties)
-    think(state, realm, party, { ...you, truce: spares(state, party) }, wasNight);
+    think(state, realm, party, { ...you, truce: !!p.captive || spares(state, party) }, wasNight);
   if (p.chase != null) follow(state, realm, events);
 
   for (let q = 0; q < 4 && !state.encounter; q++) {
@@ -272,10 +277,20 @@ export function advance(state, realm = realmOf(state)) {
     events.push({ k: "rested" });
   }
   if (isNight(state.t) !== wasNight) events.push({ k: wasNight ? "dawn" : "dusk" });
-  if (hourOf(state.t) === 0) heal(state);
-  if (state.t % HOURS_A_WEEK === 0) spawn(state, realm);
+  if (hourOf(state.t) === 0) dayTurn(state, realm);
+  if (state.t % HOURS_A_WEEK === 0) {
+    const week = weekTurn(state, realm);
+    log(state, "week", null, week);
+    events.push({ k: "week", ...week });
+    spawn(state, realm);
+  }
+  if (p.captive && state.t >= p.captive.until) {
+    const gold = release(state);
+    log(state, "freed", realm.placeAt[p.at.i], { gold });
+    events.push({ k: "freed", gold });
+  }
   look(state, realm, events);
-  watch(state, realm, events);
+  if (!p.captive) watch(state, realm, events);
   return events;
 }
 
@@ -337,7 +352,9 @@ export const spares = (state, party) =>
 
 /** Contact needs one side to mean it, a party hunting you or you after it, and no truce. */
 const wantsFight = (state, party) =>
-  !truced(state, party) && (party.goal === "hunt" || state.player.chase === party.id);
+  !state.player.captive &&
+  !truced(state, party) &&
+  (party.goal === "hunt" || state.player.chase === party.id);
 
 /** Where a party is, in hex units. */
 function spot(realm, at) {
@@ -371,12 +388,6 @@ function meet(state, party, by, events) {
   events.push({ k: "encounter", id: party.id });
 }
 
-/** The wounded heal a tenth of each stack a day (world.md §7). */
-function heal(state) {
-  for (const t of state.player.party.troops)
-    t.wounded = Math.max(0, t.wounded - Math.ceil(HEAL * t.n));
-}
-
 /**
  * A party newly in sight that is coming for you, or stronger than you,
  * stops your travel or your rest (world.md §2).
@@ -408,14 +419,19 @@ function arrive(state, realm, events) {
   if (id >= 0) log(state, "arrive", id);
 }
 
-/** A hex entered: a first visit to a place may stop you for a look (world.md §2). */
+/**
+ * A hex entered: a first visit to a place may stop you for a look (world.md
+ * §2), and what still lies in the open is picked up.
+ */
 function enter(state, realm, events) {
   const p = state.player;
   const id = realm.placeAt[p.at.i];
-  if (id < 0 || state.visited.includes(id)) return;
-  state.visited.push(id);
+  if (id < 0) return;
   const place = realm.places[id];
-  if (place.kind === "pickup") pickUp(state, place, events);
+  const first = !state.visited.includes(id);
+  if (place.kind === "pickup" && !state.gone.includes(id)) pickUp(state, place, events, first);
+  if (!first) return;
+  state.visited.push(id);
   if (place.kind === "tower") {
     reveal(state, realm, within(realm.grid, place.i, TOWER_SIGHT));
     log(state, "tower", id);
@@ -427,14 +443,24 @@ function enter(state, realm, events) {
   }
 }
 
-/** What lies in the open is yours as you pass (world.md §4); chests and arms wait for M3. */
-function pickUp(state, place, events) {
+/**
+ * What lies in the open is yours as you pass (world.md §4). Abandoned arms
+ * wait for men who can use them, and chests for the hero's XP: they say so
+ * the first time only.
+ */
+function pickUp(state, place, events, first) {
   const p = state.player;
+  let arms = null;
   if (place.pickup === "gold") p.gold += place.amount;
   else if (place.pickup === "iron") p.iron += place.amount;
   else if (place.pickup === "horses") p.horses += place.amount;
-  else {
-    events.push({ k: "pickup", id: place.id, none: true });
+  else if (place.pickup === "arms" && (arms = freeArms(p)).length) {
+    state.gone.push(place.id);
+    log(state, "arms", place.id, { up: arms });
+    events.push({ k: "pickup", id: place.id, up: arms });
+    return;
+  } else {
+    if (first) events.push({ k: "pickup", id: place.id, none: true });
     return;
   }
   state.gone.push(place.id);

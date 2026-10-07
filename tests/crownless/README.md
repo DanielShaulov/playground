@@ -62,8 +62,11 @@ brigands and wolves (pace, how a band is made up and grows, spawns and caps,
 chiefs, who hunts and who runs, contact within 0.6 hex, travel stopping
 itself); meetings (what the sheet offers, Pay, Leave, a rearguard by hand,
 loot to the gold piece against `battle.js`'s own aftermath, the household's
-losses kept out, prisoners, a defeat, chasing, truces); pickups; healing;
-and the save. Every check was watched failing: each rule was broken in a
+losses kept out, prisoners, a defeat and capture, chasing, truces); pickups;
+the warband (the tree, line costs, every kind of pool and market, XP from a
+fight by hand and from an auto-resolve, upgrades, wages, desertion, morale,
+healing, prisoners, ransoms, abandoned arms); and the save, including a
+version 2 save brought up to date. Every check was watched failing: each rule was broken in a
 copy of the rules, one at a time, and the suite went red for each. Seed 1's realm is pinned by hash: if it changes, every saved
 campaign's map has changed with it, and `CAMPAIGN_V` must be bumped.
 
@@ -77,10 +80,17 @@ phones, with `shots.mjs`'s 44 px and on-screen checks. Then a band met on
 the road: the sheet opens by itself and is saved, the odds come in, a
 reload brings the meeting back, Pay costs what Node says; Auto-resolve
 fights exactly Node's fight and Continue leaves exactly Node's save; a
-tapped shield shows its card and Attack sets off after it.
+tapped shield shows its card and Attack sets off after it. Then the
+warband: Visit a village and hire levies, train them on the Army sheet,
+buy a recruit and iron at a town, rest through the week's turn and watch
+the wages leave, sell prisoners to the broker, and sit out a capture to the
+ransom Node says, every step read back from the save.
 
 **`world-sim.mjs`** runs the living map for 200 days on 50 seeds with a
-player walking town to town and fighting whatever catches them. It fails on
+player walking town to town and fighting whatever catches them; at each
+stop it recruits all it can, sells its prisoners in towns and trains every
+man ready. That player ends most runs broke and alone: it never pays or
+runs, so it is a stress test, not the pacing policy (M3's third PR). It fails on
 a party stuck for a week, one standing where nothing can, the caps broken,
 or an hour's tick or a day over `tech.md` §5's budgets, and reports the
 rest: meetings and how they went, bands and chiefs at the end, ms per tick
@@ -120,7 +130,13 @@ the rules apart.
 Of 50 sabotages of the map rules, three slipped past `world.mjs` at first:
 the hours left when you are between two hexes, the Journal's cap of 60, and a
 validation step (a ranch per culture) that seeds 1–50 never need. The first
-two have checks now; the third changes nothing a seed makes. In the browser,
+two have checks now; the third changes nothing a seed makes. Of 106
+sabotages of the warband, 20 slipped past at first, among them the wounded
+drawing no wages, every camp selling the same troop, a capture's ransom
+(the one fixed seed happened to escape), the hourly tick never running the
+week at all, and a draw paying XP for the whole band; each has a check now,
+and one (a cap a later line made redundant) was a line to delete. A mutated
+suite that hangs counts as red. In the browser,
 dropping the `pagehide` save alone changes nothing, because
 `visibilitychange` saves too; dropping both turns the reload check red.
 
