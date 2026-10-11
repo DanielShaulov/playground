@@ -10,12 +10,14 @@
  * The rest are read-only helpers the UI uses to draw the state.
  * Module map: state.js (slices) · step.js (action list) · clock.js (day cycle,
  * fixed steps) · shop.js (coins, rep, shelf actions) · customers.js (walk-ins)
- * · orders.js (pre-orders) · jars.js (flavour) · rng.js (named random streams).
+ * · orders.js (pre-orders) · jars.js (flavour, add-in maths)
+ * · bench.js (pantry, experiments, discovery, recipe card) · rng.js (named random streams).
  */
 
 export { newGame, loadSave, SLICES } from "./state.js";
 export { step, ACTIONS } from "./step.js";
 export { STEP, STEPS_PER_HOUR } from "./clock.js";
-export { flavour, isOver, bandOf, forecast } from "./jars.js";
+export { flavour, isOver, bandOf, forecast, ageAt, lifeOf, mixOf } from "./jars.js";
+export { previewCurve, recipeCard, resolveMix, menu } from "./bench.js";
 export { judge } from "./customers.js";
 export { dueFor } from "./orders.js";

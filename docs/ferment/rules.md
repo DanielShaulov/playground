@@ -1,6 +1,7 @@
 # Rules
 
-How The Brine Nook plays as of the demo (Milestone 0). Numbers are the
+How The Brine Nook plays as of Milestone 1 (bench rules; the bench screen
+is a separate task). Numbers are the
 current tuning; the code is the source of truth, and a PR that changes a rule
 updates this file. Constant names are in brackets.
 
@@ -60,8 +61,54 @@ part-way along so day 1 has something to sell.
   missed (leaves, or never reaches the counter on their due day) costs 2.
 - Reputation runs 0 to 10 (`REP_MAX`) and speeds up arrivals.
 
-## Not in the demo yet
+## The bench and the pantry
 
-The bench and ingredient effects (Milestone 1), regulars and the order board
+- **Pantry.** In the evening you can buy ingredients (`buy`). A pantry holds
+  up to 9 of each (`MAX_STOCK`). A new game starts with 2 salt and 2 chili.
+- **Add-ins.** Starting a jar can mix in up to 3 different ingredients
+  (`MAX_ADDS`), one of each from the pantry. Each has a tag the screen shows:
+
+| Ingredient | Tag    | Effect                                                                               | Cost |
+| ---------- | ------ | ------------------------------------------------------------------------------------ | ---- |
+| Salt       | slower | ripens at 0.75× speed (a 48 h jar takes 64 h)                                        | 2    |
+| Chili      | faster | ripens at 1.33× speed (72 h kimchi in 54 h)                                          | 3    |
+| Honey      | faster | ripens at 1.2× speed                                                                 | 4    |
+| Pear       | sweet  | stays crisp for the first tenth of its life, so every band (and the pop) comes later | 3    |
+| Garlic     | funk   | starts a tenth of the way along the strip, so every band (and the pop) comes sooner  | 2    |
+
+Speeds multiply; shifts add (capped at ±0.3). A jar's life is its recipe's
+hours divided by its speed, and flavour = (age + shift × life) / life. A
+plain jar is exactly as before.
+
+- **Sweet spot.** Every recipe has a best stretch of the strip (dill 0.2–0.4,
+  hot sauce 0.45–0.65, kimchi 0.35–0.55, kraut 0.5–0.7). The bench
+  time-lapse highlights the hours a mix spends there; add-ins move it. In
+  Milestone 1 it guides the player and pays nothing extra; customers' windows
+  are still drawn as before.
+- **Discovered recipes.** A base recipe brewed with everything a discovered
+  recipe needs becomes that recipe (the most specific match wins). The first
+  time, it is discovered and joins the menu, so walk-ins can ask for it; after
+  that it can be brewed by name, which uses what it needs from the pantry. It
+  costs the same as its base and ripens like it, but sells for more:
+
+| Recipe              | Base       | Needs         | Price | Starts hinted |
+| ------------------- | ---------- | ------------- | ----- | ------------- |
+| Garlic dills        | Dill       | garlic        | 16    | yes           |
+| Honey hot sauce     | Hot sauce  | honey         | 20    | yes           |
+| Pear kimchi         | Kimchi     | pear          | 24    | yes           |
+| Fire kraut          | Sauerkraut | chili         | 28    | yes           |
+| Black garlic kimchi | Kimchi     | garlic, chili | 30    | no            |
+
+- **Experiments.** In the evening the bench can try a mix without a shelf
+  slot (`experiment`): it uses up one of each add-in, costs no coins, and
+  teaches (and discovers) exactly what brewing that mix would.
+- **Recipe card.** For each base recipe: its sweet spot, a tick for every
+  ingredient you have mixed into it, and its discovered recipes as known
+  (with what they need), hinted (only the tags, e.g. "something sweet") or
+  hidden. Off-menu requests that add hints arrive with Milestone 2.
+
+## Not in the game yet
+
+Regulars and the order board
 (2), the market, upgrades and goals ladder (3). The game is endless with a
 goals ladder; there is no season end.

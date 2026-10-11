@@ -14,6 +14,7 @@ import { tick, open, close, sleep } from "./clock.js";
 import { brew, tipOut, serve } from "./shop.js";
 import { sendAway } from "./customers.js";
 import { preorder } from "./orders.js";
+import { buy, experiment } from "./bench.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Action} Action */
@@ -30,6 +31,8 @@ export const ACTIONS = {
   serve,
   preorder,
   sendAway,
+  buy,
+  experiment,
 };
 
 /** @returns {{ state: State, events: GameEvent[] }} */
