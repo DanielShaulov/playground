@@ -13,6 +13,7 @@ export const HOUR_SECONDS = 12.5; // real seconds per in-game hour while open
 export const PATIENCE = 2.2; // hours a customer waits at the counter
 export const PREORDER_PATIENCE = 1.5; // multiplier for someone collecting a pre-order
 export const WINDOW = 0.16; // width of a customer's flavour window
+export const DEMAND_SPREAD = 0.12; // spread (std dev) of where walk-ins want a recipe around its sweet spot
 export const MAX_QUEUE = 3;
 export const REP_MAX = 10;
 

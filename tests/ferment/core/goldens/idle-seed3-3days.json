@@ -27,7 +27,7 @@
       "seed": 3,
       "nextId": 28,
       "rng": {
-        "customers": 1688210465
+        "customers": 1496386874
       }
     },
     "clock": {
@@ -93,7 +93,7 @@
     },
     "customers": {
       "queue": [],
-      "nextArrival": 12.089085893805604
+      "nextArrival": 11.88961801833939
     },
     "orders": {
       "list": []

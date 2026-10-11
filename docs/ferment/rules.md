@@ -42,9 +42,12 @@ part-way along so day 1 has something to sell.
 - Walk-ins arrive every 0.8 to 1.5 hours, sooner at higher reputation. At most
   3 wait (`MAX_QUEUE`); the one at the counter loses patience over 2.2 hours
   (`PATIENCE`) and leaves if it runs out.
-- Each wants one recipe within a window 0.16 wide (`WINDOW`) somewhere on the
-  flavour strip. About 30% of walk-ins ask for a recipe already on the shelf,
-  usually a bit riper than it is now.
+- Each wants one recipe from the menu within a window 0.16 wide (`WINDOW`).
+  Where that window sits follows a bell curve centred on the middle of the
+  recipe's sweet spot, with a spread of 0.12 (`DEMAND_SPREAD`): about two in
+  three walk-ins want it within 0.12 of the middle, and a few want it far off
+  (window middles stay between 0.1 and 0.9). About 30% of walk-ins pick a
+  recipe already on the shelf; their window follows the same curve.
 - The customer at the counter can be:
   - **served** a jar of their recipe that hasn't gone over;
   - **pre-ordered**: they leave and come back on a later day, at the hour when
@@ -83,9 +86,9 @@ flavour-only pear and garlic on 11 Oct 2026.)
 
 - **Sweet spot.** Every recipe has a best stretch of the strip (dill 0.2–0.4,
   hot sauce 0.45–0.65, kimchi 0.35–0.55, kraut 0.5–0.7). The bench
-  time-lapse highlights the hours a mix spends there; add-ins move it. In
-  Milestone 1 it guides the player and pays nothing extra; customers' windows
-  are still drawn as before.
+  time-lapse highlights the hours a mix spends there; add-ins move it. It is
+  where most walk-ins want the recipe (see Customers); serving there pays
+  nothing extra by itself.
 - **Discovered recipes.** A base recipe brewed with everything a discovered
   recipe needs becomes that recipe (the most specific match wins). The first
   time, it is discovered and joins the menu, so walk-ins can ask for it; after

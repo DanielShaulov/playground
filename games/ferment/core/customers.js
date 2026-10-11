@@ -7,10 +7,10 @@
 
 import { RECIPES } from "../content/recipes.js";
 import { NAMES } from "../content/names.js";
-import { MAX_QUEUE, OPEN_HOURS, PATIENCE, WINDOW } from "../content/tuning.js";
+import { DEMAND_SPREAD, MAX_QUEUE, OPEN_HOURS, PATIENCE, WINDOW } from "../content/tuning.js";
 import { random, between, pick } from "./rng.js";
 import { clamp, nextId } from "./util.js";
-import { flavour, isOver } from "./jars.js";
+import { isOver } from "./jars.js";
 import { addRep } from "./shop.js";
 import { menu } from "./bench.js";
 
@@ -45,19 +45,42 @@ export function judge(
   return { dist, mood: ok ? "ok" : "meh", pay, tip: 0, rep: ok ? 0 : -1 };
 }
 
+/**
+ * Where walk-ins want `recipe` on the flavour strip: a bell curve with its
+ * peak (`mean`) in the middle of the recipe's sweet spot and spread `sd`.
+ * Most windows land in or near the sweet spot; a few land far off.
+ */
+export function demand(/** @type {string} */ recipe) {
+  const [lo, hi] = RECIPES[recipe].sweet;
+  return { mean: (lo + hi) / 2, sd: DEMAND_SPREAD };
+}
+
+/** How much walk-ins want `recipe` at flavour `f`, relative to the peak (1 at the mean). */
+export function demandAt(/** @type {string} */ recipe, /** @type {number} */ f) {
+  const { mean, sd } = demand(recipe);
+  return Math.exp(-(((f - mean) / sd) ** 2) / 2);
+}
+
+/** Lowest and highest middle a walk-in's window can have. */
+const MID_RANGE = [0.1, 0.9];
+
+/** The middle of a walk-in's window: one draw from the recipe's demand curve (Box–Muller). */
+function wantedMid(/** @type {State} */ s, /** @type {string} */ recipe) {
+  const { mean, sd } = demand(recipe);
+  const u = 1 - random(s, STREAM); // (0, 1], so the log is finite
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random(s, STREAM));
+  return clamp(mean + sd * z, MID_RANGE[0], MID_RANGE[1]);
+}
+
 /** @returns {Customer} */
 function makeWalkIn(/** @type {State} */ s) {
   const live = s.shelf.slots.filter((j) => j && !isOver(j));
-  let recipe, mid;
-  if (live.length && random(s, STREAM) < 0.3) {
-    // Sometimes ask for something on the shelf, often a bit riper than it is now.
-    const jar = pick(s, STREAM, live);
-    recipe = jar.recipe;
-    mid = clamp(flavour(jar) + between(s, STREAM, -0.05, 0.3), 0.1, 0.9);
-  } else {
-    recipe = pick(s, STREAM, menu(s));
-    mid = between(s, STREAM, 0.12, 0.9);
-  }
+  // Sometimes ask for a recipe that is on the shelf; the window follows demand either way.
+  const recipe =
+    live.length && random(s, STREAM) < 0.3
+      ? pick(s, STREAM, live).recipe
+      : pick(s, STREAM, menu(s));
+  const mid = wantedMid(s, recipe);
   return {
     id: nextId(s),
     name: pick(s, STREAM, NAMES),

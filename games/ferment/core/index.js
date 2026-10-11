@@ -19,5 +19,5 @@ export { step, ACTIONS } from "./step.js";
 export { STEP, STEPS_PER_HOUR } from "./clock.js";
 export { flavour, isOver, bandOf, forecast, ageAt, lifeOf, mixOf } from "./jars.js";
 export { previewCurve, recipeCard, resolveMix, menu } from "./bench.js";
-export { judge } from "./customers.js";
+export { judge, demand, demandAt } from "./customers.js";
 export { dueFor } from "./orders.js";
