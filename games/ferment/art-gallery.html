@@ -7,7 +7,7 @@
     <link rel="icon" href="../../icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../../shared/style.css" />
     <link rel="stylesheet" href="./ui/style.css" />
-    <title>Brine Nook jar gallery</title>
+    <title>Brine Nook art gallery</title>
     <style>
       /* A scrolling page of every jar state, for screenshots and for judging the art. */
       body {
@@ -70,6 +70,17 @@
         align-items: flex-end;
         gap: 14px;
       }
+      .grid.people {
+        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+      }
+      figure svg.portrait {
+        width: 100%;
+        max-width: 74px;
+        height: auto;
+      }
+      .grid.counter-size figure svg.portrait {
+        width: 52px;
+      }
       .sizes svg.icon {
         width: 44px;
         height: 60px;
@@ -77,8 +88,11 @@
     </style>
   </head>
   <body>
-    <h1>Jar gallery</h1>
-    <p>Every state a jar can show, drawn by <code>ui/art/jar.js</code>.</p>
+    <h1>Art gallery</h1>
+    <p>
+      Every state a jar can show, drawn by <code>ui/art/jar.js</code>, and the customers, drawn by
+      <code>ui/art/customer.js</code>.
+    </p>
     <main id="gallery"></main>
     <script type="module">
       import { RECIPES, RECIPE_IDS, VARIANT_IDS } from "./content/recipes.js";
@@ -86,6 +100,16 @@
       import { SERVINGS } from "./content/tuning.js";
       import { jarArt, emptyJarSvg } from "./ui/art/jar.js";
       import { strip } from "./ui/strip.js";
+      import {
+        faceSvg,
+        MOODS,
+        HAIRS,
+        HATS,
+        TOPS,
+        GLASSES,
+        BEARDS,
+        EXTRAS,
+      } from "./ui/art/customer.js";
 
       const STOPS = [0, 0.15, 0.3, 0.45, 0.6, 0.72, 0.84, 0.94];
       const BAND = (f) => (f < 0.3 ? "crisp" : f < 0.55 ? "tangy" : f < 0.8 ? "sour" : "funky");
@@ -161,6 +185,52 @@
       html += `<section data-section="sizes"><h2>Other uses</h2><p>The empty shelf spot, and the small jar on the start-a-jar sheet.</p>
         <div class="grid sizes"><figure>${emptyJarSvg}<figcaption>empty</figcaption></figure>
         ${RECIPE_IDS.map((r) => `<figure>${jarArt(look(r, 0), "icon")}<figcaption>${RECIPES[r].name}</figcaption></figure>`).join("")}</div></section>`;
+
+      const person = (look, mood, name, note = "") =>
+        `<figure>${faceSvg(look, mood)}<figcaption>${name}<small>${note}</small></figcaption></figure>`;
+      const people = (key, title, about, cells, cls = "") =>
+        `<section data-section="${key}"><h2>${title}</h2><p>${about}</p><div class="grid people ${cls}">${cells.join("")}</div></section>`;
+      const SAMPLE = [3, 118, 247, 402, 561, 790];
+      html += people(
+        "moods",
+        "Moods",
+        "Waiting, running out of patience, delighted, fine, disappointed: brows, eyes and mouth all change.",
+        SAMPLE.flatMap((n) => MOODS.map((m) => person(n, m, m, `look ${n}`))),
+      );
+      html += people(
+        "counter",
+        "At counter size",
+        "The same moods at 52 px, the width the counter gives a face on a small phone.",
+        MOODS.map((m) => person(402, m, m)),
+        "counter-size",
+      );
+      html += people(
+        "walkins",
+        "Walk-ins",
+        "Walk-ins get a look number; every part is picked from it, so the same number is always the same person.",
+        Array.from({ length: 30 }, (_, i) => {
+          const n = (i * 337 + 11) % 1000;
+          return person(n, "wait", `look ${n}`);
+        }),
+      );
+      const part = (key, list) =>
+        list.map((v) =>
+          person({ seed: 40, [key]: v, ...(key === "hat" ? {} : { hat: "none" }) }, "wait", v),
+        );
+      html += people(
+        "parts",
+        "Parts",
+        "One person (seed 40) with one part swapped at a time. Regulars fix the parts that make them recognisable.",
+        [
+          ...part("hair", HAIRS),
+          ...part("beard", BEARDS),
+          ...part("glasses", GLASSES),
+          ...part("hat", HATS),
+          ...part("top", TOPS),
+          ...part("extra", EXTRAS),
+          ...[0, 1, 2].map((a) => person({ seed: 40, age: a, hat: "none" }, "wait", `age ${a}`)),
+        ],
+      );
 
       document.getElementById("gallery").innerHTML = html;
       document.body.dataset.ready = "1";

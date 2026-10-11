@@ -1,7 +1,9 @@
 // Art gallery: every jar state on one scrolling page (games/ferment/art-gallery.html),
 // snapped section by section on both phones. Fails if a jar fails to draw, if
 // two ripeness stops of a recipe draw the same picture, or if the add-ins and
-// serving levels don't change the jar.
+// serving levels don't change the jar. Customers: every mood must draw a
+// different face, walk-in looks must differ, and a regular's fixed parts must
+// stick whatever the seed.
 import assert from "node:assert/strict";
 
 export const name = "gallery";
@@ -53,6 +55,32 @@ export async function run(page, snap) {
   });
   assert.deepEqual(same, []);
 
+  const faces = await page.evaluate(async () => {
+    const { faceSvg, portraitLook, MOODS } = await import("./ui/art/customer.js");
+    const out = [];
+    for (let n = 0; n < 1000; n += 37) {
+      const seen = new Map();
+      for (const m of MOODS) {
+        // The mood is also tagged on the <svg>; compare the drawing only.
+        const art = faceSvg(n, m).replace(/ data-mood="[^"]*"/, "");
+        if (seen.has(art)) out.push(`look ${n}: ${seen.get(art)} and ${m} look the same`);
+        seen.set(art, m);
+      }
+      if (faceSvg(n, "wait") !== faceSvg(n, "wait")) out.push(`look ${n} is not stable`);
+    }
+    const walkIns = new Set();
+    for (let n = 0; n < 1000; n++) walkIns.add(faceSvg(n, "wait"));
+    if (walkIns.size < 980) out.push(`only ${walkIns.size} of 1000 walk-in looks differ`);
+    const fixed = { top: "apron", hat: "headscarf", extra: "pencil", glasses: "round" };
+    for (let seed = 0; seed < 50; seed++) {
+      const l = portraitLook({ seed, ...fixed });
+      for (const [k, v] of Object.entries(fixed))
+        if (l[k] !== v) out.push(`seed ${seed}: fixed ${k} came out ${l[k]}`);
+    }
+    return out;
+  });
+  assert.deepEqual(faces, []);
+
   for (const s of sections) {
     await page.evaluate(
       (k) =>
@@ -61,5 +89,5 @@ export async function run(page, snap) {
     );
     await snap(s.key);
   }
-  return `${jars} jars in ${sections.length} sections`;
+  return `${jars} pictures in ${sections.length} sections`;
 }
