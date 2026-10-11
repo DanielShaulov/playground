@@ -2,16 +2,26 @@
 /**
  * Walk-in customers: who arrives, what they want, how they judge a jar, and
  * leaving (served elsewhere, sent away, impatient, or shop closed).
- * All randomness comes from the "customers" stream.
+ * Randomness comes from the "customers" stream; whether a walk-in asks for
+ * something off the menu comes from the "requests" stream, so that choice
+ * never reshuffles who walks in.
  */
 
-import { RECIPES } from "../content/recipes.js";
+import { RECIPES, VARIANT_IDS } from "../content/recipes.js";
 import { NAMES } from "../content/names.js";
-import { DEMAND_SPREAD, MAX_QUEUE, OPEN_HOURS, PATIENCE, WINDOW } from "../content/tuning.js";
+import {
+  DEMAND_SPREAD,
+  MAX_QUEUE,
+  OFF_MENU,
+  OPEN_HOURS,
+  PATIENCE,
+  WINDOW,
+} from "../content/tuning.js";
 import { random, between, pick } from "./rng.js";
 import { clamp, nextId } from "./util.js";
 import { isOver } from "./jars.js";
 import { addRep } from "./shop.js";
+import { settle } from "./orders.js";
 import { menu } from "./bench.js";
 
 /** @typedef {import("./types.js").State} State */
@@ -72,6 +82,27 @@ function wantedMid(/** @type {State} */ s, /** @type {string} */ recipe) {
   return clamp(mean + sd * z, MID_RANGE[0], MID_RANGE[1]);
 }
 
+/**
+ * Now and then a walk-in asks for a recipe that isn't on the menu yet, at the
+ * middle of its sweet spot. Hearing about one puts a hint for it on the bench,
+ * and the request stays on the board (state.orders.asked) until it is discovered.
+ */
+function askOffMenu(/** @type {State} */ s, /** @type {Customer} */ c, events) {
+  if (random(s, "requests") >= OFF_MENU) return;
+  const unknown = VARIANT_IDS.filter((id) => !s.bench.known.includes(id));
+  if (!unknown.length) return;
+  const recipe = pick(s, "requests", unknown);
+  const [lo, hi] = RECIPES[recipe].sweet;
+  const mid = (lo + hi) / 2;
+  Object.assign(c, { recipe, lo: mid - WINDOW / 2, hi: mid + WINDOW / 2, offMenu: true });
+  const asked = s.orders.asked.filter((a) => a.recipe !== recipe);
+  asked.push({ recipe, name: c.name, look: c.look, day: s.clock.day });
+  s.orders.asked = asked;
+  if (s.bench.hints.includes(recipe)) return;
+  s.bench.hints.push(recipe);
+  events.push({ type: "hinted", recipe, customer: c });
+}
+
 /** @returns {Customer} */
 function makeWalkIn(/** @type {State} */ s) {
   const live = s.shelf.slots.filter((j) => j && !isOver(j));
@@ -102,14 +133,15 @@ export function firstArrival(/** @type {State} */ s) {
   return between(s, STREAM, 0.15, 0.5);
 }
 
-/** Whoever is at the counter leaves. A pre-order that leaves unserved is missed. */
+/**
+ * Whoever is at the counter leaves. An order that leaves unserved is missed.
+ * Someone who asked for a recipe not on the menu leaves without a grudge.
+ */
 export function leave(/** @type {State} */ s, events, /** @type {string} */ why) {
   const c = s.customers.queue.shift();
-  if (c.orderId) {
-    s.orders.list = s.orders.list.filter((o) => o.id !== c.orderId);
-    s.shop.today.missed++;
-    addRep(s, -2);
-  } else if (why !== "closed") {
+  const order = c.orderId ? s.orders.list.find((o) => o.id === c.orderId) : null;
+  if (order) settle(s, order, null, events);
+  else if (why !== "closed" && !c.offMenu) {
     addRep(s, -1);
   }
   if (why === "impatient") s.shop.today.left++;
@@ -123,6 +155,7 @@ export function walkIns(/** @type {State} */ s, events) {
   while (s.clock.hour >= cs.nextArrival && cs.nextArrival < OPEN_HOURS - 0.5) {
     if (cs.queue.length < MAX_QUEUE) {
       const c = makeWalkIn(s);
+      askOffMenu(s, c, events);
       cs.queue.push(c);
       events.push({ type: "arrived", customer: c });
     }

@@ -51,7 +51,7 @@ games/ferment/
     clock.js        day cycle and the fixed-step tick
     shop.js         coins, reputation, brew / tipOut / serve
     customers.js    walk-ins, judging a jar, leaving
-    orders.js       pre-orders
+    orders.js       pre-orders, regulars, bulk orders, planFor
     jars.js         flavour, ageing, add-in maths
     bench.js        pantry, experiments, discovery, recipe card, previewCurve
     rng.js          named random streams
@@ -81,9 +81,9 @@ games/ferment/
 The state's slices are `meta` (seed, id counter, `rng` stream positions),
 `clock` (`day`, `phase`: morning | open | evening, `hour` since opening),
 `shop` (`coins`, `rep`, `today`), `shelf` (`slots`), `customers` (`queue`,
-`nextArrival`), `orders` (`list`), `bench` (`known` discovered recipes,
-`hints`, `tried`: base recipe → ingredients mixed in) and `pantry` (`stock`:
-ingredient → count). A jar with add-ins carries `adds`; a plain jar has none. A new system adds its slice with one
+`nextArrival`), `orders` (`list`, `offers`), `bench` (`known` discovered recipes,
+`hints`, `tried`: base recipe → ingredients mixed in) `pantry` (`stock`:
+ingredient → count) and `regulars` (`met`: regular → visits). A jar with add-ins carries `adds`; a plain jar has none. A new system adds its slice with one
 line in `SLICES`.
 
 The actions are `tick { n }` (n fixed steps of 1/120 in-game hour; the screen

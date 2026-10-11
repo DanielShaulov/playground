@@ -34,8 +34,10 @@ function restock(s) {
 }
 
 export const BOTS = {
-  /** Serves the best-paying jar, pre-orders when nothing fits, restocks every morning. */
+  /** Serves the best-paying jar, pre-orders when nothing fits, restocks every morning, takes bulk orders. */
   careful(s) {
+    const offer = s.orders.offers[0];
+    if (s.clock.phase === "morning" && offer) return { type: "acceptOrder", orderId: offer.id };
     if (s.clock.phase === "morning") return restock(s) ?? { type: "open" };
     if (s.clock.phase === "evening") return { type: "sleep" };
     const c = s.customers.queue[0];

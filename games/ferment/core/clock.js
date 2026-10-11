@@ -14,7 +14,7 @@
 import { OPEN_HOURS } from "../content/tuning.js";
 import { ageJars } from "./jars.js";
 import { firstArrival, leave, walkIns, wearPatience } from "./customers.js";
-import { missOverdue, orderArrivals } from "./orders.js";
+import { missOverdue, newDay, orderArrivals } from "./orders.js";
 import { freshToday } from "./shop.js";
 
 /** @typedef {import("./types.js").State} State */
@@ -54,7 +54,7 @@ export function open(s, _action, events) {
 
 function closeNow(/** @type {State} */ s, events) {
   while (s.customers.queue.length) leave(s, events, "closed");
-  missOverdue(s);
+  missOverdue(s, events);
   s.clock.phase = "evening";
   events.push({ type: "closed", today: { ...s.shop.today } });
 }
@@ -73,4 +73,5 @@ export function sleep(s, _action, events) {
   s.clock.hour = 0;
   s.clock.phase = "morning";
   events.push({ type: "slept", day: s.clock.day, popped });
+  newDay(s, events);
 }

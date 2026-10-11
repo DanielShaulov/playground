@@ -14,7 +14,8 @@
  */
 
 import { RECIPES } from "../content/recipes.js";
-import { PATIENCE, PREORDER_PATIENCE } from "../content/tuning.js";
+import { REGULARS, REGULAR_IDS } from "../content/regulars.js";
+import { BULK_MISS, PATIENCE, PREORDER_PATIENCE, WINDOW } from "../content/tuning.js";
 import { clamp, nextId } from "./util.js";
 import { addRep, brew } from "./shop.js";
 import { resolveMix } from "./bench.js";
@@ -58,7 +59,7 @@ export function preorder(s, _action, events) {
   events.push({ type: "preordered", order, customer: c });
 }
 
-/** Tick part: pre-order customers come back on their due day, straight to the front. */
+/** Tick part: order customers come back on their due day, straight to the front. */
 export function orderArrivals(/** @type {State} */ s, events) {
   const queue = s.customers.queue;
   for (const o of s.orders.list) {
@@ -71,12 +72,124 @@ export function orderArrivals(/** @type {State} */ s, events) {
   }
 }
 
-/** At closing: anyone whose pre-order was due today and never made it to the counter. */
-export function missOverdue(/** @type {State} */ s) {
-  for (const o of s.orders.list.filter((o) => o.due <= s.clock.day)) {
-    s.orders.list = s.orders.list.filter((x) => x !== o);
+/**
+ * An order is over: collected (`mood` is how the last jar went) or missed
+ * (`mood` null). A regular's visit is counted and their next one booked.
+ */
+export function settle(
+  /** @type {State} */ s,
+  /** @type {Order} */ order,
+  /** @type {string | null} */ mood,
+  events,
+) {
+  s.orders.list = s.orders.list.filter((o) => o.id !== order.id);
+  if (mood === null) {
     s.shop.today.missed++;
-    addRep(s, -2);
+    addRep(s, order.kind === "bulk" ? -BULK_MISS : -2);
+  }
+  const met = order.regular ? s.regulars.met[order.regular] : null;
+  if (!met) return;
+  if (mood === null) met.missed++;
+  else {
+    met.visits++;
+    if (mood === "delight") met.happy++;
+  }
+  const r = REGULARS[order.regular];
+  if (r.kind === "standing") book(s, order.regular, order.due + r.every, events);
+}
+
+/** At closing: orders due today that never reached the counter; today's offers lapse. */
+export function missOverdue(/** @type {State} */ s, events = []) {
+  for (const o of s.orders.list.filter((o) => o.due <= s.clock.day)) settle(s, o, null, events);
+  s.orders.offers = [];
+}
+
+/**
+ * serve() for a bulk customer: they take the whole jar. They stay at the
+ * counter (with fresh patience) until they have every jar they ordered.
+ */
+export function deliver(
+  /** @type {State} */ s,
+  /** @type {number} */ slot,
+  /** @type {import("./types.js").Customer} */ c,
+  /** @type {{ pay: number, tip: number, rep: number, mood: string, dist: number }} */ verdict,
+  events,
+) {
+  const jar = s.shelf.slots[slot];
+  const pay = verdict.pay * jar.servings;
+  s.shelf.slots[slot] = null;
+  s.shop.coins += pay;
+  s.shop.today.served++;
+  s.shop.today.earned += pay;
+  s.shop.today.tips += verdict.tip * jar.servings;
+  if (verdict.rep < 0) addRep(s, verdict.rep);
+  const order = s.orders.list.find((o) => o.id === c.orderId);
+  c.got = (c.got ?? 0) + 1;
+  if (order) order.got = c.got;
+  const done = c.got >= (c.qty ?? 1);
+  events.push({ type: "delivered", slot, customer: c, jar, f: 0, ...verdict, pay, done });
+  if (!done) {
+    c.patience = PATIENCE * PREORDER_PATIENCE;
+    return;
+  }
+  addRep(s, 2);
+  s.customers.queue.shift();
+  if (order) settle(s, order, verdict.mood, events);
+}
+
+/** A regular's order for `day`, built from their row in content/regulars.js. */
+function orderFor(/** @type {State} */ s, /** @type {string} */ id, /** @type {number} */ day) {
+  const r = REGULARS[id];
+  /** @type {Order} */
+  const order = {
+    id: nextId(s),
+    kind: r.kind,
+    name: r.name,
+    look: r.look,
+    recipe: r.recipe,
+    lo: clamp(r.spot - WINDOW / 2, 0, 1),
+    hi: clamp(r.spot + WINDOW / 2, 0, 1),
+    due: day,
+    arriveAt: r.hour,
+    arrived: false,
+    regular: id,
+  };
+  if (r.kind === "bulk") Object.assign(order, { qty: r.qty, got: 0 });
+  return order;
+}
+
+/** Put a standing regular's visit on `day` on the board. */
+function book(/** @type {State} */ s, /** @type {string} */ id, /** @type {number} */ day, events) {
+  const order = orderFor(s, id, day);
+  s.orders.list.push(order);
+  events.push({ type: "booked", order });
+}
+
+/** True once a regular's `joins` condition is met. */
+const joinsNow = (/** @type {State} */ s, /** @type {import("./types.js").Regular} */ r) =>
+  s.clock.day >= (r.joins.day ?? 1) && s.shop.rep >= (r.joins.rep ?? 0);
+
+/**
+ * Each new morning: regulars whose time has come start visiting (a standing
+ * regular's first visit is booked for the next day), and bulk regulars whose
+ * day it is offer an order, unless one of theirs is still open.
+ */
+export function newDay(/** @type {State} */ s, events) {
+  const day = s.clock.day;
+  for (const id of REGULAR_IDS) {
+    const r = REGULARS[id];
+    if (!s.regulars.met[id]) {
+      if (!joinsNow(s, r)) continue;
+      s.regulars.met[id] = { since: day, visits: 0, happy: 0, missed: 0 };
+      events.push({ type: "regularJoined", regular: id });
+      if (r.kind === "standing") book(s, id, day + 1, events);
+    }
+    if (r.kind !== "bulk") continue;
+    if ((day - s.regulars.met[id].since) % r.every !== 0) continue;
+    if (s.orders.list.some((o) => o.regular === id)) continue;
+    const offer = orderFor(s, id, day + r.lead);
+    s.orders.offers.push(offer);
+    events.push({ type: "offered", order: offer });
   }
 }
 

@@ -35,6 +35,9 @@ function randomAction(rnd, s, { validSlots = false } = {}) {
     "preorder",
     "sendAway",
     "tick",
+    "startForOrder",
+    "acceptOrder",
+    "declineOrder",
   ];
   const type = kinds[Math.floor(rnd() * kinds.length)];
   if (type === "brew")
@@ -45,6 +48,11 @@ function randomAction(rnd, s, { validSlots = false } = {}) {
     };
   if (type === "tipOut" || type === "serve") return { type, slot: slot() };
   if (type === "tick") return { type, n: 1 + Math.floor(rnd() * 30) };
+  if (type === "startForOrder" || type === "acceptOrder" || type === "declineOrder") {
+    const list = type === "startForOrder" ? s.orders.list : s.orders.offers;
+    const o = list[Math.floor(rnd() * list.length)];
+    return { type, orderId: rnd() < 0.9 ? o?.id : 12345, slot: slot() };
+  }
   return { type };
 }
 
@@ -81,7 +89,16 @@ function checkInvariants(s) {
   for (const o of s.orders.list) {
     own(o.id);
     assert.ok(o.due >= s.clock.day, `order due day ${o.due} kept after day ${s.clock.day}`);
+    if (o.kind === "bulk") assert.ok(o.got >= 0 && o.got < o.qty, `bulk order ${o.got}/${o.qty}`);
   }
+  for (const o of s.orders.offers) {
+    own(o.id);
+    assert.equal(o.kind, "bulk");
+  }
+  if (s.clock.phase === "evening")
+    assert.equal(s.orders.offers.length, 0, "offers outlast the day");
+  const visits = s.orders.list.filter((o) => o.kind === "standing").map((o) => o.regular);
+  assert.equal(new Set(visits).size, visits.length, "a regular booked twice");
   if (s.clock.phase !== "open")
     assert.equal(s.customers.queue.length, 0, `queue left over at ${at}`);
   const collectors = s.customers.queue.filter((c) => c.orderId).length;
