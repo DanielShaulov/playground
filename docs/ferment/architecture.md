@@ -39,12 +39,62 @@ a bug gets reproduced without a person.
 - **DOM and inline SVG, not canvas.** The game is jars, panels and buttons:
   SVG jars stay crisp on any phone, and tests tap real elements.
 
+## Where things live
+
+```
+games/ferment/
+  index.html        loads ui/style.css and ui/main.js
+  core/             pure rules; import only core/index.js from outside
+    index.js        public API (below) and a module map
+    state.js        SLICES (slice name → defaults), newGame, loadSave
+    step.js         step() and ACTIONS (action type → handler)
+    clock.js        day cycle and the fixed-step tick
+    shop.js         coins, reputation, brew / tipOut / serve
+    customers.js    walk-ins, judging a jar, leaving
+    orders.js       pre-orders
+    jars.js         flavour, ageing
+    rng.js          named random streams
+    types.js        JSDoc types for the state, actions and events
+  content/          data: recipes, flavour bands, names, tuning numbers
+  ui/               main.js (state, input, loop, saving), shop.js (screen),
+                    sheets.js, strip.js, text.js, dom.js, art/, style.css
+```
+
+## The core API
+
+- `newGame(seed)` returns a fresh day-1 state.
+- `loadSave(raw)` returns a playable state, filling missing slices (and
+  missing fields inside a slice) from their defaults, or `null` to start fresh.
+- `step(state, action)` returns `{ state, events }`. It never touches its
+  input. A refused action returns the same state object and one
+  `{ type: "rejected", action, why }` event.
+- Read-only helpers for drawing: `flavour`, `isOver`, `bandOf`, `forecast`,
+  `judge`, `dueFor`, plus `STEP` and `STEPS_PER_HOUR`.
+
+The state's slices are `meta` (seed, id counter, `rng` stream positions),
+`clock` (`day`, `phase`: morning | open | evening, `hour` since opening),
+`shop` (`coins`, `rep`, `today`), `shelf` (`slots`), `customers` (`queue`,
+`nextArrival`) and `orders` (`list`). A new system adds its slice with one
+line in `SLICES`.
+
+The actions are `tick { n }` (n fixed steps of 1/120 in-game hour; the screen
+turns real time into whole steps at `HOUR_SECONDS` per hour), `open`, `close`,
+`sleep`, `brew { slot, recipe }`, `tipOut { slot }`, `serve { slot }`,
+`preorder` and `sendAway`. A new action is one line in `ACTIONS` pointing at a
+handler `(state, action, events) => reason | undefined` that mutates the copy
+`step()` made. The events are `popped`, `arrived`, `left` (with `why`:
+impatient | sent | closed), `served`, `preordered`, `brewed`, `tippedOut`,
+`opened`, `closed` and `slept`.
+
+The browser test hook is `window.__ferment`: `state` (get or set),
+`dispatch(action)` returning the events, and `core`.
+
 ## Tests that lean on this shape
 
 | Layer                 | Catches                                                                               | Lives in                 |
 | --------------------- | ------------------------------------------------------------------------------------- | ------------------------ |
 | Rule tests            | A single rule is wrong (pay, ripening, due dates)                                     | `tests/ferment/core/`    |
-| Replay goldens        | Anything that changed how a recorded game plays out                                   | `tests/ferment/core/`    |
+| Replay goldens        | Anything that changed how a recorded game plays out (`UPDATE_GOLDENS=1` regenerates)  | `tests/ferment/core/`    |
 | Invariant fuzzing     | Impossible states: negative coins, a jar in two slots, a save that doesn't round-trip | `tests/ferment/core/`    |
 | Purity check          | `Math.random`, `Date` or DOM inside the core                                          | `tests/ferment/core/`    |
 | Balance sim           | The game got too easy or too hard (Milestone 3)                                       | `tests/ferment/sim/`     |

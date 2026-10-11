@@ -1,0 +1,102 @@
+{
+  "seed": 3,
+  "bot": "idle",
+  "days": 3,
+  "events": {
+    "arrived": 21,
+    "closed": 3,
+    "left:closed": 6,
+    "left:impatient": 15,
+    "opened": 3,
+    "popped": 3,
+    "slept": 3
+  },
+  "actions": [
+    { "type": "open" },
+    { "type": "tick", "n": 1446 },
+    { "type": "sleep" },
+    { "type": "open" },
+    { "type": "tick", "n": 1446 },
+    { "type": "sleep" },
+    { "type": "open" },
+    { "type": "tick", "n": 1446 },
+    { "type": "sleep" }
+  ],
+  "end": {
+    "meta": {
+      "seed": 3,
+      "nextId": 28,
+      "rng": {
+        "customers": 1688210465
+      }
+    },
+    "clock": {
+      "day": 4,
+      "phase": "morning",
+      "hour": 0
+    },
+    "shop": {
+      "coins": 40,
+      "rep": 0,
+      "today": {
+        "served": 0,
+        "earned": 0,
+        "tips": 0,
+        "repStart": 0,
+        "missed": 0,
+        "preorders": 0,
+        "left": 5
+      }
+    },
+    "shelf": {
+      "slots": [
+        {
+          "id": 1,
+          "recipe": "dill",
+          "age": 91.20000000000832,
+          "servings": 2
+        },
+        {
+          "id": 2,
+          "recipe": "kimchi",
+          "age": 86.40000000000694,
+          "servings": 2
+        },
+        {
+          "id": 3,
+          "recipe": "hotsauce",
+          "age": 94.3200000000083,
+          "servings": 2
+        },
+        {
+          "id": 4,
+          "recipe": "kraut",
+          "age": 111.6000000000182,
+          "servings": 2
+        },
+        {
+          "id": 5,
+          "recipe": "dill",
+          "age": 75.83999999999853,
+          "servings": 2
+        },
+        null,
+        {
+          "id": 6,
+          "recipe": "kimchi",
+          "age": 108.00000000001513,
+          "servings": 2
+        },
+        null,
+        null
+      ]
+    },
+    "customers": {
+      "queue": [],
+      "nextArrival": 12.089085893805604
+    },
+    "orders": {
+      "list": []
+    }
+  }
+}
