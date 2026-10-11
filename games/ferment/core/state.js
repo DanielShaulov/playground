@@ -9,9 +9,10 @@
  * like a sliced save starts a fresh game instead.
  */
 
-import { RECIPES } from "../content/recipes.js";
+import { RECIPES, VARIANT_IDS } from "../content/recipes.js";
+import { START_PANTRY } from "../content/ingredients.js";
 import { SLOTS, START_COINS, START_REP, START_SHELF } from "../content/tuning.js";
-import { makeJar } from "./jars.js";
+import { makeJar, validAdds } from "./jars.js";
 import { freshToday } from "./shop.js";
 
 /** @typedef {import("./types.js").State} State */
@@ -24,6 +25,8 @@ export const SLICES = {
   shelf: () => ({ slots: Array(SLOTS).fill(null) }),
   customers: () => ({ queue: [], nextArrival: 0 }),
   orders: () => ({ list: [] }),
+  bench: () => ({ known: [], hints: VARIANT_IDS.filter((id) => RECIPES[id].hinted), tried: {} }),
+  pantry: () => ({ stock: { ...START_PANTRY } }),
 };
 
 /** @returns {State} */
@@ -59,5 +62,6 @@ export function loadSave(/** @type {any} */ raw) {
   }
   if (!Array.isArray(s.shelf.slots) || s.shelf.slots.length !== SLOTS) return null;
   if (s.shelf.slots.some((j) => j && !Object.hasOwn(RECIPES, j.recipe))) return null;
+  if (s.shelf.slots.some((j) => j && !validAdds(j.adds))) return null;
   return s;
 }

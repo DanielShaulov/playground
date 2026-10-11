@@ -10,6 +10,7 @@ import { REP_MAX, SLOTS } from "../content/tuning.js";
 import { clamp } from "./util.js";
 import { flavour, isOver, makeJar } from "./jars.js";
 import { judge } from "./customers.js";
+import { checkMix, useMix } from "./bench.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Today} Today */
@@ -25,16 +26,23 @@ export function freshToday(/** @type {number} */ rep) {
 
 const badSlot = (slot) => !Number.isInteger(slot) || slot < 0 || slot >= SLOTS;
 
-/** { type: "brew", slot, recipe } — start a jar in an empty slot. */
-export function brew(s, { slot, recipe }, events) {
+/**
+ * { type: "brew", slot, recipe, adds? } — start a jar in an empty slot, with
+ * optional add-ins from the pantry. A mix can make a discovered recipe (see
+ * bench.js); a discovered recipe can be brewed by name once it is known.
+ */
+export function brew(s, { slot, recipe, adds }, events) {
   if (typeof recipe !== "string" || !Object.hasOwn(RECIPES, recipe)) return "no such recipe";
   const r = RECIPES[recipe];
   if (badSlot(slot)) return "no such slot";
   if (s.clock.phase === "evening") return "shop is closed";
   if (s.shelf.slots[slot]) return "slot is full";
   if (s.shop.coins < r.cost) return "not enough coins";
+  const mix = checkMix(s, recipe, adds);
+  if (typeof mix === "string") return mix;
   s.shop.coins -= r.cost;
-  const jar = makeJar(s, recipe);
+  useMix(s, mix, events);
+  const jar = makeJar(s, mix.recipe, 0, mix.adds);
   s.shelf.slots[slot] = jar;
   events.push({ type: "brewed", slot, jar });
 }

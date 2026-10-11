@@ -97,6 +97,17 @@
     },
     "orders": {
       "list": []
+    },
+    "bench": {
+      "known": [],
+      "hints": ["garlicdill", "honeyhot", "pearkimchi", "firekraut"],
+      "tried": {}
+    },
+    "pantry": {
+      "stock": {
+        "salt": 2,
+        "chili": 2
+      }
     }
   }
 }

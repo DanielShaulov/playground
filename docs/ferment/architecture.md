@@ -52,7 +52,8 @@ games/ferment/
     shop.js         coins, reputation, brew / tipOut / serve
     customers.js    walk-ins, judging a jar, leaving
     orders.js       pre-orders
-    jars.js         flavour, ageing
+    jars.js         flavour, ageing, add-in maths
+    bench.js        pantry, experiments, discovery, recipe card, previewCurve
     rng.js          named random streams
     types.js        JSDoc types for the state, actions and events
   content/          data: recipes, flavour bands, names, tuning numbers
@@ -69,22 +70,30 @@ games/ferment/
   input. A refused action returns the same state object and one
   `{ type: "rejected", action, why }` event.
 - Read-only helpers for drawing: `flavour`, `isOver`, `bandOf`, `forecast`,
-  `judge`, `dueFor`, plus `STEP` and `STEPS_PER_HOUR`.
+  `judge`, `dueFor`, plus `STEP` and `STEPS_PER_HOUR`. For the bench:
+  `previewCurve(recipe, adds, n = 5)` (the time-lapse: `n` points from start
+  to pop, the sweet spot in flavour and hours, `sooner` vs a plain jar, and
+  the recipe the mix makes), `recipeCard(state, recipe)`, `resolveMix`,
+  `menu(state)`, `lifeOf`, `ageAt`, `mixOf`.
 
 The state's slices are `meta` (seed, id counter, `rng` stream positions),
 `clock` (`day`, `phase`: morning | open | evening, `hour` since opening),
 `shop` (`coins`, `rep`, `today`), `shelf` (`slots`), `customers` (`queue`,
-`nextArrival`) and `orders` (`list`). A new system adds its slice with one
+`nextArrival`), `orders` (`list`), `bench` (`known` discovered recipes,
+`hints`, `tried`: base recipe → ingredients mixed in) and `pantry` (`stock`:
+ingredient → count). A jar with add-ins carries `adds`; a plain jar has none. A new system adds its slice with one
 line in `SLICES`.
 
 The actions are `tick { n }` (n fixed steps of 1/120 in-game hour; the screen
 turns real time into whole steps at `HOUR_SECONDS` per hour), `open`, `close`,
-`sleep`, `brew { slot, recipe }`, `tipOut { slot }`, `serve { slot }`,
-`preorder` and `sendAway`. A new action is one line in `ACTIONS` pointing at a
+`sleep`, `brew { slot, recipe, adds? }`, `tipOut { slot }`, `serve { slot }`,
+`preorder`, `sendAway`, `buy { ingredient, n? }` (evening) and
+`experiment { recipe, adds }` (evening). A new action is one line in `ACTIONS` pointing at a
 handler `(state, action, events) => reason | undefined` that mutates the copy
 `step()` made. The events are `popped`, `arrived`, `left` (with `why`:
 impatient | sent | closed), `served`, `preordered`, `brewed`, `tippedOut`,
-`opened`, `closed` and `slept`.
+`opened`, `closed`, `slept`, `bought`, `experimented` (with its `curve`) and
+`discovered` (`recipe`, `base`, `adds`).
 
 The browser test hook is `window.__ferment`: `state` (get or set),
 `dispatch(action)` returning the events, and `core`.

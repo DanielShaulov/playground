@@ -5,13 +5,14 @@
  * All randomness comes from the "customers" stream.
  */
 
-import { RECIPES, RECIPE_IDS } from "../content/recipes.js";
+import { RECIPES } from "../content/recipes.js";
 import { NAMES } from "../content/names.js";
 import { MAX_QUEUE, OPEN_HOURS, PATIENCE, WINDOW } from "../content/tuning.js";
 import { random, between, pick } from "./rng.js";
 import { clamp, nextId } from "./util.js";
 import { flavour, isOver } from "./jars.js";
 import { addRep } from "./shop.js";
+import { menu } from "./bench.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Customer} Customer */
@@ -54,7 +55,7 @@ function makeWalkIn(/** @type {State} */ s) {
     recipe = jar.recipe;
     mid = clamp(flavour(jar) + between(s, STREAM, -0.05, 0.3), 0.1, 0.9);
   } else {
-    recipe = pick(s, STREAM, RECIPE_IDS);
+    recipe = pick(s, STREAM, menu(s));
     mid = between(s, STREAM, 0.12, 0.9);
   }
   return {
