@@ -16,9 +16,12 @@ git archive HEAD | tar -x -C "$out"
 
 # Only this repo's own branches: a fork's PR would put a stranger's page on
 # our origin, next to our saves.
+# pr/index.json is what the launcher's PR picker reads, so a Home Screen app
+# (no URL bar) can still switch builds.
 gh api "repos/$repo/pulls?state=open&per_page=100" --jq \
-  ".[] | select(.head.repo.full_name == \"$repo\") | [.number, .head.sha, .title] | @tsv" \
-  >"$out/pr/.list"
+  "[.[] | select(.head.repo.full_name == \"$repo\") | {number, title, sha: .head.sha}]" \
+  >"$out/pr/index.json"
+jq -r '.[] | [.number, .sha, .title] | @tsv' "$out/pr/index.json" >"$out/pr/.list"
 
 items=""
 while IFS=$'\t' read -r num sha title; do
@@ -30,6 +33,8 @@ while IFS=$'\t' read -r num sha title; do
   # read and write main's saves. Give it main's.
   st="$out/pr/$num/shared/storage.js"
   if [ -f "$st" ] && ! grep -q 'pr-\$' "$st"; then cp shared/storage.js "$st"; fi
+  # Likewise its launcher, which would have no PR picker and so no way back.
+  if ! grep -q 'pr/index.json' "$out/pr/$num/index.html"; then cp index.html "$out/pr/$num/"; fi
   title=$(printf '%s' "$title" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
   items+="<li><a href=\"$num/\"><b>#$num</b> $title</a> <small>${sha:0:7}</small></li>"
   echo "pr/$num <- $sha"
