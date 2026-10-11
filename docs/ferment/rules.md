@@ -1,7 +1,7 @@
 # Rules
 
-How The Brine Nook plays as of Milestone 1 (bench rules; the bench screen
-is a separate task). Numbers are the
+How The Brine Nook plays as of Milestone 1 (the bench and the pantry; the
+bench opens from the evening takings and from "Add-ins" when starting a jar). Numbers are the
 current tuning; the code is the source of truth, and a PR that changes a rule
 updates this file. Constant names are in brackets.
 

@@ -26,7 +26,7 @@ export function sheetHtml(s, sheet) {
     }).join("");
     return `<div class="panel"><h2>Start a jar</h2>
       <p>Dots show where the jar will be after each day. A green box is a pre-order you could time it for.</p>
-      ${rows}<div class="btns"><button data-act="cancel">Cancel</button></div></div>`;
+      ${rows}<div class="btns"><button data-act="cancel">Cancel</button><button data-act="bench" data-slot="${sheet.slot}">🧪 Add-ins…</button></div></div>`;
   }
   const t = sheet.summary;
   const dr = s.shop.rep - t.repStart;
@@ -39,5 +39,5 @@ export function sheetHtml(s, sheet) {
       ${t.missed ? `<div><b>${t.missed}</b>pre-orders missed</div>` : ""}
       ${t.left ? `<div><b>${t.left}</b>walked out waiting</div>` : ""}
     </div>
-    <div class="btns"><button class="main" data-act="sleep">Sleep → Day ${s.clock.day + 1}</button></div></div>`;
+    <div class="btns"><button data-act="bench">🧪 Bench</button><button class="main" data-act="sleep">Sleep → Day ${s.clock.day + 1}</button></div></div>`;
 }
