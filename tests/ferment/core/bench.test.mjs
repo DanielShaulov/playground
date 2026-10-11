@@ -63,16 +63,18 @@ test("salt slows a jar, chili and honey speed it up, and speeds multiply", () =>
   assert.equal(C.isOver(jar("kimchi", 54, ["chili"])), true);
 });
 
-test("garlic gives a head start along the strip, pear holds a jar crisp at first", () => {
-  near(C.flavour(jar("dill", 0, ["garlic"])), 0.1);
-  near(C.flavour(jar("dill", 24, ["garlic"])), 0.6);
-  assert.equal(C.isOver(jar("dill", 43.2, ["garlic"])), true, "pops at 90% of its life");
-  assert.equal(C.isOver(jar("dill", 43, ["garlic"])), false);
-  assert.equal(C.flavour(jar("dill", 4.8, ["pear"])), 0, "crisp for the first tenth");
-  near(C.flavour(jar("dill", 28.8, ["pear"])), 0.5);
-  assert.equal(C.isOver(jar("dill", 52.7, ["pear"])), false, "pops at 110% of its life");
-  assert.equal(C.isOver(jar("dill", 52.8, ["pear"])), true);
-  near(C.ageAt("dill", ["pear"], 1), 52.8);
+test("pear and garlic are flavour only: a jar with them ripens like a plain one", () => {
+  for (const recipe of RECIPE_IDS) {
+    const h = RECIPES[recipe].hours;
+    for (const adds of [["pear"], ["garlic"], ["pear", "garlic"]]) {
+      assert.equal(C.lifeOf(recipe, adds), h);
+      for (const age of [0, 1 / 3, h / 2, h - 1e-9, h]) {
+        assert.equal(C.flavour(jar(recipe, age, adds)), C.flavour(jar(recipe, age)));
+        assert.equal(C.isOver(jar(recipe, age, adds)), C.isOver(jar(recipe, age)));
+      }
+    }
+  }
+  near(C.lifeOf("kimchi", ["garlic", "chili"]), 54, "chili still speeds a garlic jar");
 });
 
 test("the time-lapse runs from starting the jar to its lid popping", () => {
@@ -96,7 +98,7 @@ test("the time-lapse runs from starting the jar to its lid popping", () => {
   near(chili.popAt, 54);
   near(chili.sooner, 0.45 * 72 - 0.45 * 54, "chili brings the sweet spot forward");
   assert.ok(C.previewCurve("kimchi", ["salt"]).sooner < 0, "salt pushes it later");
-  assert.ok(C.previewCurve("hotsauce", ["garlic"]).sooner > 0, "a head start is sooner too");
+  assert.equal(C.previewCurve("hotsauce", ["garlic"]).sooner, 0, "garlic moves nothing");
   assert.equal(C.previewCurve("kimchi", ["pear"]).recipe, "pearkimchi");
   for (const c of [
     C.previewCurve("hotsauce", ["pear", "salt"], 9),

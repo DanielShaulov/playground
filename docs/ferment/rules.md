@@ -68,17 +68,18 @@ part-way along so day 1 has something to sell.
 - **Add-ins.** Starting a jar can mix in up to 3 different ingredients
   (`MAX_ADDS`), one of each from the pantry. Each has a tag the screen shows:
 
-| Ingredient | Tag    | Effect                                                                               | Cost |
-| ---------- | ------ | ------------------------------------------------------------------------------------ | ---- |
-| Salt       | slower | ripens at 0.75× speed (a 48 h jar takes 64 h)                                        | 2    |
-| Chili      | faster | ripens at 1.33× speed (72 h kimchi in 54 h)                                          | 3    |
-| Honey      | faster | ripens at 1.2× speed                                                                 | 4    |
-| Pear       | sweet  | stays crisp for the first tenth of its life, so every band (and the pop) comes later | 3    |
-| Garlic     | funk   | starts a tenth of the way along the strip, so every band (and the pop) comes sooner  | 2    |
+| Ingredient | Tag    | Effect                                                      | Cost |
+| ---------- | ------ | ----------------------------------------------------------- | ---- |
+| Salt       | slower | ripens at 0.75× speed (a 48 h jar takes 64 h)               | 2    |
+| Chili      | faster | ripens at 1.33× speed (72 h kimchi in 54 h)                 | 3    |
+| Honey      | faster | ripens at 1.2× speed                                        | 4    |
+| Pear       | sweet  | flavour only: no change to timing; makes discovered recipes | 3    |
+| Garlic     | funk   | flavour only: no change to timing; makes discovered recipes | 2    |
 
-Speeds multiply; shifts add (capped at ±0.3). A jar's life is its recipe's
-hours divided by its speed, and flavour = (age + shift × life) / life. A
-plain jar is exactly as before.
+Speeds multiply. A jar's life is its recipe's hours divided by its speed, and
+flavour = age / life. A plain jar is exactly as before. (The core also
+supports a `shift` along the strip, but no ingredient uses one: Hadash chose
+flavour-only pear and garlic on 11 Oct 2026.)
 
 - **Sweet spot.** Every recipe has a best stretch of the strip (dill 0.2–0.4,
   hot sauce 0.45–0.65, kimchi 0.35–0.55, kraut 0.5–0.7). The bench
