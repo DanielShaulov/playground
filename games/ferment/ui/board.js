@@ -11,13 +11,16 @@
  * requests (state.orders.asked, recipes not on the menu yet) pin a hint ticket that opens the
  * bench on the right base.
  *
- * Tapping an order ticket opens the planner: a jar for that order, started
- * now, previewed through core planFor() on the strip and on a day timeline
- * (when it is at its best, when they come) before anything is committed.
- * Timing add-ins from the pantry can be toggled in; "Start" dispatches
- * startForOrder into the chosen empty shelf spot.
+ * Tapping an order ticket opens the planner: which jar will serve it. Each
+ * shelf jar of that recipe with a portion free is an option, shown where it
+ * will sit at pickup, beside "a new jar, started now" (core planFor()). The
+ * chosen one drives the big strip, a day timeline and the verdict. A shelf
+ * jar is kept with a "hold" action; a new jar takes timing add-ins and an
+ * empty spot and starts with "startForOrder". The planner offers only what
+ * the order still needs, and jars already kept for it can be let go.
  *
- * Screen-only state: ui.plan = { orderId, slot, adds } (null when closed).
+ * Screen-only state: ui.plan = { orderId, slot, adds, src } (null when closed),
+ * src being the shelf slot of the chosen jar or "new".
  * Buttons carry data-act="board-…" (and "order"); main.js hands them to boardAct().
  */
 
@@ -170,10 +173,65 @@ function planSheet() {
 
 const firstEmpty = (s) => s.shelf.slots.findIndex((j) => !j);
 
-/** Open the planner for an order, on the first empty shelf spot. */
+/** Open the planner for an order: on the best shelf jar for it if one suits, else a new jar. */
 export function openPlan(ui, orderId) {
-  ui.plan = { orderId, slot: firstEmpty(ui.s), adds: [] };
+  ui.plan = { orderId, slot: firstEmpty(ui.s), adds: [], src: "new" };
+  const o = ui.s.orders.list.find((x) => x.id === orderId);
+  if (o) ui.plan.src = pickSrc(ui.s, o);
 }
+
+/** Absolute hours → { day, hour }. */
+const dayHour = (t) => {
+  const day = Math.floor(t / 24);
+  return { day, hour: t - day * 24 };
+};
+
+/** A jar already on the shelf, previewed like planFor previews a new one. */
+function shelfPlan(s, o, j) {
+  const now = s.clock.day * 24 + s.clock.hour;
+  const adds = j.adds ?? [];
+  const dt = Math.max(0, hoursUntil(s, o.due, o.arriveAt));
+  const f = isOver(j) ? 1 : Math.min(1, forecast(j.recipe, j.age + dt, adds));
+  const from = (x) => dayHour(now + Math.max(0, ageAt(j.recipe, adds, x) - j.age));
+  return {
+    recipe: j.recipe,
+    adds,
+    right: true,
+    f,
+    fits: f < 1 && f >= o.lo && f <= o.hi,
+    lands: from(o.lo),
+    leaves: from(o.hi),
+    shelf: true,
+  };
+}
+
+/** Jars on the shelf that could still be kept for an order, with how each will be at pickup. */
+function candidates(s, o) {
+  return s.shelf.slots
+    .map((j, i) => ({ i, j }))
+    .filter(
+      ({ j }) =>
+        j &&
+        j.recipe === o.recipe &&
+        !(o.jars ?? []).includes(j.id) &&
+        !isOver(j) &&
+        freeFor(s, j, o),
+    )
+    .map((c) => ({ ...c, plan: shelfPlan(s, o, c.j) }))
+    .filter((c) => c.plan.f < 1);
+}
+
+/** The shelf jar that suits an order best (nearest the middle of its window), else "new". */
+function pickSrc(s, o) {
+  const mid = (o.lo + o.hi) / 2;
+  const fits = candidates(s, o)
+    .filter((c) => c.plan.fits)
+    .sort((a, b) => Math.abs(a.plan.f - mid) - Math.abs(b.plan.f - mid));
+  return fits.length ? fits[0].i : "new";
+}
+
+/** How many more jars (or portions) an order still needs kept or started. */
+const stillNeeds = (s, o) => (o.qty ?? 1) - (o.got ?? 0) - jarsFor(s, o).length;
 
 /** Timing add-ins the pantry has that keep the jar the order's recipe. */
 function timingAdds(s, o) {
@@ -217,6 +275,11 @@ function verdict(s, o, plan) {
       : plan.f < o.lo
         ? `Still too ${bandWord(plan.f)} when ${o.name} comes in.`
         : `Gone ${bandWord(plan.f)} by the time ${o.name} comes in.`;
+  if (plan.shelf) {
+    const fresh = planFor(s, o, []);
+    const better = fresh && (fresh.fits || bestStart(s, o, fresh));
+    return `<b class="bad">${now}</b>${better ? ` <span class="tip">A fresh jar would suit ${o.name} better.</span>` : ""}`;
+  }
   const t = bestStart(s, o, plan);
   let tip;
   if (t) {
@@ -258,6 +321,18 @@ export function bestStart(s, o, plan) {
 
 const bandWord = (f) => word(f).replace(/<[^>]+>/g, "");
 
+/** How a jar will be at pickup, in a word or two. */
+function fitWord(o, f) {
+  if (f >= 1) return `<small class="fit bad">Lid popped</small>`;
+  if (f < o.lo) return `<small class="fit bad">Still ${bandWord(f)}</small>`;
+  if (f > o.hi) return `<small class="fit bad">Gone ${bandWord(f)}</small>`;
+  return `<small class="fit good">Just right</small>`;
+}
+
+/** Hours a jar has been brewing, as the shop says it. */
+const ageText = (h) =>
+  h < 24 ? `${Math.max(1, Math.round(h))}h in` : `${Math.round(h / 24)} day${h < 36 ? "" : "s"} in`;
+
 function renderPlan(ui) {
   const el = planSheet();
   const p = ui.plan;
@@ -275,8 +350,8 @@ function renderPlan(ui) {
   }
   el.hidden = false;
   if (p.slot >= 0 && s.shelf.slots[p.slot]) p.slot = firstEmpty(s);
-  const plan = planFor(s, o, p.adds);
-  if (!plan) {
+  const fresh = planFor(s, o, p.adds);
+  if (!fresh) {
     p.adds = [];
     return;
   }
@@ -284,76 +359,90 @@ function renderPlan(ui) {
   const evening = s.clock.phase === "evening";
   const jars = jarsFor(s, o);
   const need = (o.qty ?? 1) - (o.got ?? 0);
-  const ghosts = s.shelf.slots
-    .filter((j) => j && j.recipe === o.recipe && !(o.jars ?? []).includes(j.id) && freeFor(s, j, o))
-    .map((j) =>
-      Math.min(
-        1,
-        forecast(j.recipe, j.age + Math.max(0, hoursUntil(s, o.due, o.arriveAt)), j.adds ?? []),
-      ),
-    )
-    .filter((f) => f < 1);
-  const missing = plan.adds.filter((a) => (s.pantry.stock[a] ?? 0) < 1);
+  const left = offer ? need : stillNeeds(s, o);
+  const options = offer || left <= 0 ? [] : candidates(s, o);
+  if (p.src !== "new" && !options.some((c) => c.i === p.src)) p.src = offer ? "new" : pickSrc(s, o);
+  const chosen = options.find((c) => c.i === p.src);
+  // What the strip, timeline and verdict show: the chosen shelf jar, a new jar,
+  // or once the order is covered, the jar kept for it that suits best.
+  const keptPlans = jars
+    .map((x) => shelfPlan(s, o, x.jar))
+    .sort((a, b) => Number(b.fits) - Number(a.fits));
+  const plan = left <= 0 && keptPlans.length ? keptPlans[0] : (chosen?.plan ?? fresh);
+  const portion = o.kind === "bulk" ? "it" : "a portion";
+
+  const kept = jars.length
+    ? `<div class="have">${jars
+        .map(
+          (x) =>
+            `<button class="kept" data-act="board-unhold" data-slot="${s.shelf.slots.indexOf(x.jar)}">${jarSvg(x.jar, "mini")}<small>Let go</small></button>`,
+        )
+        .join("")}<small>${jars.length} of ${need} kept for ${o.name}</small></div>`
+    : "";
+  const optHtml = options.length
+    ? `<div class="opts">${options
+        .map(
+          (c) =>
+            `<button class="opt${p.src === c.i ? " sel" : ""}" data-act="board-src" data-src="${c.i}"><span class="ojar">${jarSvg(c.j, "mini")}</span><span class="otext">On the shelf, ${ageText(c.j.age)}${stripMarks(o, [c.plan.f], c.plan.fits)}</span>${fitWord(o, c.plan.f)}</button>`,
+        )
+        .join(
+          "",
+        )}<button class="opt${p.src === "new" ? " sel" : ""}" data-act="board-src" data-src="new"><span class="ojar">${emptyJarSvg}</span><span class="otext">A new jar, started now${stripMarks(o, [fresh.f], fresh.fits)}</span>${fresh.right ? fitWord(o, fresh.f) : ""}</button></div>`
+    : "";
+
   const adds = timingAdds(s, o)
     .map(
       (a) =>
         `<button class="add${p.adds.includes(a.id) ? " on" : ""}" data-act="board-add" data-ingredient="${a.id}" ${!a.ok || (a.stock < 1 && !p.adds.includes(a.id)) ? "disabled" : ""}>${INGREDIENTS[a.id].icon} ${INGREDIENTS[a.id].name}<small>${INGREDIENTS[a.id].tag} · ${a.stock} left</small></button>`,
     )
     .join("");
-  let canHold = false;
   const spots = s.shelf.slots
-    .map((j, i) => {
-      if (!j)
-        return `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`;
-      if ((o.jars ?? []).includes(j.id))
-        return `<button class="spot mine" data-act="board-unhold" data-slot="${i}">${portionsHtml(s, j)}${jarSvg(j, "mini")}</button>`;
-      const by = Math.max(0, hoursUntil(s, o.due, o.arriveAt));
-      if (
-        freeFor(s, j, o) &&
-        !offer &&
-        j.recipe === o.recipe &&
-        forecast(j.recipe, j.age + by, j.adds ?? []) < 1
-      ) {
-        canHold = true;
-        return `<button class="spot can" data-act="board-hold" data-slot="${i}">${portionsHtml(s, j)}${jarSvg(j, "mini")}</button>`;
-      }
-      return `<span class="spot full">${portionsHtml(s, j)}${jarSvg(j, "mini")}</span>`;
-    })
+    .map((j, i) =>
+      j
+        ? `<span class="spot full">${portionsHtml(s, j)}${jarSvg(j, "mini")}</span>`
+        : `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`,
+    )
     .join("");
-  const noRoom = firstEmpty(s) < 0;
+  const newJar = !offer && left > 0 && p.src === "new";
+
+  const missing = fresh.adds.filter((a) => (s.pantry.stock[a] ?? 0) < 1);
   let go;
   if (offer)
     go = `<button class="main" data-act="board-take" data-order="${o.id}">Take it</button>`;
+  else if (left <= 0) go = `<button class="main" data-act="board-close">All set</button>`;
+  else if (chosen)
+    go = `<button class="main" data-act="board-hold" data-slot="${chosen.i}">Keep ${portion} for ${o.name}</button>`;
   else if (evening) go = `<button class="main" disabled>Start it in the morning</button>`;
-  else if (noRoom) go = `<button class="main" disabled>No room on the shelf</button>`;
+  else if (firstEmpty(s) < 0) go = `<button class="main" disabled>No room on the shelf</button>`;
   else if (missing.length)
     go = `<button class="main" disabled>Needs ${missing.map((a) => INGREDIENTS[a].icon + " " + INGREDIENTS[a].name.toLowerCase()).join(", ")}</button>`;
   else
     go = `<button class="main" data-act="board-start" ${s.shop.coins < r.cost ? "disabled" : ""}>Start a jar<small>🪙 ${r.cost}</small></button>`;
+
   const html = `<div class="panel" data-act="board-keep">
     <div class="phead"><span class="face">${faceSvg(o.look, "wait")}</span>
       <div><h2>${o.name}</h2><p>${whatLine(o)} · ${o.due <= s.clock.day ? `today at ${clockAt(o.arriveAt)}` : o.due === s.clock.day + 1 ? `tomorrow at ${clockAt(o.arriveAt)}` : `day ${o.due} at ${clockAt(o.arriveAt)}`}</p></div></div>
     ${regularHtml(s, o)}
-    ${jars.length ? `<div class="have">${jars.map((x) => `<span>${jarSvg(x.jar, "mini")}</span>`).join("")}<small>${jars.length} of ${need} started</small></div>` : ""}
+    ${kept}
+    ${optHtml}
     <div class="pickup">${stripPlan(
       o,
       plan,
-      ghosts,
-      jars.map((x) => x.at),
+      left <= 0 ? [] : jars.map((x) => x.at),
     )}${stripLabels}</div>
     ${timelineHtml(s, o, plan)}
     <div class="verdict">${verdict(s, o, plan)}</div>
-    ${offer ? "" : `${adds ? `<div class="adds">${adds}</div>` : ""}${canHold ? `<p class="hint">Tap a ${RECIPES[o.recipe].name.toLowerCase()} jar to keep ${o.kind === "bulk" ? "it" : "a portion"} for ${o.name}.</p>` : ""}<div class="spots">${spots}</div>`}
+    ${newJar ? `${adds ? `<div class="adds">${adds}</div>` : ""}<div class="spots">${spots}</div>` : ""}
     <div class="btns">${offer ? `<button data-act="board-pass" data-order="${o.id}">Pass</button>` : `<button data-act="board-close">Not now</button>`}${go}</div></div>`;
   patch(el, html);
 }
 
-/** The big strip in the planner: window, other jars of that recipe, jars kept for it, and a new jar at pickup. */
-function stripPlan(o, plan, ghosts, kept) {
+/** The big strip in the planner: the order's window, jars already kept for it, and the jar being planned at pickup. */
+function stripPlan(o, plan, kept) {
   const m = kept
     .map((f) => `<i class="mark jarmark${f >= 1 ? " over" : ""}" style="left:${pct(f)}"></i>`)
     .join("");
-  return strip({ win: o, ghosts, f: Math.min(1, plan.f), big: true }).replace(
+  return strip({ win: o, f: Math.min(1, plan.f), big: true }).replace(
     '<div class="strip big">',
     `<div class="strip big${plan.fits ? " fits" : ""}">${m}`,
   );
@@ -391,11 +480,26 @@ export function boardAct(act, t, ui, dispatch, toast) {
     // a tap on the panel itself
   } else if (ui.plan) {
     const p = ui.plan;
+    // Once an order is covered the planner closes; otherwise it moves on to the next jar.
+    const next = (said) => {
+      const o = ui.s.orders.list.find((x) => x.id === p.orderId);
+      const left = o ? stillNeeds(ui.s, o) : 0;
+      if (left > 0) {
+        p.src = pickSrc(ui.s, o);
+        p.slot = firstEmpty(ui.s);
+        toast(`${said} ${left} more to go.`);
+      } else {
+        ui.plan = null;
+        toast(`${said} That's ${o?.name ?? "them"} sorted.`);
+      }
+    };
     if (act === "board-slot") {
       p.slot = Number(t.dataset.slot);
+    } else if (act === "board-src") {
+      p.src = t.dataset.src === "new" ? "new" : Number(t.dataset.src);
     } else if (act === "board-hold") {
       const events = dispatch({ type: "hold", orderId: p.orderId, slot: Number(t.dataset.slot) });
-      if (events.some((e) => e.type === "held")) toast(`Kept back for ${events[0].order.name}`);
+      if (events.some((e) => e.type === "held")) next("Kept back!");
     } else if (act === "board-unhold") {
       dispatch({ type: "release", slot: Number(t.dataset.slot), orderId: p.orderId });
     } else if (act === "board-add") {
@@ -409,17 +513,7 @@ export function boardAct(act, t, ui, dispatch, toast) {
         slot: p.slot,
         adds: p.adds,
       });
-      if (events.some((e) => e.type === "startedForOrder")) {
-        const o = ui.s.orders.list.find((x) => x.id === p.orderId);
-        const left = o ? (o.qty ?? 1) - (o.got ?? 0) - jarsFor(ui.s, o).length : 0;
-        if (left > 0 && firstEmpty(ui.s) >= 0) {
-          p.slot = firstEmpty(ui.s);
-          toast(`Started! ${left} more to go.`);
-        } else {
-          ui.plan = null;
-          toast("Started! It's on the shelf.");
-        }
-      }
+      if (events.some((e) => e.type === "startedForOrder")) next("Started!");
     }
   }
   return true;

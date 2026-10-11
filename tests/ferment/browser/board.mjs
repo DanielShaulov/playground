@@ -2,7 +2,8 @@
 // regular's visit, a pre-order and a bulk order on the board plus a bulk offer,
 // takes the offer, plans a jar for the pre-order (the planner's marker must sit
 // where core planFor says, and salt must move it), starts it, and checks the
-// ticket then shows that jar, with Sam's portion kept back from walk-ins. An off-menu request
+// ticket then shows that jar, with Sam's portion kept back from walk-ins; then
+// lets it go and keeps it again from the planner's list of shelf jars. An off-menu request
 // opens the bench. Depends on
 // window.__ferment and the data-act / data-order / data-ingredient attributes
 // of the board's buttons.
@@ -122,6 +123,9 @@ export async function run(page, snap) {
   // Plan Sam's kimchi: the marker sits where planFor says; salt pulls it back.
   await page.locator('.plan .btns [data-act="board-close"]').tap();
   await page.locator('.ticket[data-order="902"]').tap();
+  // A kimchi already on the shelf is an option too; plan a new one here.
+  const newOpt = page.locator('.plan .opt[data-src="new"]');
+  if (await newOpt.count()) await newOpt.tap();
   const plain = await planned(902, []);
   assert.ok(Math.abs((await markAt()) - Math.min(1, plain.f)) < 0.002, "marker matches planFor");
   assert.ok(plain.fits, "a kimchi started now suits tomorrow's pickup");
@@ -150,16 +154,26 @@ export async function run(page, snap) {
   assert.equal(await page.locator(`.slot[data-slot="${slot}"].held`).count(), 0, "not all kept");
   await snap("4-started");
 
-  // Keep a kimchi already on the shelf back for Sam too, then let one go.
+  // Covered, the planner offers nothing more, only letting the jar go.
   await page.locator('.ticket[data-order="902"]').tap();
-  assert.equal(await page.locator(".plan .spot.can").count(), 2, "both kimchi jars last till then");
-  await page.locator(".plan .spot.can").first().tap();
+  assert.equal(await page.locator(".plan .opt").count(), 0, "no more than Sam needs");
+  assert.match(await page.locator(".plan .btns .main").innerText(), /All set/);
+  await page.locator(`.plan .kept[data-slot="${slot}"]`).tap();
   s = await state();
-  assert.equal(s.orders.list.find((o) => o.id === 902).jars?.length, 2, "kimchi kept back");
-  await page.locator(".plan .spot.mine").first().tap();
+  assert.deepEqual(s.orders.list.find((o) => o.id === 902).jars, [], "let go");
+  // Then each kimchi on the shelf is an option, with how it'll be at pickup.
+  const opts = page.locator(".plan .opt:not([data-src=new])");
+  assert.equal(await opts.count(), 3, "every kimchi jar lasts till then");
+  for (const t of await opts.locator(".fit").allInnerTexts())
+    assert.match(t, /Just right|Still|Gone/);
+  await page.locator(`.plan .opt[data-src="${slot}"]`).tap();
+  assert.match(await page.locator(".plan .btns .main").innerText(), /Keep a portion for Sam/);
+  assert.equal(await page.locator(".plan .add").count(), 0, "no add-ins for a jar already going");
+  await snap("4b-options");
+  await page.locator('.plan .btns [data-act="board-hold"]').tap();
   s = await state();
-  assert.equal(s.orders.list.find((o) => o.id === 902).jars?.length, 1, "and let go again");
-  await page.locator('.plan .btns [data-act="board-close"]').tap();
+  assert.deepEqual(s.orders.list.find((o) => o.id === 902).jars, [jar.id], "kept again");
+  assert.ok(await page.locator(".plan").isHidden(), "and the planner closes");
 
   // A regular's planner says how often they come.
   await page.locator('.ticket[data-order="901"]').tap();
