@@ -241,6 +241,7 @@
       "list": [
         {
           "id": 80,
+          "kind": "preorder",
           "name": "Kenji",
           "look": 818,
           "recipe": "dill",
@@ -252,6 +253,7 @@
         },
         {
           "id": 82,
+          "kind": "preorder",
           "name": "Mr. Lindqvist",
           "look": 669,
           "recipe": "dill",
@@ -263,6 +265,7 @@
         },
         {
           "id": 85,
+          "kind": "preorder",
           "name": "Kenji",
           "look": 623,
           "recipe": "dill",
@@ -272,7 +275,8 @@
           "arriveAt": 0.5,
           "arrived": false
         }
-      ]
+      ],
+      "offers": []
     },
     "bench": {
       "known": [],
@@ -284,6 +288,9 @@
         "salt": 2,
         "chili": 2
       }
+    },
+    "regulars": {
+      "met": {}
     }
   }
 }

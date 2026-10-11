@@ -24,9 +24,10 @@ export const SLICES = {
   shop: () => ({ coins: START_COINS, rep: START_REP, today: freshToday(START_REP) }),
   shelf: () => ({ slots: Array(SLOTS).fill(null) }),
   customers: () => ({ queue: [], nextArrival: 0 }),
-  orders: () => ({ list: [] }),
+  orders: () => ({ list: [], offers: [] }),
   bench: () => ({ known: [], hints: VARIANT_IDS.filter((id) => RECIPES[id].hinted), tried: {} }),
   pantry: () => ({ stock: { ...START_PANTRY } }),
+  regulars: () => ({ met: {} }),
 };
 
 /** @returns {State} */
