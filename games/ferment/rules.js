@@ -14,10 +14,10 @@
  */
 
 export const RECIPES = {
-  dill: { name: "Dill pickles", hours: 48, price: 12, cost: 4, brine: "#cfe0a8", bits: "#6f9f48" },
-  hotsauce: { name: "Hot sauce", hours: 36, price: 15, cost: 5, brine: "#e9846c", bits: "#c43b2b" },
-  kimchi: { name: "Kimchi", hours: 72, price: 18, cost: 6, brine: "#f0a58a", bits: "#d9573b" },
-  kraut: { name: "Sauerkraut", hours: 120, price: 22, cost: 5, brine: "#f1ead0", bits: "#d2bf63" },
+  dill: { name: "Dill pickles", hours: 48, price: 12, cost: 7, brine: "#cfe0a8", bits: "#6f9f48" },
+  hotsauce: { name: "Hot sauce", hours: 36, price: 15, cost: 9, brine: "#e9846c", bits: "#c43b2b" },
+  kimchi: { name: "Kimchi", hours: 72, price: 18, cost: 11, brine: "#f0a58a", bits: "#d9573b" },
+  kraut: { name: "Sauerkraut", hours: 120, price: 22, cost: 12, brine: "#f1ead0", bits: "#d2bf63" },
 };
 export const RECIPE_IDS = Object.keys(RECIPES);
 
@@ -29,12 +29,12 @@ export const BANDS = [
 ];
 
 export const SLOTS = 9;
-export const SERVINGS = 3;
+export const SERVINGS = 2;
 export const OPEN_AT = 8; // shop opens 08:00
 export const OPEN_HOURS = 12; // and closes 20:00
 export const HOUR_SECONDS = 12.5; // real seconds per in-game hour while open
 export const PATIENCE = 2.2; // hours a customer waits at the counter
-export const WINDOW = 0.22; // width of a customer's flavour window
+export const WINDOW = 0.16; // width of a customer's flavour window
 export const MAX_QUEUE = 3;
 export const REP_MAX = 10;
 
@@ -96,8 +96,10 @@ export function judge(cust, f) {
       rep: cust.orderId ? 2 : 1,
     };
   }
-  const pay = Math.round(price * Math.max(0.25, 1 - dist * 3));
-  return { dist, mood: dist < 0.08 ? "ok" : "meh", pay, tip: 0, rep: 0 };
+  // Close misses are forgiven; a clearly wrong jar costs a little reputation.
+  const pay = Math.round(price * Math.max(0.2, 1 - dist * 4));
+  const ok = dist < 0.06;
+  return { dist, mood: ok ? "ok" : "meh", pay, tip: 0, rep: ok ? 0 : -1 };
 }
 
 // ---------- state ----------
@@ -150,11 +152,11 @@ function addRep(s, d) {
 function makeWalkIn(s) {
   const live = s.shelf.filter((j) => j && !isOver(j));
   let recipe, mid;
-  if (live.length && random(s) < 0.6) {
-    // Usually ask for something near what's on the shelf (a little ahead of it).
+  if (live.length && random(s) < 0.3) {
+    // Sometimes ask for something on the shelf, often a bit riper than it is now.
     const jar = pick(s, live);
     recipe = jar.recipe;
-    mid = clamp(flavour(jar) + between(s, -0.06, 0.2), 0.12, 0.9);
+    mid = clamp(flavour(jar) + between(s, -0.05, 0.3), 0.1, 0.9);
   } else {
     recipe = pick(s, RECIPE_IDS);
     mid = between(s, 0.12, 0.9);

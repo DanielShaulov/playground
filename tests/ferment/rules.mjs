@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import * as R from "../../games/ferment/rules.js";
 
-const jar = (recipe, f) => ({ id: 1, recipe, age: f * R.RECIPES[recipe].hours, servings: 3 });
+const jar = (recipe, f) => ({ id: 1, recipe, age: f * R.RECIPES[recipe].hours, servings: R.SERVINGS });
 
 // Flavour runs 0 → 1 with age, and the lid pops at 1.
 {
