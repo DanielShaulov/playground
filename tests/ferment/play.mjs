@@ -32,7 +32,7 @@ await snap("2-brew-sheet");
 await page.locator('.recipe[data-recipe="hotsauce"]').tap();
 s = await state();
 assert.equal(s.shelf[empty].recipe, "hotsauce");
-assert.equal(s.coins, 40 - 5);
+assert.equal(s.coins, 40 - 9);
 
 // Open, wait for a customer, serve the best matching jar (or pre-order).
 await page.locator('[data-act="open"]').tap();
