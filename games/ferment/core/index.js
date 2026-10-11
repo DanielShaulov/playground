@@ -20,4 +20,4 @@ export { STEP, STEPS_PER_HOUR } from "./clock.js";
 export { flavour, isOver, bandOf, forecast, ageAt, lifeOf, mixOf } from "./jars.js";
 export { previewCurve, recipeCard, resolveMix, menu } from "./bench.js";
 export { judge, demand, demandAt } from "./customers.js";
-export { dueFor, planFor } from "./orders.js";
+export { dueFor, planFor, heldFor } from "./orders.js";

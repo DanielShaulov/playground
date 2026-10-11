@@ -329,3 +329,39 @@ test("off-menu requests stay on the board until the recipe is discovered", () =>
   s = ok(s, { type: "experiment", recipe: base, adds: needs }).state;
   assert.ok(!s.orders.asked.some((a) => a.recipe === seen.recipe));
 });
+
+test("hold: a jar set aside for an order is only for that order's customer", () => {
+  let s = C.newGame(1);
+  s.orders.list.push(order());
+  // Slot 0 starts as a dill jar.
+  s = ok(s, { type: "hold", orderId: 900, slot: 0 }).state;
+  const jarId = s.shelf.slots[0].id;
+  assert.equal(C.heldFor(s, jarId)?.id, 900);
+  assert.equal(rejected(s, { type: "hold", orderId: 900, slot: 0 }), "already set aside");
+  assert.equal(rejected(s, { type: "hold", orderId: 900, slot: 1 }), "wrong recipe");
+
+  const walkIn = { id: 77, name: "W", look: 2, recipe: "dill", lo: 0, hi: 1, patience: 2 };
+  const withWalkIn = structuredClone(s);
+  withWalkIn.clock.phase = "open";
+  withWalkIn.customers.queue = [walkIn];
+  assert.equal(rejected(withWalkIn, { type: "serve", slot: 0 }), "set aside for someone else");
+
+  const collector = { ...order(), id: 78, orderId: 900, patience: 3 };
+  const withOwner = structuredClone(withWalkIn);
+  withOwner.customers.queue = [collector];
+  const served = ok(withOwner, { type: "serve", slot: 0 }).state;
+  assert.equal(served.orders.list.length, 0, "the order is collected");
+  assert.equal(C.heldFor(served, jarId), undefined, "what's left of the jar is free again");
+
+  const freed = ok(withWalkIn, { type: "release", slot: 0 }).state;
+  assert.equal(C.heldFor(freed, jarId), undefined);
+  ok(freed, { type: "serve", slot: 0 });
+  assert.equal(rejected(freed, { type: "release", slot: 0 }), "not set aside");
+});
+
+test("startForOrder: the new jar is set aside for that order", () => {
+  let s = C.newGame(1);
+  s.orders.list.push(order());
+  s = ok(s, { type: "startForOrder", orderId: 900, slot: 5 }).state;
+  assert.equal(C.heldFor(s, s.shelf.slots[5].id)?.id, 900);
+});

@@ -7,13 +7,13 @@
 
 import { RECIPES } from "../content/recipes.js";
 import { PATIENCE, PREORDER_PATIENCE } from "../content/tuning.js";
-import { flavour, isOver, dueFor } from "../core/index.js";
+import { flavour, isOver, dueFor, heldFor } from "../core/index.js";
 import { jarSvg, emptyJarSvg } from "./art/jar.js";
 import { faceSvg } from "./art/customer.js";
 import { strip, stripLabels } from "./strip.js";
 import { word, lower, requestLine, clockText } from "./text.js";
 import { sheetHtml } from "./sheets.js";
-import { renderBoard } from "./board.js";
+import { renderBoard, freeFor, heldTag, whoNote } from "./board.js";
 import { patch, setClass, bump } from "./dom.js";
 
 /** Build the screen's fixed skeleton; returns the elements render() fills in. */
@@ -100,9 +100,11 @@ export function renderShop(els, ui) {
        ${showing.pay ? `<div class="float">+${showing.pay} 🪙</div>` : ""}`,
     );
   } else if (cust) {
-    const matching = s.shelf.slots.filter((j) => j && j.recipe === cust.recipe && !isOver(j));
+    const matching = s.shelf.slots.filter(
+      (j) => j && j.recipe === cust.recipe && !isOver(j) && freeFor(s, j, cust),
+    );
     const selF =
-      sel && sel.recipe === cust.recipe && !isOver(sel)
+      sel && sel.recipe === cust.recipe && !isOver(sel) && freeFor(s, sel, cust)
         ? Math.round(flavour(sel) * 200) / 200
         : null;
     const ghosts = matching
@@ -114,7 +116,7 @@ export function renderShop(els, ui) {
     patch(
       els.counter,
       `<div class="face">${faceSvg(cust.look, low ? "impatient" : "wait")}</div>
-       <div class="talk"><div class="say"><small>${cust.name}${cust.orderId ? " · pre-order" : ""}</small>${requestLine(cust)}</div>
+       <div class="talk"><div class="say"><small>${cust.name}${whoNote(cust)}</small>${requestLine(cust)}</div>
        <div>${strip({ win: cust, f: selF, ghosts, big: true })}${stripLabels}</div>
        <div class="patience${low ? " low" : ""}"><b></b></div></div>
        <div class="queue">${"<i></i>".repeat(Math.max(0, queue.length - 1))}</div>`,
@@ -126,7 +128,7 @@ export function renderShop(els, ui) {
     let html;
     if (s.clock.phase === "morning") {
       const due = s.orders.list.filter((o) => o.due === s.clock.day).length;
-      html = `<div><b>Morning, day ${s.clock.day}</b>Tap an empty shelf spot to start a jar, then open the shop.${due ? ` ${due} pre-order${due > 1 ? "s" : ""} collecting today.` : ""}</div>`;
+      html = `<div><b>Morning, day ${s.clock.day}</b>Tap an empty shelf spot to start a jar, then open the shop.${due ? ` ${due} order${due > 1 ? "s" : ""} to collect today.` : ""}</div>`;
     } else if (s.clock.phase === "evening") {
       html = `<div><b>Closed for the night</b>The jars keep working while you sleep.</div>`;
     } else {
@@ -148,19 +150,23 @@ export function renderShop(els, ui) {
     }
     const f = Math.round(flavour(jar) * 200) / 200;
     const over = isOver(jar);
-    const relevant = cust && jar.recipe === cust.recipe && !over;
+    const held = heldFor(s, jar.id);
+    const relevant = cust && jar.recipe === cust.recipe && !over && freeFor(s, jar, cust);
     const fits = relevant && f >= cust.lo && f <= cust.hi;
     let cls = "slot";
     if (cust && !relevant) cls += " dim";
     if (fits) cls += " fits";
     if (i === ui.selected) cls += " sel";
+    if (held) cls += " held";
     setClass(el, cls);
     const status = over
       ? `<small style="color:#8e5bb0">lid popped</small>`
-      : `<small>${word(f)}</small>`;
+      : held
+        ? `<small>for ${held.name}</small>`
+        : `<small>${word(f)}</small>`;
     patch(
       el,
-      `${jarSvg(jar)}${strip({ f, win: relevant ? cust : null })}<div class="lbl">${RECIPES[jar.recipe].name}${status}</div>`,
+      `${held ? heldTag(held) : ""}${jarSvg(jar)}${strip({ f, win: relevant ? cust : null })}<div class="lbl">${RECIPES[jar.recipe].name}${status}</div>`,
     );
   });
 
@@ -193,10 +199,16 @@ function actionsHtml(s, cust, sel) {
   let main = tip;
   if (!main) {
     const name = RECIPES[cust.recipe].name;
-    if (sel && sel.recipe === cust.recipe) {
+    const heldSel =
+      sel && sel.recipe === cust.recipe && !freeFor(s, sel, cust) && heldFor(s, sel.id);
+    if (heldSel) {
+      main = `<button class="main hold" data-act="board-release">For ${heldSel.name}<small>tap to sell it anyway</small></button>`;
+    } else if (sel && sel.recipe === cust.recipe) {
       main = `<button class="main" data-act="serve">Serve ${name}</button>`;
     } else {
-      const have = s.shelf.slots.some((j) => j && j.recipe === cust.recipe && !isOver(j));
+      const have = s.shelf.slots.some(
+        (j) => j && j.recipe === cust.recipe && !isOver(j) && freeFor(s, j, cust),
+      );
       main = `<button class="main" disabled>${have ? `Tap a ${lower(cust.recipe)} jar` : `No ${lower(cust.recipe)} on the shelf`}</button>`;
     }
   }

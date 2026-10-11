@@ -25,7 +25,7 @@ import { RECIPES } from "../content/recipes.js";
 import { INGREDIENTS, INGREDIENT_IDS, MAX_ADDS } from "../content/ingredients.js";
 import { OPEN_AT, OPEN_HOURS } from "../content/tuning.js";
 import { REGULARS } from "../content/regulars.js";
-import { planFor, forecast, isOver, ageAt } from "../core/index.js";
+import { planFor, forecast, isOver, ageAt, heldFor } from "../core/index.js";
 import { faceSvg } from "./art/customer.js";
 import { jarSvg, emptyJarSvg } from "./art/jar.js";
 import { openBench } from "./bench.js";
@@ -246,7 +246,7 @@ export function bestStart(s, o, plan) {
   let best = null;
   for (let d = s.clock.day; d * 24 <= to; d++) {
     const lo = Math.max(from, d * 24 + (d === s.clock.day ? s.clock.hour : 0));
-    const hi = Math.min(to, d * 24 + OPEN_HOURS);
+    const hi = Math.min(to, d * 24 + OPEN_HOURS - 0.5); // before closing
     if (lo > hi) continue;
     const t = Math.min(hi, Math.max(lo, aim));
     if (!best || Math.abs(t - aim) < Math.abs(best - aim)) best = t;
@@ -285,7 +285,7 @@ function renderPlan(ui) {
   const jars = jarsFor(s, o);
   const need = (o.qty ?? 1) - (o.got ?? 0);
   const ghosts = s.shelf.slots
-    .filter((j) => j && j.recipe === o.recipe && !(o.jars ?? []).includes(j.id))
+    .filter((j) => j && j.recipe === o.recipe && !heldFor(s, j.id))
     .map((j) =>
       Math.min(
         1,
@@ -300,12 +300,26 @@ function renderPlan(ui) {
         `<button class="add${p.adds.includes(a.id) ? " on" : ""}" data-act="board-add" data-ingredient="${a.id}" ${!a.ok || (a.stock < 1 && !p.adds.includes(a.id)) ? "disabled" : ""}>${INGREDIENTS[a.id].icon} ${INGREDIENTS[a.id].name}<small>${INGREDIENTS[a.id].tag} · ${a.stock} left</small></button>`,
     )
     .join("");
+  let canHold = false;
   const spots = s.shelf.slots
-    .map((j, i) =>
-      j
-        ? `<span class="spot full">${jarSvg(j, "mini")}</span>`
-        : `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`,
-    )
+    .map((j, i) => {
+      if (!j)
+        return `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`;
+      const held = heldFor(s, j.id);
+      if (held?.id === o.id)
+        return `<button class="spot mine" data-act="board-unhold" data-slot="${i}">${heldTag(o)}${jarSvg(j, "mini")}</button>`;
+      const by = Math.max(0, hoursUntil(s, o.due, o.arriveAt));
+      if (
+        !held &&
+        !offer &&
+        j.recipe === o.recipe &&
+        forecast(j.recipe, j.age + by, j.adds ?? []) < 1
+      ) {
+        canHold = true;
+        return `<button class="spot can" data-act="board-hold" data-slot="${i}">${jarSvg(j, "mini")}</button>`;
+      }
+      return `<span class="spot full">${held ? heldTag(held) : ""}${jarSvg(j, "mini")}</span>`;
+    })
     .join("");
   const noRoom = firstEmpty(s) < 0;
   let go;
@@ -320,20 +334,29 @@ function renderPlan(ui) {
   const html = `<div class="panel" data-act="board-keep">
     <div class="phead"><span class="face">${faceSvg(o.look, "wait")}</span>
       <div><h2>${o.name}</h2><p>${whatLine(o)} · ${o.due <= s.clock.day ? `today at ${clockAt(o.arriveAt)}` : o.due === s.clock.day + 1 ? `tomorrow at ${clockAt(o.arriveAt)}` : `day ${o.due} at ${clockAt(o.arriveAt)}`}</p></div></div>
+    ${regularHtml(s, o)}
     ${jars.length ? `<div class="have">${jars.map((x) => `<span>${jarSvg(x.jar, "mini")}</span>`).join("")}<small>${jars.length} of ${need} started</small></div>` : ""}
-    <div class="pickup">${stripPlan(o, plan, ghosts)}${stripLabels}</div>
+    <div class="pickup">${stripPlan(
+      o,
+      plan,
+      ghosts,
+      jars.map((x) => x.at),
+    )}${stripLabels}</div>
     ${timelineHtml(s, o, plan)}
     <div class="verdict">${verdict(s, o, plan)}</div>
-    ${offer ? "" : `${adds ? `<div class="adds">${adds}</div>` : ""}<div class="spots">${spots}</div>`}
+    ${offer ? "" : `${adds ? `<div class="adds">${adds}</div>` : ""}${canHold ? `<p class="hint">Tap a ${RECIPES[o.recipe].name.toLowerCase()} jar to keep it for ${o.name}.</p>` : ""}<div class="spots">${spots}</div>`}
     <div class="btns">${offer ? `<button data-act="board-pass" data-order="${o.id}">Pass</button>` : `<button data-act="board-close">Not now</button>`}${go}</div></div>`;
   patch(el, html);
 }
 
-/** The big strip in the planner: window, other jars of that recipe, and the new jar at pickup. */
-function stripPlan(o, plan, ghosts) {
+/** The big strip in the planner: window, other jars of that recipe, jars kept for it, and a new jar at pickup. */
+function stripPlan(o, plan, ghosts, kept) {
+  const m = kept
+    .map((f) => `<i class="mark jarmark${f >= 1 ? " over" : ""}" style="left:${pct(f)}"></i>`)
+    .join("");
   return strip({ win: o, ghosts, f: Math.min(1, plan.f), big: true }).replace(
     '<div class="strip big">',
-    `<div class="strip big${plan.fits ? " fits" : ""}">`,
+    `<div class="strip big${plan.fits ? " fits" : ""}">${m}`,
   );
 }
 
@@ -358,6 +381,11 @@ export function boardAct(act, t, ui, dispatch, toast) {
     const r = RECIPES[t.dataset.recipe];
     openBench(ui, s.clock.phase === "evening" ? null : firstEmpty(s) < 0 ? null : firstEmpty(s));
     ui.bench.recipe = r.base ?? t.dataset.recipe;
+  } else if (act === "board-release") {
+    // At the counter: sell a jar that was kept for someone else after all.
+    const slot = ui.selected;
+    const freed = dispatch({ type: "release", slot });
+    if (freed.some((e) => e.type === "released")) dispatch({ type: "serve", slot });
   } else if (act === "board-close") {
     ui.plan = null;
   } else if (act === "board-keep") {
@@ -366,6 +394,11 @@ export function boardAct(act, t, ui, dispatch, toast) {
     const p = ui.plan;
     if (act === "board-slot") {
       p.slot = Number(t.dataset.slot);
+    } else if (act === "board-hold") {
+      const events = dispatch({ type: "hold", orderId: p.orderId, slot: Number(t.dataset.slot) });
+      if (events.some((e) => e.type === "held")) toast(`Kept back for ${events[0].order.name}`);
+    } else if (act === "board-unhold") {
+      dispatch({ type: "release", slot: Number(t.dataset.slot) });
     } else if (act === "board-add") {
       const ing = t.dataset.ingredient;
       if (p.adds.includes(ing)) p.adds = p.adds.filter((a) => a !== ing);
@@ -379,7 +412,7 @@ export function boardAct(act, t, ui, dispatch, toast) {
       });
       if (events.some((e) => e.type === "startedForOrder")) {
         const o = ui.s.orders.list.find((x) => x.id === p.orderId);
-        const left = o ? (o.qty ?? 1) - (o.got ?? 0) - (o.jars?.length ?? 0) : 0;
+        const left = o ? (o.qty ?? 1) - (o.got ?? 0) - jarsFor(ui.s, o).length : 0;
         if (left > 0 && firstEmpty(ui.s) >= 0) {
           p.slot = firstEmpty(ui.s);
           toast(`Started! ${left} more to go.`);
@@ -399,4 +432,45 @@ export function boardReact(e, toast) {
   else if (e.type === "hinted") toast(`${e.customer.name} asked for something new`);
   else if (e.type === "delivered" && !e.done)
     toast(`${e.customer.got} of ${e.customer.qty} jars handed over`);
+}
+
+/** Can `jar` be served to `cust`? Not when it is kept back for another order. */
+export function freeFor(s, jar, cust) {
+  const held = heldFor(s, jar.id);
+  return !held || held.id === cust?.orderId;
+}
+
+/** The little paper tag on a jar kept back for an order: who it's for. */
+export const heldTag = (o) =>
+  `<span class="held-tag" title="For ${o.name}">${faceSvg(o.look, "wait")}</span>`;
+
+/** What the counter adds after a collecting customer's name. */
+export function whoNote(c) {
+  if (!c.orderId) return "";
+  if (c.kind === "bulk") return ` · ${c.got ?? 0} of ${c.qty} jars`;
+  if (c.kind === "standing") return " · regular";
+  return " · pre-order";
+}
+
+const EVERY = ["every day", "every other day"];
+
+/** A regular's line in the planner: how often they come, and how their visits went. */
+function regularHtml(s, o) {
+  const r = o.regular && REGULARS[o.regular];
+  if (!r) return "";
+  const met = s.regulars.met?.[o.regular] ?? { visits: 0, happy: 0, missed: 0 };
+  const often = EVERY[r.every - 1] ?? `every ${r.every} days`;
+  const line =
+    r.kind === "bulk"
+      ? `${r.name.split(" from ")[1] ?? r.name} orders ${often}.`
+      : `${r.name} comes in ${often} for ${bandWord(r.spot)} ${RECIPES[r.recipe].name.toLowerCase()}.`;
+  const dots =
+    '<i class="v-happy"></i>'.repeat(met.happy) +
+    '<i class="v-ok"></i>'.repeat(Math.max(0, met.visits - met.happy)) +
+    '<i class="v-missed"></i>'.repeat(met.missed);
+  return `<div class="regular"><span>${line}</span>${
+    dots
+      ? `<span class="visits" title="Past visits">${dots}</span>`
+      : `<span class="visits new">first visit</span>`
+  }</div>`;
 }

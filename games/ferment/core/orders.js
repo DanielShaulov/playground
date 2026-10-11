@@ -256,6 +256,34 @@ export function startForOrder(s, { orderId, slot, adds }, events) {
   events.push({ type: "startedForOrder", order, slot });
 }
 
+/** The taken order a jar is set aside for, if any. */
+export const heldFor = (/** @type {State} */ s, /** @type {number} */ jarId) =>
+  s.orders.list.find((o) => o.jars?.includes(jarId));
+
+/**
+ * { type: "hold", orderId, slot } — set a jar already on the shelf aside for a
+ * taken order. Only that order's customer can be served from it.
+ */
+export function hold(s, { orderId, slot }, events) {
+  const order = findIn(s.orders.list, orderId);
+  if (!order) return "no such order";
+  const jar = Number.isInteger(slot) ? s.shelf.slots[slot] : null;
+  if (!jar) return "empty slot";
+  if (jar.recipe !== order.recipe) return "wrong recipe";
+  if (heldFor(s, jar.id)) return "already set aside";
+  (order.jars ??= []).push(jar.id);
+  events.push({ type: "held", order, slot });
+}
+
+/** { type: "release", slot } — a set-aside jar goes back to everyone. */
+export function release(s, { slot }, events) {
+  const jar = Number.isInteger(slot) ? s.shelf.slots[slot] : null;
+  const order = jar ? heldFor(s, jar.id) : null;
+  if (!order) return "not set aside";
+  order.jars = order.jars.filter((id) => id !== jar.id);
+  events.push({ type: "released", order, slot });
+}
+
 /** { type: "acceptOrder", orderId } — take a bulk order on offer today. */
 export function acceptOrder(s, { orderId }, events) {
   const order = findIn(s.orders.offers, orderId);

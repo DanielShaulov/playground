@@ -2,7 +2,8 @@
 // regular's visit, a pre-order and a bulk order on the board plus a bulk offer,
 // takes the offer, plans a jar for the pre-order (the planner's marker must sit
 // where core planFor says, and salt must move it), starts it, and checks the
-// ticket then shows that jar. An off-menu request opens the bench. Depends on
+// ticket then shows that jar, kept back from walk-ins. An off-menu request
+// opens the bench. Depends on
 // window.__ferment and the data-act / data-order / data-ingredient attributes
 // of the board's buttons.
 import assert from "node:assert/strict";
@@ -143,14 +144,59 @@ export async function run(page, snap) {
   assert.deepEqual(s.orders.list.find((o) => o.id === 902).jars, [jar.id]);
   assert.ok(await page.locator(".plan").isHidden(), "planner closes once the order is covered");
   await page.locator('.ticket[data-order="902"] .strip.fits .jarmark').waitFor();
+  await page.locator(`.slot[data-slot="${slot}"].held .held-tag`).waitFor();
   await snap("4-started");
+
+  // Keep a kimchi already on the shelf back for Sam too, then let one go.
+  await page.locator('.ticket[data-order="902"]').tap();
+  assert.equal(await page.locator(".plan .spot.can").count(), 2, "both kimchi jars last till then");
+  await page.locator(".plan .spot.can").first().tap();
+  s = await state();
+  assert.equal(s.orders.list.find((o) => o.id === 902).jars?.length, 2, "kimchi kept back");
+  await page.locator(".plan .spot.mine").first().tap();
+  s = await state();
+  assert.equal(s.orders.list.find((o) => o.id === 902).jars?.length, 1, "and let go again");
+  await page.locator('.plan .btns [data-act="board-close"]').tap();
+
+  // A regular's planner says how often they come.
+  await page.locator('.ticket[data-order="901"]').tap();
+  assert.match(await page.locator(".plan .regular").innerText(), /every other day for crisp dill/);
+  await snap("6-regular");
+  await page.locator('.plan .btns [data-act="board-close"]').tap();
+
+  // A walk-in wants kimchi: Sam's jar is not theirs unless you let it go.
+  await page.evaluate(() => {
+    const s = structuredClone(window.__ferment.state);
+    s.clock.phase = "open";
+    s.customers.queue = [
+      { id: 950, name: "Wren", look: 9, recipe: "kimchi", lo: 0, hi: 0.2, patience: 2 },
+    ];
+    window.__ferment.state = s;
+  });
+  assert.ok(
+    !(await page.locator(`.slot[data-slot="${slot}"]`).getAttribute("class")).includes("fits"),
+  );
+  await page.locator(`.slot[data-slot="${slot}"]`).tap();
+  assert.match(await page.locator(".actions .main").innerText(), /For Sam/);
+  await snap("5-kept-back");
+  const coins = (await state()).shop.coins;
+  await page.locator('.actions [data-act="board-release"]').tap();
+  s = await state();
+  assert.ok(s.shop.coins > coins, "sold anyway");
+  assert.deepEqual(s.orders.list.find((o) => o.id === 902).jars, [], "no longer kept for Sam");
+  await page.evaluate(() => {
+    const s = structuredClone(window.__ferment.state);
+    s.clock.phase = "morning";
+    s.customers.queue = [];
+    window.__ferment.state = s;
+  });
 
   // The bulk order with a jar started too soon says when to start instead.
   await page.locator('.ticket[data-order="903"]').tap();
   const v = await page.locator(".plan .verdict").innerText();
   assert.match(v, /popped|Gone/);
   assert.match(v, /salt|Start it/);
-  await snap("5-too-soon");
+  await snap("7-too-soon");
   await page.locator('.plan .btns [data-act="board-close"]').tap();
 
   // An off-menu request opens the bench on the recipe it grows from.
