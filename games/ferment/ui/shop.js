@@ -7,13 +7,13 @@
 
 import { RECIPES } from "../content/recipes.js";
 import { PATIENCE, PREORDER_PATIENCE } from "../content/tuning.js";
-import { flavour, isOver, dueFor, heldFor } from "../core/index.js";
+import { flavour, isOver, dueFor } from "../core/index.js";
 import { jarSvg, emptyJarSvg } from "./art/jar.js";
 import { faceSvg } from "./art/customer.js";
 import { strip, stripLabels } from "./strip.js";
 import { word, lower, requestLine, clockText } from "./text.js";
 import { sheetHtml } from "./sheets.js";
-import { renderBoard, freeFor, heldTag, whoNote } from "./board.js";
+import { renderBoard, freeFor, portionsHtml, keptFor, whoNote } from "./board.js";
 import { patch, setClass, bump } from "./dom.js";
 
 /** Build the screen's fixed skeleton; returns the elements render() fills in. */
@@ -150,23 +150,23 @@ export function renderShop(els, ui) {
     }
     const f = Math.round(flavour(jar) * 200) / 200;
     const over = isOver(jar);
-    const held = heldFor(s, jar.id);
+    const kept = keptFor(s, jar);
     const relevant = cust && jar.recipe === cust.recipe && !over && freeFor(s, jar, cust);
     const fits = relevant && f >= cust.lo && f <= cust.hi;
     let cls = "slot";
     if (cust && !relevant) cls += " dim";
     if (fits) cls += " fits";
     if (i === ui.selected) cls += " sel";
-    if (held) cls += " held";
+    if (kept && !freeFor(s, jar, null)) cls += " held";
     setClass(el, cls);
     const status = over
       ? `<small style="color:#8e5bb0">lid popped</small>`
-      : held
-        ? `<small>for ${held.name}</small>`
+      : kept && !freeFor(s, jar, null)
+        ? `<small>for ${kept}</small>`
         : `<small>${word(f)}</small>`;
     patch(
       el,
-      `${held ? heldTag(held) : ""}${jarSvg(jar)}${strip({ f, win: relevant ? cust : null })}<div class="lbl">${RECIPES[jar.recipe].name}${status}</div>`,
+      `${jarSvg(jar)}${strip({ f, win: relevant ? cust : null })}<div class="lbl"><span>${RECIPES[jar.recipe].name}${portionsHtml(s, jar)}</span>${status}</div>`,
     );
   });
 
@@ -199,10 +199,10 @@ function actionsHtml(s, cust, sel) {
   let main = tip;
   if (!main) {
     const name = RECIPES[cust.recipe].name;
-    const heldSel =
-      sel && sel.recipe === cust.recipe && !freeFor(s, sel, cust) && heldFor(s, sel.id);
-    if (heldSel) {
-      main = `<button class="main hold" data-act="board-release">For ${heldSel.name}<small>tap to sell it anyway</small></button>`;
+    const keptSel =
+      sel && sel.recipe === cust.recipe && !freeFor(s, sel, cust) ? keptFor(s, sel) : "";
+    if (keptSel) {
+      main = `<button class="main hold" data-act="board-release">For ${keptSel}<small>tap to sell it anyway</small></button>`;
     } else if (sel && sel.recipe === cust.recipe) {
       main = `<button class="main" data-act="serve">Serve ${name}</button>`;
     } else {

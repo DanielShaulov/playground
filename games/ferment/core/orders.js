@@ -256,13 +256,34 @@ export function startForOrder(s, { orderId, slot, adds }, events) {
   events.push({ type: "startedForOrder", order, slot });
 }
 
-/** The taken order a jar is set aside for, if any. */
-export const heldFor = (/** @type {State} */ s, /** @type {number} */ jarId) =>
-  s.orders.list.find((o) => o.jars?.includes(jarId));
+/**
+ * Portions of `jar` set aside for an order: a bulk buyer takes whole jars,
+ * anyone else one portion. A jar can hold portions for several orders.
+ */
+const portionsFor = (/** @type {Order} */ o, /** @type {import("./types.js").Jar} */ jar) =>
+  o.kind === "bulk" ? jar.servings : 1;
+
+/** Orders with portions set aside in a jar, each with how many. */
+export const holdsOn = (/** @type {State} */ s, /** @type {import("./types.js").Jar} */ jar) =>
+  s.orders.list
+    .filter((o) => o.jars?.includes(jar.id))
+    .map((order) => ({ order, n: portionsFor(order, jar) }));
+
+/** Portions of a jar nobody else has set aside (`orderId`'s own hold counts as free). */
+export const freePortions = (
+  /** @type {State} */ s,
+  /** @type {import("./types.js").Jar} */ jar,
+  /** @type {number | undefined} */ orderId = undefined,
+) =>
+  jar.servings -
+  holdsOn(s, jar)
+    .filter((h) => h.order.id !== orderId)
+    .reduce((sum, h) => sum + h.n, 0);
 
 /**
- * { type: "hold", orderId, slot } — set a jar already on the shelf aside for a
- * taken order. Only that order's customer can be served from it.
+ * { type: "hold", orderId, slot } — set portions of a jar already on the
+ * shelf aside for a taken order (one portion, or the whole jar for a bulk
+ * order). Only that order's customer can be served what is set aside.
  */
 export function hold(s, { orderId, slot }, events) {
   const order = findIn(s.orders.list, orderId);
@@ -270,15 +291,24 @@ export function hold(s, { orderId, slot }, events) {
   const jar = Number.isInteger(slot) ? s.shelf.slots[slot] : null;
   if (!jar) return "empty slot";
   if (jar.recipe !== order.recipe) return "wrong recipe";
-  if (heldFor(s, jar.id)) return "already set aside";
+  if (order.jars?.includes(jar.id)) return "already set aside";
+  if (freePortions(s, jar) < portionsFor(order, jar)) return "no portion free";
   (order.jars ??= []).push(jar.id);
   events.push({ type: "held", order, slot });
 }
 
-/** { type: "release", slot } — a set-aside jar goes back to everyone. */
-export function release(s, { slot }, events) {
+/**
+ * { type: "release", slot, orderId? } — what an order set aside in a jar
+ * goes back to everyone. Without orderId, the hold collected last goes.
+ */
+export function release(s, { slot, orderId }, events) {
   const jar = Number.isInteger(slot) ? s.shelf.slots[slot] : null;
-  const order = jar ? heldFor(s, jar.id) : null;
+  if (!jar) return "empty slot";
+  const holds = holdsOn(s, jar).map((h) => h.order);
+  const order =
+    orderId === undefined
+      ? holds.sort((a, b) => b.due - a.due || b.arriveAt - a.arriveAt)[0]
+      : holds.find((o) => o.id === orderId);
   if (!order) return "not set aside";
   order.jars = order.jars.filter((id) => id !== jar.id);
   events.push({ type: "released", order, slot });

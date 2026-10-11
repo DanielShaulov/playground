@@ -330,38 +330,71 @@ test("off-menu requests stay on the board until the recipe is discovered", () =>
   assert.ok(!s.orders.asked.some((a) => a.recipe === seen.recipe));
 });
 
-test("hold: a jar set aside for an order is only for that order's customer", () => {
+test("hold: portions set aside for orders are only for their customers", () => {
   let s = C.newGame(1);
-  s.orders.list.push(order());
-  // Slot 0 starts as a dill jar.
+  s.orders.list.push(order(), order({ id: 901, name: "U", due: 3 }));
+  // Slot 0 starts as a dill jar with SERVINGS portions; hold one for each order.
+  const jar0 = s.shelf.slots[0];
+  assert.equal(jar0.servings, 2, "this test assumes two portions a jar");
   s = ok(s, { type: "hold", orderId: 900, slot: 0 }).state;
-  const jarId = s.shelf.slots[0].id;
-  assert.equal(C.heldFor(s, jarId)?.id, 900);
   assert.equal(rejected(s, { type: "hold", orderId: 900, slot: 0 }), "already set aside");
   assert.equal(rejected(s, { type: "hold", orderId: 900, slot: 1 }), "wrong recipe");
-
+  const open = (st, c) => {
+    const x = structuredClone(st);
+    x.clock.phase = "open";
+    x.customers.queue = [c];
+    return x;
+  };
   const walkIn = { id: 77, name: "W", look: 2, recipe: "dill", lo: 0, hi: 1, patience: 2 };
-  const withWalkIn = structuredClone(s);
-  withWalkIn.clock.phase = "open";
-  withWalkIn.customers.queue = [walkIn];
-  assert.equal(rejected(withWalkIn, { type: "serve", slot: 0 }), "set aside for someone else");
 
+  // One portion is still free: a walk-in can have it.
+  assert.equal(C.freePortions(s, s.shelf.slots[0]), 1);
+  const sold = ok(open(s, walkIn), { type: "serve", slot: 0 }).state;
+  assert.equal(sold.shelf.slots[0].servings, 1);
+  assert.equal(rejected(sold, { type: "hold", orderId: 901, slot: 0 }), "no portion free");
+
+  // Both portions set aside: walk-ins can't, either order's customer can.
+  s = ok(s, { type: "hold", orderId: 901, slot: 0 }).state;
+  assert.deepEqual(
+    C.holdsOn(s, s.shelf.slots[0]).map((h) => h.order.id),
+    [900, 901],
+  );
+  assert.equal(rejected(open(s, walkIn), { type: "serve", slot: 0 }), "set aside for someone else");
   const collector = { ...order(), id: 78, orderId: 900, patience: 3 };
-  const withOwner = structuredClone(withWalkIn);
-  withOwner.customers.queue = [collector];
-  const served = ok(withOwner, { type: "serve", slot: 0 }).state;
-  assert.equal(served.orders.list.length, 0, "the order is collected");
-  assert.equal(C.heldFor(served, jarId), undefined, "what's left of the jar is free again");
+  const served = ok(open(s, collector), { type: "serve", slot: 0 }).state;
+  assert.equal(served.orders.list.length, 1, "900 is collected");
+  assert.equal(C.freePortions(served, served.shelf.slots[0]), 0, "the last portion is still U's");
 
-  const freed = ok(withWalkIn, { type: "release", slot: 0 }).state;
-  assert.equal(C.heldFor(freed, jarId), undefined);
+  // Letting go: the hold collected last goes first.
+  const freed = ok(open(s, walkIn), { type: "release", slot: 0 }).state;
+  assert.deepEqual(
+    C.holdsOn(freed, freed.shelf.slots[0]).map((h) => h.order.id),
+    [900],
+  );
   ok(freed, { type: "serve", slot: 0 });
-  assert.equal(rejected(freed, { type: "release", slot: 0 }), "not set aside");
+  const both = ok(freed, { type: "release", slot: 0, orderId: 900 }).state;
+  assert.equal(rejected(both, { type: "release", slot: 0 }), "not set aside");
+});
+
+test("hold: a bulk order sets the whole jar aside", () => {
+  let s = C.newGame(1);
+  s.orders.list.push(order({ kind: "bulk", qty: 2, got: 0 }), order({ id: 901 }));
+  s = ok(s, { type: "hold", orderId: 900, slot: 0 }).state;
+  assert.equal(C.freePortions(s, s.shelf.slots[0]), 0);
+  assert.equal(rejected(s, { type: "hold", orderId: 901, slot: 0 }), "no portion free");
+  // And it needs the whole jar free.
+  let t = C.newGame(1);
+  t.orders.list.push(order({ kind: "bulk", qty: 2, got: 0 }), order({ id: 901 }));
+  t = ok(t, { type: "hold", orderId: 901, slot: 0 }).state;
+  assert.equal(rejected(t, { type: "hold", orderId: 900, slot: 0 }), "no portion free");
 });
 
 test("startForOrder: the new jar is set aside for that order", () => {
   let s = C.newGame(1);
   s.orders.list.push(order());
   s = ok(s, { type: "startForOrder", orderId: 900, slot: 5 }).state;
-  assert.equal(C.heldFor(s, s.shelf.slots[5].id)?.id, 900);
+  assert.deepEqual(
+    C.holdsOn(s, s.shelf.slots[5]).map((h) => h.order.id),
+    [900],
+  );
 });

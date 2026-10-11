@@ -25,7 +25,7 @@ import { RECIPES } from "../content/recipes.js";
 import { INGREDIENTS, INGREDIENT_IDS, MAX_ADDS } from "../content/ingredients.js";
 import { OPEN_AT, OPEN_HOURS } from "../content/tuning.js";
 import { REGULARS } from "../content/regulars.js";
-import { planFor, forecast, isOver, ageAt, heldFor } from "../core/index.js";
+import { planFor, forecast, isOver, ageAt, holdsOn, freePortions } from "../core/index.js";
 import { faceSvg } from "./art/customer.js";
 import { jarSvg, emptyJarSvg } from "./art/jar.js";
 import { openBench } from "./bench.js";
@@ -285,7 +285,7 @@ function renderPlan(ui) {
   const jars = jarsFor(s, o);
   const need = (o.qty ?? 1) - (o.got ?? 0);
   const ghosts = s.shelf.slots
-    .filter((j) => j && j.recipe === o.recipe && !heldFor(s, j.id))
+    .filter((j) => j && j.recipe === o.recipe && !(o.jars ?? []).includes(j.id) && freeFor(s, j, o))
     .map((j) =>
       Math.min(
         1,
@@ -305,20 +305,19 @@ function renderPlan(ui) {
     .map((j, i) => {
       if (!j)
         return `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`;
-      const held = heldFor(s, j.id);
-      if (held?.id === o.id)
-        return `<button class="spot mine" data-act="board-unhold" data-slot="${i}">${heldTag(o)}${jarSvg(j, "mini")}</button>`;
+      if ((o.jars ?? []).includes(j.id))
+        return `<button class="spot mine" data-act="board-unhold" data-slot="${i}">${portionsHtml(s, j)}${jarSvg(j, "mini")}</button>`;
       const by = Math.max(0, hoursUntil(s, o.due, o.arriveAt));
       if (
-        !held &&
+        freeFor(s, j, o) &&
         !offer &&
         j.recipe === o.recipe &&
         forecast(j.recipe, j.age + by, j.adds ?? []) < 1
       ) {
         canHold = true;
-        return `<button class="spot can" data-act="board-hold" data-slot="${i}">${jarSvg(j, "mini")}</button>`;
+        return `<button class="spot can" data-act="board-hold" data-slot="${i}">${portionsHtml(s, j)}${jarSvg(j, "mini")}</button>`;
       }
-      return `<span class="spot full">${held ? heldTag(held) : ""}${jarSvg(j, "mini")}</span>`;
+      return `<span class="spot full">${portionsHtml(s, j)}${jarSvg(j, "mini")}</span>`;
     })
     .join("");
   const noRoom = firstEmpty(s) < 0;
@@ -344,7 +343,7 @@ function renderPlan(ui) {
     )}${stripLabels}</div>
     ${timelineHtml(s, o, plan)}
     <div class="verdict">${verdict(s, o, plan)}</div>
-    ${offer ? "" : `${adds ? `<div class="adds">${adds}</div>` : ""}${canHold ? `<p class="hint">Tap a ${RECIPES[o.recipe].name.toLowerCase()} jar to keep it for ${o.name}.</p>` : ""}<div class="spots">${spots}</div>`}
+    ${offer ? "" : `${adds ? `<div class="adds">${adds}</div>` : ""}${canHold ? `<p class="hint">Tap a ${RECIPES[o.recipe].name.toLowerCase()} jar to keep ${o.kind === "bulk" ? "it" : "a portion"} for ${o.name}.</p>` : ""}<div class="spots">${spots}</div>`}
     <div class="btns">${offer ? `<button data-act="board-pass" data-order="${o.id}">Pass</button>` : `<button data-act="board-close">Not now</button>`}${go}</div></div>`;
   patch(el, html);
 }
@@ -398,7 +397,7 @@ export function boardAct(act, t, ui, dispatch, toast) {
       const events = dispatch({ type: "hold", orderId: p.orderId, slot: Number(t.dataset.slot) });
       if (events.some((e) => e.type === "held")) toast(`Kept back for ${events[0].order.name}`);
     } else if (act === "board-unhold") {
-      dispatch({ type: "release", slot: Number(t.dataset.slot) });
+      dispatch({ type: "release", slot: Number(t.dataset.slot), orderId: p.orderId });
     } else if (act === "board-add") {
       const ing = t.dataset.ingredient;
       if (p.adds.includes(ing)) p.adds = p.adds.filter((a) => a !== ing);
@@ -434,15 +433,30 @@ export function boardReact(e, toast) {
     toast(`${e.customer.got} of ${e.customer.qty} jars handed over`);
 }
 
-/** Can `jar` be served to `cust`? Not when it is kept back for another order. */
+/** Can `cust` be served from `jar`? Not from portions kept back for other orders. */
 export function freeFor(s, jar, cust) {
-  const held = heldFor(s, jar.id);
-  return !held || held.id === cust?.orderId;
+  return freePortions(s, jar, cust?.orderId) >= (cust?.kind === "bulk" ? jar.servings : 1);
 }
 
-/** The little paper tag on a jar kept back for an order: who it's for. */
-export const heldTag = (o) =>
-  `<span class="held-tag" title="For ${o.name}">${faceSvg(o.look, "wait")}</span>`;
+/**
+ * The portions left in a jar, one chip each, hung on the jar: a kept-back
+ * portion shows the face of who it's for, a free one is a plain chip.
+ */
+export function portionsHtml(s, jar) {
+  let chips = "";
+  let held = 0;
+  for (const h of holdsOn(s, jar))
+    for (let k = 0; k < h.n && held < jar.servings; k++, held++)
+      chips += `<i class="held" title="For ${h.order.name}">${faceSvg(h.order.look, "wait")}</i>`;
+  chips += "<i></i>".repeat(Math.max(0, jar.servings - held));
+  return `<span class="portions">${chips}</span>`;
+}
+
+/** Names of who has portions kept back in a jar, as the shop would say them. */
+export const keptFor = (s, jar) => {
+  const names = holdsOn(s, jar).map((h) => h.order.name);
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} & ${names.at(-1)}` : (names[0] ?? "");
+};
 
 /** What the counter adds after a collecting customer's name. */
 export function whoNote(c) {

@@ -2,7 +2,7 @@
 // regular's visit, a pre-order and a bulk order on the board plus a bulk offer,
 // takes the offer, plans a jar for the pre-order (the planner's marker must sit
 // where core planFor says, and salt must move it), starts it, and checks the
-// ticket then shows that jar, kept back from walk-ins. An off-menu request
+// ticket then shows that jar, with Sam's portion kept back from walk-ins. An off-menu request
 // opens the bench. Depends on
 // window.__ferment and the data-act / data-order / data-ingredient attributes
 // of the board's buttons.
@@ -144,7 +144,10 @@ export async function run(page, snap) {
   assert.deepEqual(s.orders.list.find((o) => o.id === 902).jars, [jar.id]);
   assert.ok(await page.locator(".plan").isHidden(), "planner closes once the order is covered");
   await page.locator('.ticket[data-order="902"] .strip.fits .jarmark').waitFor();
-  await page.locator(`.slot[data-slot="${slot}"].held .held-tag`).waitFor();
+  // One portion is kept for Sam (a chip with Sam's face), the other is free.
+  await page.locator(`.slot[data-slot="${slot}"] .portions i.held`).waitFor();
+  assert.equal(await page.locator(`.slot[data-slot="${slot}"] .portions i`).count(), jar.servings);
+  assert.equal(await page.locator(`.slot[data-slot="${slot}"].held`).count(), 0, "not all kept");
   await snap("4-started");
 
   // Keep a kimchi already on the shelf back for Sam too, then let one go.
@@ -164,18 +167,26 @@ export async function run(page, snap) {
   await snap("6-regular");
   await page.locator('.plan .btns [data-act="board-close"]').tap();
 
-  // A walk-in wants kimchi: Sam's jar is not theirs unless you let it go.
-  await page.evaluate(() => {
-    const s = structuredClone(window.__ferment.state);
-    s.clock.phase = "open";
-    s.customers.queue = [
-      { id: 950, name: "Wren", look: 9, recipe: "kimchi", lo: 0, hi: 0.2, patience: 2 },
-    ];
-    window.__ferment.state = s;
-  });
-  assert.ok(
-    !(await page.locator(`.slot[data-slot="${slot}"]`).getAttribute("class")).includes("fits"),
-  );
+  // Walk-ins want kimchi: the first gets the free portion of Sam's jar; the
+  // next finds only Sam's portion left, and has it only if you let it go.
+  const walkIn = (id, name) =>
+    page.evaluate(
+      ([id, name]) => {
+        const s = structuredClone(window.__ferment.state);
+        s.clock.phase = "open";
+        s.customers.queue = [{ id, name, look: 9, recipe: "kimchi", lo: 0, hi: 0.2, patience: 2 }];
+        window.__ferment.state = s;
+      },
+      [id, name],
+    );
+  await walkIn(950, "Wren");
+  await page.locator(`.slot[data-slot="${slot}"].fits`).tap();
+  await page.locator('.actions [data-act="serve"]').tap();
+  s = await state();
+  assert.equal(s.shelf.slots[slot].servings, jar.servings - 1, "a free portion sold");
+  assert.deepEqual(s.orders.list.find((o) => o.id === 902).jars, [jar.id], "Sam's still kept");
+  await walkIn(951, "Ash");
+  await page.locator(`.slot[data-slot="${slot}"].held`).waitFor();
   await page.locator(`.slot[data-slot="${slot}"]`).tap();
   assert.match(await page.locator(".actions .main").innerText(), /For Sam/);
   await snap("5-kept-back");
