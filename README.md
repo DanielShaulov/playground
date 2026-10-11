@@ -13,6 +13,9 @@ The site deploys to GitHub Pages whenever something lands on `main`
 GitHub Actions**. After that it's live at
 `https://<user>.github.io/playground/`.
 
+Every open PR also gets its own copy at `…/playground/pr/<number>/`, with its
+own saves; `…/playground/pr/` lists them.
+
 Open that on your phone and **Add to Home Screen** — it then runs fullscreen
 with no browser chrome, locked to portrait, and works offline.
 
