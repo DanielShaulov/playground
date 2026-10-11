@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6ead8" />
+    <link rel="icon" href="../../icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../../shared/style.css" />
+    <link rel="stylesheet" href="./ui/style.css" />
+    <title>Brine Nook jar gallery</title>
+    <style>
+      /* A scrolling page of every jar state, for screenshots and for judging the art. */
+      body {
+        overflow: auto;
+        user-select: text;
+        -webkit-user-select: text;
+        padding: 12px 16px 40px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 4px 0 2px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 18px 0 2px;
+      }
+      p {
+        margin: 0 0 6px;
+        font-size: 12px;
+        color: var(--fg-dim);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+        gap: 10px 8px;
+        padding-bottom: 10px;
+        border-bottom: 7px solid var(--wood);
+        box-shadow: 0 4px 0 var(--wood-dark);
+        margin-bottom: 8px;
+      }
+      figure {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 0;
+      }
+      figure svg.jar {
+        width: 100%;
+        height: 96px;
+      }
+      figure .strip {
+        width: 88%;
+        margin-top: 10px;
+      }
+      figcaption {
+        margin-top: 5px;
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
+        line-height: 1.15;
+      }
+      figcaption small {
+        display: block;
+        font-weight: 400;
+        color: var(--fg-dim);
+      }
+      .sizes {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+      }
+      .sizes svg.icon {
+        width: 44px;
+        height: 60px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Jar gallery</h1>
+    <p>Every state a jar can show, drawn by <code>ui/art/jar.js</code>.</p>
+    <main id="gallery"></main>
+    <script type="module">
+      import { RECIPES, RECIPE_IDS, VARIANT_IDS } from "./content/recipes.js";
+      import { INGREDIENT_IDS } from "./content/ingredients.js";
+      import { SERVINGS } from "./content/tuning.js";
+      import { jarArt, emptyJarSvg } from "./ui/art/jar.js";
+      import { strip } from "./ui/strip.js";
+
+      const STOPS = [0, 0.15, 0.3, 0.45, 0.6, 0.72, 0.84, 0.94];
+      const BAND = (f) => (f < 0.3 ? "crisp" : f < 0.55 ? "tangy" : f < 0.8 ? "sour" : "funky");
+      let id = 1;
+      const look = (recipe, f, more = {}) => ({
+        id: id++,
+        recipe,
+        f: Math.min(f, 1),
+        over: f >= 1,
+        servings: SERVINGS,
+        adds: [],
+        ...more,
+      });
+      const fig = (l, name, note = "") =>
+        `<figure>${jarArt(l)}${strip({ f: Math.min(l.f, 1) })}<figcaption>${name}<small>${note}</small></figcaption></figure>`;
+      const section = (key, title, about, cells) =>
+        `<section data-section="${key}"><h2>${title}</h2><p>${about}</p><div class="grid">${cells.join("")}</div></section>`;
+
+      let html = "";
+      for (const r of RECIPE_IDS)
+        html += section(
+          r,
+          RECIPES[r].name,
+          "Crisp to funky: brine clouds, bubbles rise, foam rings the top, sediment settles, the lid domes, then pops.",
+          [
+            ...STOPS.map((f) => fig(look(r, f), BAND(f), `${Math.round(f * 100)}%`)),
+            fig(look(r, 1), "over", "lid popped"),
+          ],
+        );
+
+      const sold = [];
+      for (const r of RECIPE_IDS)
+        for (let s = SERVINGS; s >= 1; s--)
+          sold.push(
+            fig(look(r, 0.4, { servings: s }), RECIPES[r].name, `${s} of ${SERVINGS} left`),
+          );
+      html += section(
+        "servings",
+        "Sold down",
+        "The brine drops to the next notch on the glass with each serving sold.",
+        sold,
+      );
+
+      html += section(
+        "variants",
+        "Discovered recipes",
+        "Found at the bench: the base recipe's bits in their own colours, with the add-ins that made them.",
+        VARIANT_IDS.flatMap((r) => [
+          fig(look(r, 0.25, { adds: RECIPES[r].needs }), RECIPES[r].name, "tangy"),
+          fig(look(r, 0.7, { adds: RECIPES[r].needs }), RECIPES[r].name, "sour"),
+        ]),
+      );
+
+      html += section(
+        "adds",
+        "Add-ins",
+        "Bench ingredients float in the brine; salt sits as crystals on the bottom. An unknown id gets a plain speck.",
+        [
+          ...[...INGREDIENT_IDS, "mystery"].map((a) => fig(look("dill", 0.2, { adds: [a] }), a)),
+          fig(
+            look("kimchi", 0.35, { adds: ["salt", "chili", "pear"] }),
+            "kimchi",
+            "salt, chili, pear",
+          ),
+          fig(
+            look("kraut", 0.5, { adds: ["honey", "garlic", "salt"] }),
+            "kraut",
+            "honey, garlic, salt",
+          ),
+        ],
+      );
+
+      html += `<section data-section="sizes"><h2>Other uses</h2><p>The empty shelf spot, and the small jar on the start-a-jar sheet.</p>
+        <div class="grid sizes"><figure>${emptyJarSvg}<figcaption>empty</figcaption></figure>
+        ${RECIPE_IDS.map((r) => `<figure>${jarArt(look(r, 0), "icon")}<figcaption>${RECIPES[r].name}</figcaption></figure>`).join("")}</div></section>`;
+
+      document.getElementById("gallery").innerHTML = html;
+      document.body.dataset.ready = "1";
+    </script>
+  </body>
+</html>
