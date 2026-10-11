@@ -1,0 +1,17 @@
+{
+  // Dev-only type check: `npm run typecheck`. Nothing here ships or builds.
+  // A file is checked once it starts with `// @ts-check`, so modules opt in
+  // one at a time; every new module under games/ferment/ should.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "strict": false,
+    "skipLibCheck": true
+  },
+  "include": ["./**/*.js", "./**/*.d.ts"]
+}

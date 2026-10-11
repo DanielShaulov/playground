@@ -1,0 +1,59 @@
+name: Test
+
+# The gate every PR must pass before it merges. Ferment's rules tests and the
+# type check run in Node. The phone job plays Ferment in Chrome on a small and
+# a large phone, uploads the screenshots as the "ferment-shots" artifact, and
+# runs Checkwiz's rules tests, which drive its page in a browser too.
+# `npm test` runs the same checks locally.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ferment
+      - run: npm run typecheck
+
+  phone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The runner image ships Google Chrome; no Playwright browser download.
+    env:
+      CHROMIUM: /usr/bin/google-chrome
+      CHECKWIZ_CHROMIUM: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ferment:browser
+      # Checkwiz's rules tests drive its page in a browser and need `npm start`.
+      - run: |
+          npm start >/dev/null 2>&1 &
+          until curl -sf http://localhost:8000/ >/dev/null; do sleep 0.2; done
+          npm run test:checkwiz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ferment-shots
+          path: tests/ferment/browser/shots/
+          if-no-files-found: ignore
