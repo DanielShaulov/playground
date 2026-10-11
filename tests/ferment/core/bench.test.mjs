@@ -350,3 +350,34 @@ test("random bench play never reaches an impossible state", () => {
     assert.deepEqual(C.loadSave(JSON.parse(JSON.stringify(s))), s);
   }
 });
+
+test("walk-ins want a recipe on a bell curve centred on its sweet spot", () => {
+  for (const recipe of Object.keys(RECIPES)) {
+    const { mean, sd } = C.demand(recipe);
+    const [lo, hi] = RECIPES[recipe].sweet;
+    near(mean, (lo + hi) / 2);
+    assert.equal(C.demandAt(recipe, mean), 1);
+    near(C.demandAt(recipe, mean + sd), Math.exp(-0.5));
+    near(C.demandAt(recipe, mean - 2 * sd), C.demandAt(recipe, mean + 2 * sd));
+  }
+  // Play many open days and look at where each walk-in's window is centred.
+  const mids = {};
+  for (let seed = 1; seed <= 150; seed++) {
+    let g = C.newGame(seed);
+    g.bench.known = [...VARIANT_IDS];
+    g = ok(g, { type: "open" }).state;
+    for (const e of ok(g, { type: "tick", n: 120 * 11 }).events) {
+      if (e.type !== "arrived" || e.customer.orderId) continue;
+      (mids[e.customer.recipe] ??= []).push((e.customer.lo + e.customer.hi) / 2);
+    }
+  }
+  for (const [recipe, list] of Object.entries(mids)) {
+    const { mean, sd } = C.demand(recipe);
+    const avg = list.reduce((a, b) => a + b, 0) / list.length;
+    const within = list.filter((m) => Math.abs(m - mean) <= sd).length / list.length;
+    assert.ok(list.length >= 40, `${recipe}: only ${list.length} walk-ins`);
+    assert.ok(Math.abs(avg - mean) < 0.04, `${recipe}: average ${avg} vs ${mean}`);
+    assert.ok(within > 0.55 && within < 0.85, `${recipe}: ${within} within one spread`);
+    assert.ok(list.every((m) => m >= 0.1 - 1e-12 && m <= 0.9 + 1e-12));
+  }
+});

@@ -1,13 +1,9 @@
 // Invariant fuzzing: thousands of random action sequences must never reach an
 // impossible state, never mutate step()'s input, and always survive a save.
-// The second test also plays every random sequence on the demo's frozen rules
-// and demands the same outcome, accepted or refused, action by action.
 // FUZZ_RUNS=<n> runs more sequences locally.
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as C from "../../../games/ferment/core/index.js";
-import * as L from "./legacy/rules.js";
-import { streamSeed } from "../../../games/ferment/core/rng.js";
 import { RECIPE_IDS } from "../../../games/ferment/content/recipes.js";
 import {
   MAX_QUEUE,
@@ -123,49 +119,4 @@ test(`fuzz: ${RUNS} random games of ${LENGTH} actions keep every invariant`, () 
     }
   }
   assert.ok(accepted > RUNS * LENGTH * 0.4, `only ${accepted} actions were accepted`);
-});
-
-test("fuzz parity: random games play the same on the core and the demo's rules", () => {
-  const legacy = {
-    tick: (ls, a) => {
-      if (ls.phase !== "open") return { ok: false };
-      for (let i = 0; i < a.n && ls.phase === "open"; i++) L.tick(ls, C.STEP);
-      return { ok: true };
-    },
-    open: (ls) => L.openShop(ls),
-    close: (ls) => L.closeShop(ls),
-    sleep: (ls) => L.sleep(ls),
-    brew: (ls, a) => L.brew(ls, a.slot, a.recipe),
-    tipOut: (ls, a) => L.tipOut(ls, a.slot),
-    serve: (ls, a) => L.serve(ls, a.slot),
-    preorder: (ls) => L.preorder(ls),
-    sendAway: (ls) => L.sendAway(ls),
-  };
-  for (let run = 0; run < Math.ceil(RUNS / 3); run++) {
-    const rnd = testRng(run * 104729 + 3);
-    const seed = Math.floor(rnd() * 2 ** 31);
-    let s = C.newGame(seed);
-    const ls = L.newGame(0);
-    ls.seed = streamSeed(seed, "customers");
-    for (let i = 0; i < LENGTH; i++) {
-      const action = randomAction(rnd, s, { validSlots: true });
-      if (action.recipe === "toString") action.recipe = "nope"; // the demo looked recipes up on a plain object
-      const r = C.step(s, action);
-      const ok = legacy[action.type](ls, action).ok;
-      assert.equal(
-        r.events[0]?.type !== "rejected",
-        ok,
-        `run ${run} action ${i} ${JSON.stringify(action)}: accept/refuse differs`,
-      );
-      s = r.state;
-      assert.equal(s.meta.nextId, ls.nextId);
-      assert.equal(s.shop.coins, ls.coins);
-      assert.equal(s.shop.rep, ls.rep);
-      assert.equal(s.clock.hour, ls.clock);
-      assert.deepEqual(s.shelf.slots, ls.shelf);
-      assert.deepEqual(s.customers.queue, ls.queue);
-      assert.deepEqual(s.orders.list, ls.orders);
-      assert.deepEqual(s.shop.today, ls.today);
-    }
-  }
 });

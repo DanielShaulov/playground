@@ -74,7 +74,8 @@ games/ferment/
   `previewCurve(recipe, adds, n = 5)` (the time-lapse: `n` points from start
   to pop, the sweet spot in flavour and hours, `sooner` vs a plain jar, and
   the recipe the mix makes), `recipeCard(state, recipe)`, `resolveMix`,
-  `menu(state)`, `lifeOf`, `ageAt`, `mixOf`.
+  `menu(state)`, `lifeOf`, `ageAt`, `mixOf`, and `demand(recipe)` /
+  `demandAt(recipe, f)` (the bell curve of where walk-ins want a recipe).
 
 The state's slices are `meta` (seed, id counter, `rng` stream positions),
 `clock` (`day`, `phase`: morning | open | evening, `hour` since opening),
