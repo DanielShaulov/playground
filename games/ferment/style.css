@@ -1,0 +1,640 @@
+/* The Brine Nook — a light kraft-paper shop, unlike the dark arcade default. */
+
+:root {
+  --bg: #f6ead8;
+  --fg: #4a3524;
+  --fg-dim: #9a7a58;
+  --card: #fdf6ea;
+  --line: #e6d3b6;
+  --good: #3d8b3d;
+  --go: #7fb069;
+  --go-dark: #5e8f4c;
+  --coin: #ffd36b;
+  --wood: #b9875a;
+  --wood-dark: #8f6440;
+  --crisp: #8fc77a;
+  --tangy: #f2b84b;
+  --sour: #e2683f;
+  --funky: #8e5bb0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.app {
+  gap: 8px;
+}
+
+/* --- top bar --- */
+.top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.top .back {
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-size: 24px;
+  padding: 4px 10px 4px 2px;
+}
+.top .title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pill {
+  background: var(--card);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 15px;
+}
+.pill.coins {
+  background: var(--coin);
+  color: #6b4a00;
+}
+.pill.rep {
+  color: #c0503a;
+}
+.pill.bump {
+  animation: bump 0.4s;
+}
+@keyframes bump {
+  40% {
+    transform: scale(1.18);
+  }
+}
+
+/* --- flavour strip (used everywhere) --- */
+.strip {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--crisp), var(--tangy) 40%, var(--sour) 70%, var(--funky));
+}
+.strip.big {
+  height: 12px;
+  border-radius: 6px;
+}
+.strip .win {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  border: 2.5px solid var(--good);
+  border-radius: 6px;
+}
+.strip .mark {
+  position: absolute;
+  top: -9px;
+  width: 0;
+  height: 0;
+  margin-left: -6px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 9px solid var(--fg);
+}
+.strip .mark::after {
+  content: "";
+  position: absolute;
+  left: -1.5px;
+  top: -1px;
+  width: 3px;
+  height: 10px;
+  background: var(--fg);
+}
+.strip .mark.ghost {
+  opacity: 0.25;
+}
+.strip .tick {
+  position: absolute;
+  top: -3px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2.5px solid var(--fg);
+  font-size: 0;
+}
+.strip .tick span {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.strip-labels {
+  position: relative;
+  height: 13px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 5px;
+}
+/* Each word sits under the middle of its own band (see BANDS in rules.js). */
+.strip-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.strip-labels .crisp {
+  left: 15%;
+}
+.strip-labels .tangy {
+  left: 42.5%;
+}
+.strip-labels .sour {
+  left: 67.5%;
+}
+.strip-labels .funky {
+  left: 90%;
+}
+.strip-labels .crisp {
+  color: #6e9f55;
+}
+.strip-labels .tangy {
+  color: #c98a1b;
+}
+.strip-labels .sour {
+  color: #c0503a;
+}
+.strip-labels .funky {
+  color: var(--funky);
+}
+.w-crisp {
+  color: #5d8f45;
+}
+.w-tangy {
+  color: #c98a1b;
+}
+.w-sour {
+  color: #c0503a;
+}
+.w-funky {
+  color: var(--funky);
+}
+
+/* --- order board --- */
+.board {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 12px;
+  scrollbar-width: none;
+}
+.board:empty {
+  display: none;
+}
+.ticket {
+  flex: 0 0 auto;
+  width: 132px;
+  background: var(--card);
+  border: 1.5px dashed var(--wood);
+  border-radius: 10px;
+  padding: 6px 9px 9px;
+  font-size: 12px;
+}
+.ticket.today {
+  border-style: solid;
+  border-color: var(--good);
+}
+.ticket .who {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-weight: 700;
+  margin-bottom: 9px;
+}
+.ticket .who span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ticket .due {
+  color: var(--fg-dim);
+  flex: none;
+}
+.ticket.today .due {
+  color: var(--good);
+}
+
+/* --- counter --- */
+.counter {
+  margin: 0 12px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  padding: 10px 12px 10px 6px;
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  min-height: 132px;
+  position: relative;
+}
+.counter .face {
+  flex: 0 0 74px;
+  display: flex;
+  align-items: flex-end;
+}
+.counter .face svg {
+  width: 74px;
+  height: auto;
+  display: block;
+}
+.counter .talk {
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+.counter .say {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.counter .say small {
+  display: block;
+  font-size: 12px;
+  color: var(--fg-dim);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.counter .queue {
+  position: absolute;
+  right: 12px;
+  bottom: -9px;
+  display: flex;
+  gap: 3px;
+}
+.counter .queue i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--wood);
+  border: 2px solid var(--bg);
+}
+.patience {
+  height: 5px;
+  border-radius: 3px;
+  background: #efe2cf;
+  overflow: hidden;
+}
+.patience b {
+  display: block;
+  height: 100%;
+  background: var(--go);
+  border-radius: 3px;
+}
+.patience.low b {
+  background: #e2683f;
+}
+.counter.idle {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 14px 18px;
+  color: var(--fg-dim);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.counter.idle b {
+  color: var(--fg);
+  display: block;
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+.float {
+  position: absolute;
+  right: 18px;
+  top: 8px;
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--good);
+  animation: rise 1.4s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes rise {
+  to {
+    transform: translateY(-26px);
+    opacity: 0;
+  }
+}
+
+/* --- shelf --- */
+.shelf {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px;
+}
+.row {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border-bottom: 9px solid var(--wood);
+  box-shadow: 0 5px 0 var(--wood-dark);
+  margin-bottom: 9px;
+  border-radius: 0 0 3px 3px;
+}
+.slot {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 2px 4px 6px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition:
+    opacity 0.2s,
+    background 0.2s;
+}
+.slot svg.jar {
+  flex: 1 1 0;
+  min-height: 34px;
+  width: 100%;
+  max-height: 96px;
+}
+.slot .strip {
+  width: 88%;
+  margin-top: 10px;
+  flex: none;
+}
+.slot .lbl {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.15;
+  flex: none;
+}
+.slot .lbl small {
+  display: block;
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+.slot.dim {
+  opacity: 0.38;
+}
+.slot.sel {
+  background: #fff3c4;
+  box-shadow: 0 0 0 3px var(--tangy) inset;
+}
+.slot.fits:not(.sel) {
+  background: #e4f1dc;
+}
+.slot.empty .lbl {
+  color: var(--fg-dim);
+}
+
+/* --- actions --- */
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 10px;
+}
+.actions button {
+  appearance: none;
+  font: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  min-height: 54px;
+  padding: 6px 8px;
+  flex: 1;
+  line-height: 1.15;
+}
+.actions button.main {
+  flex: 1.7;
+  background: var(--go);
+  border-color: var(--go-dark);
+  color: #fff;
+  font-size: 16px;
+}
+.actions button.main.warn {
+  background: #c0604a;
+  border-color: #9e4936;
+}
+.actions button:disabled {
+  opacity: 0.55;
+}
+.actions button.main:disabled {
+  background: #d9cdb8;
+  border-color: #cbbb9f;
+  color: #7a634a;
+  opacity: 1;
+}
+.actions button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.actions button small {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+/* --- bottom sheet (brew / evening) --- */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(60, 40, 20, 0.35);
+  display: flex;
+  align-items: flex-end;
+}
+.sheet[hidden] {
+  display: none;
+}
+.sheet .panel {
+  width: 100%;
+  background: var(--bg);
+  border-radius: 22px 22px 0 0;
+  padding: 18px 16px calc(16px + var(--safe-bottom));
+  max-height: 88dvh;
+  overflow-y: auto;
+}
+.sheet h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+.sheet p {
+  margin: 0 0 14px;
+  color: var(--fg-dim);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.recipe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 12px 8px 6px;
+  margin-bottom: 8px;
+}
+.recipe:disabled {
+  opacity: 0.45;
+}
+.recipe svg {
+  width: 44px;
+  height: 64px;
+  flex: none;
+}
+.recipe .info {
+  flex: 1;
+  min-width: 0;
+}
+.recipe .name {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.recipe .name span:last-child {
+  color: #6b4a00;
+}
+.recipe .strip {
+  margin-bottom: 18px;
+}
+.sheet .btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.sheet .btns button {
+  flex: 1;
+  appearance: none;
+  font: inherit;
+  font-weight: 800;
+  font-size: 16px;
+  min-height: 54px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: var(--card);
+  color: var(--fg);
+}
+.sheet .btns button.main {
+  background: var(--go);
+  border-color: var(--go-dark);
+  color: #fff;
+}
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.stats div {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--fg-dim);
+  font-weight: 600;
+}
+.stats b {
+  display: block;
+  font-size: 22px;
+  color: var(--fg);
+}
+
+/* --- toasts --- */
+.toasts {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--safe-bottom) + 84px);
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 15;
+}
+.toast {
+  background: var(--fg);
+  color: var(--bg);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  animation: toast 2.6s forwards;
+}
+@keyframes toast {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  10%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Short phones (iPhone SE and friends): give the shelf the room. */
+@media (max-height: 720px) {
+  .app {
+    gap: 6px;
+  }
+  .counter {
+    min-height: 0;
+    padding: 6px 8px 6px 4px;
+  }
+  .counter .face {
+    flex-basis: 52px;
+  }
+  .counter .face svg {
+    width: 52px;
+  }
+  .counter .talk {
+    padding: 7px 10px 6px;
+    gap: 7px;
+  }
+  .counter .say {
+    font-size: 14px;
+  }
+  .slot .lbl small {
+    display: none;
+  }
+  .slot .strip {
+    margin-top: 8px;
+  }
+  .row {
+    border-bottom-width: 7px;
+    margin-bottom: 7px;
+  }
+  .actions button {
+    min-height: 48px;
+  }
+}

@@ -38,4 +38,10 @@ export const GAMES = [
     blurb: "Take a piece, keep its move. Fifteen chambers to the Keep.",
     icon: "♞",
   },
+  {
+    id: "ferment",
+    title: "The Brine Nook",
+    blurb: "Ferment demo: read the jars, serve the window.",
+    icon: "🫙",
+  },
 ];
