@@ -14,8 +14,9 @@ import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright-core";
 import { serve } from "./serve.mjs";
 import * as day from "./day.mjs";
+import * as gallery from "./gallery.mjs";
 
-const FLOWS = [day];
+const FLOWS = [day, gallery];
 const PHONES = { small: devices["iPhone SE"], large: devices["iPhone 15 Pro Max"] };
 const SHOTS = fileURLToPath(new URL("./shots/", import.meta.url));
 
