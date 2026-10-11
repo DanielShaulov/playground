@@ -118,6 +118,10 @@ Two things that have already broken this once each:
 
 Play it. A game that compiles is not a game that works.
 
+Every PR runs `.github/workflows/test.yml` and merges only when it is green;
+`npm test` runs the same checks locally. Ferment's testing notes are in
+`docs/ferment/README.md`.
+
 ```sh
 npm start   # http://localhost:8000
 ```

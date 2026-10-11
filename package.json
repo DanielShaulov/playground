@@ -9,15 +9,18 @@
     "new": "scripts/new-game.sh",
     "icons": "python3 scripts/make-icons.py",
     "format": "prettier --write .",
+    "test": "npm run test:checkwiz && npm run test:ferment && npm run typecheck && npm run test:ferment:browser",
+    "typecheck": "tsc -p games/ferment/jsconfig.json",
     "test:checkwiz": "node tests/checkwiz/rules.mjs",
     "test:checkwiz:bot": "node tests/checkwiz/bot.mjs",
     "test:checkwiz:sim": "node tests/checkwiz/sim.mjs",
     "test:checkwiz:shots": "node tests/checkwiz/shots.mjs",
-    "test:ferment": "node tests/ferment/rules.mjs",
-    "test:ferment:play": "node tests/ferment/play.mjs"
+    "test:ferment": "node --test \"tests/ferment/*.mjs\" \"tests/ferment/core/**/*.mjs\"",
+    "test:ferment:browser": "node tests/ferment/browser/run.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.56.1",
-    "prettier": "^3.3.3"
+    "prettier": "^3.3.3",
+    "typescript": "^5.9.3"
   }
 }
