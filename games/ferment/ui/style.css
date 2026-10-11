@@ -182,50 +182,6 @@ body {
   color: var(--funky);
 }
 
-/* --- order board --- */
-.board {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 0 12px;
-  scrollbar-width: none;
-}
-.board:empty {
-  display: none;
-}
-.ticket {
-  flex: 0 0 auto;
-  width: 132px;
-  background: var(--card);
-  border: 1.5px dashed var(--wood);
-  border-radius: 10px;
-  padding: 6px 9px 9px;
-  font-size: 12px;
-}
-.ticket.today {
-  border-style: solid;
-  border-color: var(--good);
-}
-.ticket .who {
-  display: flex;
-  justify-content: space-between;
-  gap: 4px;
-  font-weight: 700;
-  margin-bottom: 9px;
-}
-.ticket .who span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ticket .due {
-  color: var(--fg-dim);
-  flex: none;
-}
-.ticket.today .due {
-  color: var(--good);
-}
-
 /* --- counter --- */
 .counter {
   margin: 0 12px;

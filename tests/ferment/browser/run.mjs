@@ -16,8 +16,9 @@ import { serve } from "./serve.mjs";
 import * as day from "./day.mjs";
 import * as gallery from "./gallery.mjs";
 import * as bench from "./bench.mjs";
+import * as board from "./board.mjs";
 
-const FLOWS = [day, gallery, bench];
+const FLOWS = [day, gallery, bench, board];
 const PHONES = { small: devices["iPhone SE"], large: devices["iPhone 15 Pro Max"] };
 const SHOTS = fileURLToPath(new URL("./shots/", import.meta.url));
 
@@ -44,10 +45,15 @@ async function play(flow, phone) {
     shots.push(file);
     const over = await page.evaluate(() => {
       const w = document.documentElement.clientWidth;
+      // A row meant to scroll sideways (data-scroll-x, like the order board) may run past the edge.
+      const inScroller = (el) => {
+        const p = el.parentElement?.closest("[data-scroll-x]");
+        return !!p && p.getBoundingClientRect().right <= w + 1;
+      };
       return [...document.querySelectorAll("body *")]
         .filter((el) => {
           const r = el.getBoundingClientRect();
-          return r.width > 0 && r.height > 0 && r.right > w + 1;
+          return r.width > 0 && r.height > 0 && r.right > w + 1 && !inScroller(el);
         })
         .slice(0, 3)
         .map((el) => `<${el.tagName.toLowerCase()} class="${el.className}">`);

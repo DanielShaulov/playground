@@ -13,6 +13,7 @@ import { faceSvg } from "./art/customer.js";
 import { strip, stripLabels } from "./strip.js";
 import { word, lower, requestLine, clockText } from "./text.js";
 import { sheetHtml } from "./sheets.js";
+import { renderBoard } from "./board.js";
 import { patch, setClass, bump } from "./dom.js";
 
 /** Build the screen's fixed skeleton; returns the elements render() fills in. */
@@ -86,17 +87,7 @@ export function renderShop(els, ui) {
   lastRep = s.shop.rep;
 
   // order board
-  patch(
-    els.board,
-    s.orders.list
-      .slice()
-      .sort((a, b) => a.due - b.due)
-      .map((o) => {
-        const today = o.due === s.clock.day;
-        return `<div class="ticket${today ? " today" : ""}"><div class="who"><span>${RECIPES[o.recipe].name}</span><span class="due">${today ? "Today" : "Day " + o.due}</span></div>${strip({ win: o })}</div>`;
-      })
-      .join(""),
-  );
+  renderBoard(els.board, ui);
 
   // counter
   if (showing) {
