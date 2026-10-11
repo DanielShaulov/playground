@@ -1,7 +1,7 @@
 # Rules
 
-How The Brine Nook plays as of Milestone 1 (the bench and the pantry; the
-bench opens from the evening takings and from "Add-ins" when starting a jar). Numbers are the
+How The Brine Nook plays as of Milestone 2's rules (regulars, bulk orders and
+off-menu requests; the order board screen is a separate task). Numbers are the
 current tuning; the code is the source of truth, and a PR that changes a rule
 updates this file. Constant names are in brackets.
 
@@ -48,6 +48,13 @@ part-way along so day 1 has something to sell.
   three walk-ins want it within 0.12 of the middle, and a few want it far off
   (window middles stay between 0.1 and 0.9). About 30% of walk-ins pick a
   recipe already on the shelf; their window follows the same curve.
+- About 8% of walk-ins (`OFF_MENU`, drawn from its own "requests" random
+  stream) ask instead for a discovered recipe that isn't on the menu yet, at
+  the middle of its sweet spot. If it was hidden, the bench now hints at it.
+  The request stays on the board (`state.orders.asked`, the latest asker per
+  recipe) until that recipe is discovered.
+  Sending them away, or letting them give up, costs no reputation; they can
+  also pre-order it, which gives you until the due day to discover it.
 - The customer at the counter can be:
   - **served** a jar of their recipe that hasn't gone over;
   - **pre-ordered**: they leave and come back on a later day, at the hour when
@@ -60,8 +67,9 @@ part-way along so day 1 has something to sell.
   window's centre, and +1 reputation. A pre-order pays 25% extra and gives +2.
 - Outside the window: pay drops by 4× the distance (never below 20% of price).
   A miss under 0.06 is forgiven; a bigger miss costs 1 reputation.
-- A walk-in who gives up costs 1 reputation. A pre-order customer who is
-  missed (leaves, or never reaches the counter on their due day) costs 2.
+- A walk-in who gives up costs 1 reputation. An order that is missed (the
+  customer leaves unserved, or never reaches the counter on their due day)
+  costs 2, or 3 for a bulk order (`BULK_MISS`).
 - Reputation runs 0 to 10 (`REP_MAX`) and speeds up arrivals.
 
 ## The bench and the pantry
@@ -109,10 +117,57 @@ flavour-only pear and garlic on 11 Oct 2026.)
 - **Recipe card.** For each base recipe: its sweet spot, a tick for every
   ingredient you have mixed into it, and its discovered recipes as known
   (with what they need), hinted (only the tags, e.g. "something sweet") or
-  hidden. Off-menu requests that add hints arrive with Milestone 2.
+  hidden. An off-menu request turns a hidden recipe into a hinted one.
+
+## Orders and regulars
+
+Everyone who will come on a known day is an order (`state.orders.list`), of
+one of three kinds:
+
+- **Pre-order**: a walk-in booked a later day (see Customers).
+- **Standing**: a regular's next visit.
+- **Bulk**: a business wants several whole jars on a due day.
+
+All of them arrive on their due day at their hour, go straight to the
+counter (or right behind whoever is there), pay 25% extra and give +2
+reputation when served inside their window.
+
+**Regulars** (`content/regulars.js`) have a favourite recipe and their own spot
+on the strip, always within one spread of where walk-ins want that recipe.
+Each starts coming on a given day, some only once the shop's reputation is
+high enough too. On their first morning their first visit is booked for the
+next day; after every visit, served or missed, the next one is booked
+`every` days later. `state.regulars.met` counts each one's visits, delighted
+visits and misses.
+
+| Regular                  | Kind     | Wants               | Every  | Arrives | Starts              |
+| ------------------------ | -------- | ------------------- | ------ | ------- | ------------------- |
+| Mrs. Okafor              | standing | dill at 0.25        | 2 days | 09:30   | day 2               |
+| Old Bram                 | standing | sauerkraut at 0.68  | 4 days | 17:00   | day 3               |
+| Mei from Lucky Noodle    | bulk     | 4 dill at 0.2       | 5 days | 11:00   | day 4               |
+| Kenji                    | standing | kimchi at 0.52      | 3 days | 13:00   | day 5, reputation 6 |
+| Noor                     | standing | hot sauce at 0.6    | 3 days | 15:30   | day 6, reputation 7 |
+| Luis from the taco truck | bulk     | 3 hot sauce at 0.52 | 6 days | 14:00   | day 7, reputation 7 |
+
+Each window is 0.16 wide around the spot.
+
+**Bulk orders.** A bulk regular offers an order on their first morning and
+every `every` days after (not while one of theirs is still open), due `lead`
+days later (3 for the noodle bar, 2 for the taco truck). Offers sit in
+`state.orders.offers` until accepted (`acceptOrder`) or declined
+(`declineOrder`), and lapse at closing at no cost. On the due day the buyer
+takes **whole jars**: each serve hands over the whole jar and pays the
+per-serving price for every serving left in it. They wait, with fresh
+patience after each jar, until they have them all (+2 reputation).
+
+**Planning.** `planFor(state, order, adds)` says where a jar started right
+now, with those add-ins, would be at pickup: its flavour, whether it fits,
+and the day and hour it enters and leaves the window. `startForOrder` starts
+that jar (brewed from the base with whatever the recipe needs, so a correct
+mix for an undiscovered recipe discovers it) and remembers the jar on the
+order.
 
 ## Not in the game yet
 
-Regulars and the order board
-(2), the market, upgrades and goals ladder (3). The game is endless with a
+The market, upgrades and goals ladder (3). The game is endless with a
 goals ladder; there is no season end.

@@ -217,7 +217,7 @@ test("a pre-order comes back on its due day, and a jar started today can make it
     if (!seen) s = ok(ok(s, { type: "sleep" }).state, { type: "open" }).state;
   }
   assert.ok(seen, "pre-order customer never arrived");
-  assert.equal(s.orders.list.length, 0);
+  assert.ok(!s.orders.list.some((o) => o.id === order.id), "the order is closed");
 });
 
 test("a careful bot plays 10 days, makes money, and the same seed replays the same game", () => {

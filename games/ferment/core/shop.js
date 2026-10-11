@@ -11,6 +11,7 @@ import { clamp } from "./util.js";
 import { flavour, isOver, makeJar } from "./jars.js";
 import { judge } from "./customers.js";
 import { checkMix, useMix } from "./bench.js";
+import { deliver, settle } from "./orders.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Today} Today */
@@ -65,13 +66,18 @@ export function serve(s, { slot }, events) {
   if (isOver(jar)) return "jar has gone over";
   const f = flavour(jar);
   const verdict = judge(c, f);
+  if (c.kind === "bulk") {
+    deliver(s, slot, c, verdict, events);
+    return;
+  }
   s.shop.coins += verdict.pay;
   addRep(s, verdict.rep);
   s.shop.today.served++;
   s.shop.today.earned += verdict.pay;
   s.shop.today.tips += verdict.tip;
   if (--jar.servings <= 0) s.shelf.slots[slot] = null;
-  if (c.orderId) s.orders.list = s.orders.list.filter((o) => o.id !== c.orderId);
   s.customers.queue.shift();
   events.push({ type: "served", slot, customer: c, f, ...verdict });
+  const order = c.orderId ? s.orders.list.find((o) => o.id === c.orderId) : null;
+  if (order) settle(s, order, verdict.mood, events);
 }

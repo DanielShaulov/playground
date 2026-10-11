@@ -14,6 +14,7 @@ const GOLDENS = [
   { name: "careful-seed42-5days", bot: "careful", seed: 42, days: 5 },
   { name: "careless-seed7-5days", bot: "careless", seed: 7, days: 5 },
   { name: "idle-seed3-3days", bot: "idle", seed: 3, days: 3 },
+  { name: "careful-seed5-9days", bot: "careful", seed: 5, days: 9 },
 ];
 const file = (name) => new URL(`./goldens/${name}.json`, import.meta.url);
 

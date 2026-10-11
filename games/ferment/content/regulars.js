@@ -9,8 +9,8 @@
  * regular is a business: every `every` days it offers an order for `qty` whole
  * jars, due `lead` days later. `spot` is the middle of the window they want
  * and stays inside the walk-in bell curve (within one spread of the recipe's
- * sweet spot middle). `joins` is the first day, or the reputation, at which
- * they start coming. `hello` is what they say at the counter. `look` seeds the
+ * sweet spot middle). `joins` is when they start coming: from that day, and
+ * once the shop has that reputation (both, when both are given). `hello` is what they say at the counter. `look` seeds the
  * portrait.
  */
 
@@ -59,7 +59,7 @@ export const REGULARS = {
     spot: 0.52,
     every: 3,
     hour: 5,
-    joins: { rep: 6 },
+    joins: { day: 5, rep: 6 },
     hello: "Hey! Kimchi with a bit of a kick today?",
   },
   noor: {
@@ -70,7 +70,7 @@ export const REGULARS = {
     spot: 0.6,
     every: 3,
     hour: 7.5,
-    joins: { rep: 7 },
+    joins: { day: 6, rep: 7 },
     hello: "Something hot for the weekend, please.",
   },
   tacotruck: {
@@ -83,7 +83,7 @@ export const REGULARS = {
     hour: 6,
     qty: 3,
     lead: 2,
-    joins: { rep: 7 },
+    joins: { day: 7, rep: 7 },
     hello: "Three jars of the red stuff for the truck!",
   },
 };

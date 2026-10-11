@@ -4,11 +4,14 @@
   "days": 3,
   "events": {
     "arrived": 21,
+    "booked": 3,
     "closed": 3,
-    "left:closed": 6,
-    "left:impatient": 15,
+    "left:closed": 7,
+    "left:impatient": 14,
+    "offered": 1,
     "opened": 3,
     "popped": 3,
+    "regularJoined": 3,
     "slept": 3
   },
   "actions": [
@@ -25,9 +28,10 @@
   "end": {
     "meta": {
       "seed": 3,
-      "nextId": 28,
+      "nextId": 32,
       "rng": {
-        "customers": 1496386874
+        "customers": -903073412,
+        "requests": -1331939111
       }
     },
     "clock": {
@@ -43,9 +47,9 @@
         "earned": 0,
         "tips": 0,
         "repStart": 0,
-        "missed": 0,
+        "missed": 1,
         "preorders": 0,
-        "left": 5
+        "left": 4
       }
     },
     "shelf": {
@@ -93,11 +97,62 @@
     },
     "customers": {
       "queue": [],
-      "nextArrival": 11.88961801833939
+      "nextArrival": 12.171203648785594
     },
     "orders": {
-      "list": [],
-      "offers": []
+      "list": [
+        {
+          "id": 22,
+          "kind": "standing",
+          "name": "Old Bram",
+          "look": 640,
+          "recipe": "kraut",
+          "lo": 0.6000000000000001,
+          "hi": 0.76,
+          "due": 4,
+          "arriveAt": 9,
+          "arrived": false,
+          "regular": "bram"
+        },
+        {
+          "id": 27,
+          "kind": "standing",
+          "name": "Mrs. Okafor",
+          "look": 212,
+          "recipe": "dill",
+          "lo": 0.16999999999999998,
+          "hi": 0.33,
+          "due": 5,
+          "arriveAt": 1.5,
+          "arrived": false,
+          "regular": "okafor"
+        }
+      ],
+      "offers": [
+        {
+          "id": 31,
+          "kind": "bulk",
+          "name": "Mei from Lucky Noodle",
+          "look": 377,
+          "recipe": "dill",
+          "lo": 0.12000000000000001,
+          "hi": 0.28,
+          "due": 7,
+          "arriveAt": 3,
+          "arrived": false,
+          "regular": "noodlebar",
+          "qty": 4,
+          "got": 0
+        }
+      ],
+      "asked": [
+        {
+          "recipe": "pearkimchi",
+          "name": "Ezra",
+          "look": 887,
+          "day": 3
+        }
+      ]
     },
     "bench": {
       "known": [],
@@ -111,7 +166,26 @@
       }
     },
     "regulars": {
-      "met": {}
+      "met": {
+        "okafor": {
+          "since": 2,
+          "visits": 0,
+          "happy": 0,
+          "missed": 1
+        },
+        "bram": {
+          "since": 3,
+          "visits": 0,
+          "happy": 0,
+          "missed": 0
+        },
+        "noodlebar": {
+          "since": 4,
+          "visits": 0,
+          "happy": 0,
+          "missed": 0
+        }
+      }
     }
   }
 }

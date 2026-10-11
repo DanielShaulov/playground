@@ -158,6 +158,7 @@ export function useMix(
   if (mix.recipe !== mix.base && !s.bench.known.includes(mix.recipe)) {
     s.bench.known.push(mix.recipe);
     s.bench.hints = s.bench.hints.filter((h) => h !== mix.recipe);
+    s.orders.asked = s.orders.asked.filter((x) => x.recipe !== mix.recipe);
     events.push({ type: "discovered", recipe: mix.recipe, base: mix.base, adds: [...mix.adds] });
   }
 }

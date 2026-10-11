@@ -3,15 +3,19 @@
   "bot": "careful",
   "days": 5,
   "events": {
-    "arrived": 49,
+    "accepted": 1,
+    "arrived": 53,
+    "booked": 5,
     "brewed": 24,
     "closed": 5,
-    "left:sent": 1,
+    "left:sent": 2,
+    "offered": 1,
     "opened": 5,
     "popped": 3,
-    "preordered": 8,
+    "preordered": 10,
+    "regularJoined": 3,
     "served:delight": 6,
-    "served:meh": 29,
+    "served:meh": 30,
     "served:ok": 5,
     "slept": 5,
     "tippedOut": 5
@@ -22,28 +26,28 @@
     { "type": "brew", "slot": 8, "recipe": "hotsauce" },
     { "type": "open" },
     { "type": "tick", "n": 30 },
-    { "type": "serve", "slot": 0 },
+    { "type": "preorder" },
     { "type": "tick", "n": 114 },
     { "type": "serve", "slot": 0 },
-    { "type": "tick", "n": 126 },
-    { "type": "serve", "slot": 4 },
-    { "type": "tick", "n": 96 },
+    { "type": "tick", "n": 132 },
+    { "type": "serve", "slot": 0 },
+    { "type": "tick", "n": 102 },
+    { "type": "serve", "slot": 6 },
+    { "type": "tick", "n": 132 },
     { "type": "serve", "slot": 6 },
     { "type": "tick", "n": 138 },
-    { "type": "serve", "slot": 6 },
+    { "type": "serve", "slot": 1 },
+    { "type": "tick", "n": 132 },
+    { "type": "serve", "slot": 1 },
     { "type": "tick", "n": 144 },
-    { "type": "serve", "slot": 1 },
-    { "type": "tick", "n": 138 },
-    { "type": "serve", "slot": 1 },
-    { "type": "tick", "n": 156 },
     { "type": "serve", "slot": 8 },
-    { "type": "tick", "n": 114 },
+    { "type": "tick", "n": 108 },
     { "type": "serve", "slot": 5 },
     { "type": "tick", "n": 138 },
     { "type": "serve", "slot": 5 },
     { "type": "tick", "n": 168 },
     { "type": "preorder" },
-    { "type": "tick", "n": 84 },
+    { "type": "tick", "n": 108 },
     { "type": "sleep" },
     { "type": "tipOut", "slot": 2 },
     { "type": "brew", "slot": 0, "recipe": "kimchi" },
@@ -84,8 +88,10 @@
     { "type": "preorder" },
     { "type": "tick", "n": 30 },
     { "type": "sendAway" },
-    { "type": "tick", "n": 204 },
+    { "type": "tick", "n": 114 },
     { "type": "serve", "slot": 1 },
+    { "type": "tick", "n": 90 },
+    { "type": "preorder" },
     { "type": "tick", "n": 204 },
     { "type": "serve", "slot": 3 },
     { "type": "tick", "n": 216 },
@@ -100,6 +106,7 @@
     { "type": "serve", "slot": 1 },
     { "type": "tick", "n": 126 },
     { "type": "sleep" },
+    { "type": "acceptOrder", "orderId": 60 },
     { "type": "tipOut", "slot": 7 },
     { "type": "brew", "slot": 0, "recipe": "dill" },
     { "type": "brew", "slot": 1, "recipe": "hotsauce" },
@@ -118,14 +125,18 @@
     { "type": "serve", "slot": 5 },
     { "type": "tick", "n": 162 },
     { "type": "serve", "slot": 5 },
-    { "type": "tick", "n": 72 },
+    { "type": "tick", "n": 30 },
+    { "type": "sendAway" },
+    { "type": "tick", "n": 42 },
     { "type": "serve", "slot": 0 },
     { "type": "tick", "n": 174 },
     { "type": "serve", "slot": 0 },
-    { "type": "tick", "n": 126 },
+    { "type": "tick", "n": 114 },
+    { "type": "serve", "slot": 4 },
+    { "type": "tick", "n": 12 },
     { "type": "preorder" },
     { "type": "tick", "n": 204 },
-    { "type": "serve", "slot": 4 },
+    { "type": "serve", "slot": 7 },
     { "type": "tick", "n": 150 },
     { "type": "sleep" },
     { "type": "tipOut", "slot": 2 },
@@ -142,8 +153,10 @@
     { "type": "serve", "slot": 3 },
     { "type": "tick", "n": 144 },
     { "type": "serve", "slot": 1 },
-    { "type": "tick", "n": 210 },
+    { "type": "tick", "n": 6 },
     { "type": "serve", "slot": 3 },
+    { "type": "tick", "n": 204 },
+    { "type": "serve", "slot": 8 },
     { "type": "tick", "n": 222 },
     { "type": "preorder" },
     { "type": "tick", "n": 150 },
@@ -162,9 +175,10 @@
   "end": {
     "meta": {
       "seed": 1,
-      "nextId": 88,
+      "nextId": 100,
       "rng": {
-        "customers": -657696260
+        "customers": -657696260,
+        "requests": -1771434648
       }
     },
     "clock": {
@@ -173,11 +187,11 @@
       "hour": 0
     },
     "shop": {
-      "coins": 118,
+      "coins": 133,
       "rep": 0,
       "today": {
-        "served": 6,
-        "earned": 30,
+        "served": 7,
+        "earned": 45,
         "tips": 0,
         "repStart": 0,
         "missed": 0,
@@ -188,49 +202,44 @@
     "shelf": {
       "slots": [
         {
-          "id": 69,
+          "id": 79,
           "recipe": "hotsauce",
           "age": 24,
           "servings": 1
         },
         null,
         {
-          "id": 71,
+          "id": 81,
           "recipe": "kraut",
           "age": 24,
           "servings": 2
         },
         null,
         {
-          "id": 73,
+          "id": 83,
           "recipe": "hotsauce",
           "age": 24,
           "servings": 2
         },
         {
-          "id": 74,
+          "id": 84,
           "recipe": "kimchi",
           "age": 24,
           "servings": 2
         },
         {
-          "id": 75,
+          "id": 85,
           "recipe": "kraut",
           "age": 24,
           "servings": 2
         },
         {
-          "id": 57,
+          "id": 64,
           "recipe": "kraut",
           "age": 47.99999999999936,
-          "servings": 2
-        },
-        {
-          "id": 42,
-          "recipe": "kraut",
-          "age": 71.99999999999872,
           "servings": 1
-        }
+        },
+        null
       ]
     },
     "customers": {
@@ -240,9 +249,62 @@
     "orders": {
       "list": [
         {
-          "id": 80,
+          "id": 52,
           "kind": "preorder",
-          "name": "Kenji",
+          "name": "Theo",
+          "look": 652,
+          "recipe": "firekraut",
+          "lo": 0.5700000000000001,
+          "hi": 0.73,
+          "due": 6,
+          "arriveAt": 8.299999999999994,
+          "arrived": false
+        },
+        {
+          "id": 60,
+          "kind": "bulk",
+          "name": "Mei from Lucky Noodle",
+          "look": 377,
+          "recipe": "dill",
+          "lo": 0.12000000000000001,
+          "hi": 0.28,
+          "due": 7,
+          "arriveAt": 3,
+          "arrived": false,
+          "regular": "noodlebar",
+          "qty": 4,
+          "got": 0
+        },
+        {
+          "id": 75,
+          "kind": "standing",
+          "name": "Old Bram",
+          "look": 640,
+          "recipe": "kraut",
+          "lo": 0.6000000000000001,
+          "hi": 0.76,
+          "due": 8,
+          "arriveAt": 9,
+          "arrived": false,
+          "regular": "bram"
+        },
+        {
+          "id": 89,
+          "kind": "standing",
+          "name": "Mrs. Okafor",
+          "look": 212,
+          "recipe": "dill",
+          "lo": 0.16999999999999998,
+          "hi": 0.33,
+          "due": 7,
+          "arriveAt": 1.5,
+          "arrived": false,
+          "regular": "okafor"
+        },
+        {
+          "id": 92,
+          "kind": "preorder",
+          "name": "Wren",
           "look": 818,
           "recipe": "dill",
           "lo": 0.07811180432339467,
@@ -252,7 +314,7 @@
           "arrived": false
         },
         {
-          "id": 82,
+          "id": 94,
           "kind": "preorder",
           "name": "Mr. Lindqvist",
           "look": 669,
@@ -264,9 +326,9 @@
           "arrived": false
         },
         {
-          "id": 85,
+          "id": 97,
           "kind": "preorder",
-          "name": "Kenji",
+          "name": "Wren",
           "look": 623,
           "recipe": "dill",
           "lo": 0.09029114767244965,
@@ -276,7 +338,15 @@
           "arrived": false
         }
       ],
-      "offers": []
+      "offers": [],
+      "asked": [
+        {
+          "recipe": "firekraut",
+          "name": "Theo",
+          "look": 652,
+          "day": 3
+        }
+      ]
     },
     "bench": {
       "known": [],
@@ -290,7 +360,26 @@
       }
     },
     "regulars": {
-      "met": {}
+      "met": {
+        "okafor": {
+          "since": 2,
+          "visits": 2,
+          "happy": 0,
+          "missed": 0
+        },
+        "bram": {
+          "since": 3,
+          "visits": 1,
+          "happy": 0,
+          "missed": 0
+        },
+        "noodlebar": {
+          "since": 4,
+          "visits": 0,
+          "happy": 0,
+          "missed": 0
+        }
+      }
     }
   }
 }

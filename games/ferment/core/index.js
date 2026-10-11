@@ -10,7 +10,7 @@
  * The rest are read-only helpers the UI uses to draw the state.
  * Module map: state.js (slices) · step.js (action list) · clock.js (day cycle,
  * fixed steps) · shop.js (coins, rep, shelf actions) · customers.js (walk-ins)
- * · orders.js (pre-orders) · jars.js (flavour, add-in maths)
+ * · orders.js (orders, regulars, planFor) · jars.js (flavour, add-in maths)
  * · bench.js (pantry, experiments, discovery, recipe card) · rng.js (named random streams).
  */
 

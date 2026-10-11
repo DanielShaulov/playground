@@ -15,6 +15,8 @@ export const PREORDER_PATIENCE = 1.5; // multiplier for someone collecting a pre
 export const WINDOW = 0.16; // width of a customer's flavour window
 export const DEMAND_SPREAD = 0.12; // spread (std dev) of where walk-ins want a recipe around its sweet spot
 export const MAX_QUEUE = 3;
+export const BULK_MISS = 3; // reputation lost when a bulk order is missed
+export const OFF_MENU = 0.08; // chance a walk-in asks for a recipe not on the menu yet
 export const REP_MAX = 10;
 
 export const START_COINS = 40;

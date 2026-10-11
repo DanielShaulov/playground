@@ -48,8 +48,10 @@
  * @typedef {{ slots: (Jar | null)[] }} ShelfSlice
  * @typedef {{ queue: Customer[], nextArrival: number }} CustomersSlice
  *   queue[0] is at the counter.
- * @typedef {{ list: Order[], offers: Order[] }} OrdersSlice
+ * @typedef {{ recipe: string, name: string, look: number, day: number }} Asked
+ * @typedef {{ list: Order[], offers: Order[], asked: Asked[] }} OrdersSlice
  *   list: orders taken. offers: bulk orders offered today, gone at closing unless accepted.
+ *   asked: off-menu requests not yet discovered, newest last, one per recipe (the latest asker).
  *
  * @typedef {{ known: string[], hints: string[], tried: Record<string, string[]> }} BenchSlice
  *   known: discovered recipes on the menu. hints: discovered recipes the card hints at.
@@ -94,7 +96,7 @@
  * }} Regular
  *   content/regulars.js. spot: middle of the window they want (inside the walk-in bell
  *   curve). every: days between visits (standing) or offers (bulk). hour: hours since
- *   opening they arrive. joins: first day, or reputation, they start coming.
+ *   opening they arrive. joins: from which day, and at what reputation, they start coming.
  *   qty/lead (bulk): whole jars wanted, and days from the offer to the due day.
  *
  * @typedef {{ since: number, visits: number, happy: number, missed: number }} RegularMet

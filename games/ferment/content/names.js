@@ -1,18 +1,21 @@
 // @ts-check
-/** Walk-in customer names, picked at random from the "customers" stream. */
+/**
+ * Walk-in customer names, picked at random from the "customers" stream. None
+ * is a regular's name (content/regulars.js), so a regular is always themself.
+ */
 export const NAMES = [
-  "Mrs. Okafor",
+  "Ines",
   "Theo",
   "Priya",
   "Mr. Lindqvist",
   "Ama",
   "Jonas",
   "Rosa",
-  "Kenji",
-  "Old Bram",
+  "Wren",
+  "Tomasz",
   "Lea",
   "Dmitri",
-  "Noor",
+  "Yusuf",
   "Felix",
   "Hana",
   "Marisol",
