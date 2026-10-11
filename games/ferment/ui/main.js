@@ -18,6 +18,7 @@ import * as C from "../core/index.js";
 import { HOUR_SECONDS } from "../content/tuning.js";
 import { createStore } from "../../../shared/storage.js";
 import { mountShop, renderShop } from "./shop.js";
+import { mountBench, renderBench, benchAct } from "./bench.js";
 import { toast } from "./dom.js";
 import { lower, LINES } from "./text.js";
 
@@ -30,6 +31,7 @@ const ui = {
   selected: null, // shelf slot index
   departing: null, // { customer, mood, line, pay, f, until }
   sheet: null, // { kind: "brew", slot } | { kind: "evening", summary }
+  bench: null, // the brewing bench when open (ui/bench.js)
 };
 
 function save() {
@@ -38,7 +40,8 @@ function save() {
 
 const els = mountShop(document.body);
 document.title = "The Brine Nook · Playground";
-const render = () => renderShop(els, ui);
+const bench = mountBench(els.root);
+const render = () => (renderShop(els, ui), renderBench(bench, ui));
 
 function depart(customer, mood, line, extra = {}) {
   ui.departing = { customer, mood, line, until: performance.now() + 1500, ...extra };
@@ -113,7 +116,9 @@ els.root.addEventListener("click", (e) => {
   }
   const act = t.dataset.act;
   const s = ui.s;
-  if (act === "slot") {
+  if (benchAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
+    // handled by the bench
+  } else if (act === "slot") {
     const i = Number(t.dataset.slot);
     if (!s.shelf.slots[i]) {
       if (s.clock.phase !== "evening") ui.sheet = { kind: "brew", slot: i };
@@ -201,6 +206,7 @@ requestAnimationFrame(frame);
   set state(v) {
     ui.s = C.loadSave(v) ?? C.newGame(freshSeed());
     ui.selected = null;
+    ui.bench = null;
     ui.sheet =
       ui.s.clock.phase === "evening" ? { kind: "evening", summary: { ...ui.s.shop.today } } : null;
     render();

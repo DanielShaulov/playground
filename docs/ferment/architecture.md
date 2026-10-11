@@ -58,6 +58,7 @@ games/ferment/
     types.js        JSDoc types for the state, actions and events
   content/          data: recipes, flavour bands, names, tuning numbers
   ui/               main.js (state, input, loop, saving), shop.js (screen),
+                    bench.js + recipe-card.js + bench.css (brewing bench),
                     sheets.js, strip.js, text.js, dom.js, art/, style.css
 ```
 

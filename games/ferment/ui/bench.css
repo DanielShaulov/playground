@@ -1,0 +1,441 @@
+/* The brewing bench (ui/bench.js): a full-screen panel over the shop. */
+
+.bench {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  height: 100dvh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+.bench[hidden] {
+  display: none;
+}
+.bench .top .back {
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--fg-dim);
+  font-size: 28px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px 4px 0;
+  text-align: left;
+}
+.bench .top .title {
+  font-size: 20px;
+}
+.bench .scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overscroll-behavior: contain;
+}
+.bench .card {
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  padding: 10px 12px 12px;
+}
+.bench h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+}
+.bench h3 > span {
+  color: var(--fg);
+}
+.bench h3 .right {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+.bench h3 .dim {
+  color: var(--fg-dim);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+.bench button {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+/* effect tags */
+.bench .tag {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.tag.t-base {
+  background: #e3efd9;
+  color: var(--good);
+}
+.tag.t-slower {
+  background: #dde9f5;
+  color: #3d6fa3;
+}
+.tag.t-faster {
+  background: #fbe0d8;
+  color: #c0503a;
+}
+.tag.t-sweet {
+  background: #fbefcc;
+  color: #a5780f;
+}
+.tag.t-funk {
+  background: #eee0f5;
+  color: var(--funky);
+}
+
+/* base recipe picker */
+.bench .bases {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.bench .base {
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  padding: 4px 2px 6px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.bench .base svg {
+  width: 30px;
+  height: 40px;
+}
+.bench .base.on {
+  border-color: var(--go-dark);
+  background: #e3efd9;
+}
+
+/* the mix: base + add-in slots */
+.bench .slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.bench .add {
+  min-height: 88px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 2px;
+  font-size: 12px;
+  text-align: center;
+}
+.bench .add .ico {
+  font-size: 26px;
+  line-height: 1.1;
+}
+.bench .add svg {
+  width: 28px;
+  height: 36px;
+}
+.bench .add.empty {
+  border-style: dashed;
+  background: none;
+  color: #c9b08e;
+  font-size: 26px;
+  line-height: 1;
+}
+.bench .add.empty small {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* time-lapse */
+.bench .track {
+  position: relative;
+  height: 108px;
+  margin: 0 26px;
+}
+.bench .col {
+  position: absolute;
+  bottom: 0;
+  width: 52px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg-dim);
+  z-index: 1;
+}
+.bench .col svg {
+  width: 46px;
+  height: 72px;
+}
+.bench .col.sweet span {
+  color: var(--good);
+}
+.bench .curve {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  width: 100%;
+  height: calc(100% - 14px);
+  overflow: visible;
+}
+.bench .curve .area {
+  fill: #e3efd9;
+  stroke: var(--go);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.bench .curve .ghost {
+  fill: none;
+  stroke: #c9b08e;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+.bench .want {
+  position: absolute;
+  top: -4px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--good);
+  background: var(--card);
+  padding: 0 4px;
+  border-radius: 6px;
+  z-index: 2;
+}
+.bench .bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  margin: 8px 0 0;
+}
+.bench .bar i {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--card);
+}
+.bench .words {
+  position: relative;
+  height: 16px;
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+}
+.bench .words span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.bench .words .pop {
+  transform: translateX(-12px);
+  color: var(--funky);
+}
+.bench .words .pop.end {
+  transform: translateX(calc(-100% + 12px));
+}
+.bench .words .pop.off {
+  left: auto;
+  right: 0;
+  transform: none;
+  color: var(--fg-dim);
+}
+.bench .key {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #a8906c;
+}
+.bench .key b {
+  display: inline-block;
+  width: 16px;
+  height: 10px;
+  background: #e3efd9;
+  border: 2px solid var(--go);
+  border-radius: 8px 8px 0 0;
+  vertical-align: -1px;
+}
+.bench .key i {
+  display: inline-block;
+  width: 16px;
+  height: 10px;
+  border: 2px dashed #c9b08e;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+.bench .soon {
+  color: #c0503a;
+}
+.bench .late {
+  color: #3d6fa3;
+}
+
+/* pantry */
+.bench .items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 6px;
+}
+.bench .pi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bench .pick {
+  position: relative;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  min-height: 72px;
+  padding: 4px 2px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-size: 13px;
+}
+.bench .pick .ico {
+  font-size: 22px;
+}
+.bench .pick .n {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--fg-dim);
+}
+.bench .pi.in .pick {
+  border-color: var(--go-dark);
+  background: #e3efd9;
+}
+.bench .pi.out .pick {
+  opacity: 0.5;
+}
+.bench .pick:disabled {
+  opacity: 0.5;
+}
+.bench .buy {
+  min-height: 44px;
+  border: 2px solid #e9c25a;
+  background: var(--coin);
+  color: #6b4a00;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.bench .buy:disabled {
+  background: #eee3cf;
+  border-color: var(--line);
+  color: #a8906c;
+}
+
+/* recipe card */
+.bench .rcard ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.bench .rcard li {
+  border: 2px solid var(--line);
+  background: #fff;
+  border-radius: 12px;
+  padding: 7px 9px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.bench .rcard li.unk {
+  background: #f6eedf;
+  border-style: dashed;
+  color: #b49c7a;
+}
+.bench .rcard li.new {
+  animation: learnt 1.6s;
+}
+@keyframes learnt {
+  0% {
+    background: #fff3b8;
+    transform: scale(1.06);
+  }
+  100% {
+    background: #fff;
+    transform: none;
+  }
+}
+
+/* note and actions */
+.bench .note {
+  margin: 0 12px;
+  font-size: 13px;
+  color: var(--fg-dim);
+  text-align: center;
+  min-height: 1em;
+}
+.bench .note:not(.hint) {
+  color: var(--fg);
+  font-weight: 700;
+}
+.bench .note.big {
+  background: var(--coin);
+  color: #6b4a00;
+  border-radius: 12px;
+  padding: 8px;
+  font-size: 15px;
+  animation: learnt 1s;
+}
+
+@media (max-height: 720px) {
+  .bench {
+    gap: 6px;
+  }
+  .bench .add {
+    min-height: 72px;
+  }
+  .bench .track {
+    height: 96px;
+  }
+  .bench .col svg {
+    height: 62px;
+  }
+  .bench .actions button {
+    min-height: 48px;
+  }
+}
