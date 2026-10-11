@@ -1,0 +1,215 @@
+// @ts-check
+/**
+ * The Brine Nook — screen entry point. Owns the live state, turns taps into
+ * core actions, turns real time into fixed clock steps, and saves.
+ *
+ * Every change to the game goes through dispatch(action) → core step(). This
+ * file and the other ui/ modules only draw state and react to step() events.
+ *
+ * DOM + inline SVG rather than canvas: the game is panels, jars and buttons.
+ * The screen is redrawn from state ~10×/s, but `patch` only touches the DOM
+ * when a region's HTML actually changed, so taps never land on a node that
+ * is being replaced.
+ *
+ * Test hook: window.__ferment = { state (get/set), dispatch(action) → events, core }.
+ */
+
+import * as C from "../core/index.js";
+import { HOUR_SECONDS } from "../content/tuning.js";
+import { createStore } from "../../../shared/storage.js";
+import { mountShop, renderShop } from "./shop.js";
+import { toast } from "./dom.js";
+import { lower, LINES } from "./text.js";
+
+const store = createStore("ferment");
+const freshSeed = () => (Date.now() % 1e9) | 0;
+
+/** Game state plus screen-only state. */
+const ui = {
+  s: C.loadSave(store.get("save")) ?? C.newGame(freshSeed()),
+  selected: null, // shelf slot index
+  departing: null, // { customer, mood, line, pay, f, until }
+  sheet: null, // { kind: "brew", slot } | { kind: "evening", summary }
+};
+
+function save() {
+  store.set("save", ui.s);
+}
+
+const els = mountShop(document.body);
+document.title = "The Brine Nook · Playground";
+const render = () => renderShop(els, ui);
+
+function depart(customer, mood, line, extra = {}) {
+  ui.departing = { customer, mood, line, until: performance.now() + 1500, ...extra };
+}
+
+function showSummary(today) {
+  ui.sheet = { kind: "evening", summary: { ...today } };
+  ui.departing = null;
+}
+
+/** Apply one action through the core and react to what happened. */
+function dispatch(action) {
+  const { state, events } = C.step(ui.s, action);
+  ui.s = state;
+  for (const e of events) react(e);
+  return events;
+}
+
+function react(e) {
+  switch (e.type) {
+    case "popped":
+      toast(els.toasts, `A ${lower(e.jar.recipe)} jar popped its lid!`);
+      break;
+    case "arrived":
+      if (e.customer.orderId) toast(els.toasts, `${e.customer.name} is here to collect`);
+      break;
+    case "left":
+      if (e.why === "impatient") {
+        toast(els.toasts, `${e.customer.name} got tired of waiting`);
+        depart(e.customer, "meh", "“Never mind, I'll go elsewhere.”");
+      } else if (e.why === "sent") {
+        depart(e.customer, "meh", "“Oh well. Another time.”");
+      }
+      break;
+    case "served":
+      depart(e.customer, e.mood, LINES[e.mood], { pay: e.pay, f: e.f });
+      ui.selected = null;
+      break;
+    case "preordered":
+      depart(e.customer, "ok", `“Lovely. I'll be back on day ${e.order.due}.”`);
+      break;
+    case "brewed":
+      ui.sheet = null;
+      break;
+    case "tippedOut":
+    case "opened":
+      ui.selected = null;
+      break;
+    case "closed":
+      showSummary(e.today);
+      break;
+    case "slept":
+      if (e.popped.length)
+        toast(
+          els.toasts,
+          `${e.popped.length} jar${e.popped.length > 1 ? "s" : ""} popped overnight`,
+        );
+      break;
+  }
+}
+
+// ---------- input ----------
+
+els.root.addEventListener("click", (e) => {
+  const t = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (e.target).closest("[data-act]")
+  );
+  if (!t) {
+    if (e.target === els.sheet && ui.sheet?.kind === "brew") ui.sheet = null;
+    render();
+    return;
+  }
+  const act = t.dataset.act;
+  const s = ui.s;
+  if (act === "slot") {
+    const i = Number(t.dataset.slot);
+    if (!s.shelf.slots[i]) {
+      if (s.clock.phase !== "evening") ui.sheet = { kind: "brew", slot: i };
+    } else {
+      ui.selected = ui.selected === i ? null : i;
+    }
+  } else if (act === "brew") {
+    dispatch({ type: "brew", slot: ui.sheet.slot, recipe: t.dataset.recipe });
+  } else if (act === "cancel") {
+    ui.sheet = null;
+  } else if (act === "open") {
+    dispatch({ type: "open" });
+  } else if (act === "serve") {
+    dispatch({ type: "serve", slot: ui.selected });
+  } else if (act === "preorder") {
+    dispatch({ type: "preorder" });
+  } else if (act === "away") {
+    dispatch({ type: "sendAway" });
+  } else if (act === "tip") {
+    dispatch({ type: "tipOut", slot: ui.selected });
+  } else if (act === "close") {
+    dispatch({ type: "close" });
+  } else if (act === "summary") {
+    showSummary(s.shop.today);
+  } else if (act === "sleep") {
+    ui.sheet = null;
+    dispatch({ type: "sleep" });
+  } else if (act === "restart") {
+    if (confirm("Start a fresh shop? This day and your jars are lost.")) {
+      ui.s = C.newGame(freshSeed());
+      ui.selected = null;
+    }
+  }
+  save();
+  render();
+});
+
+// ---------- loop ----------
+// Real time becomes whole fixed steps; the remainder carries to the next frame.
+
+let last = performance.now();
+let pending = 0; // in-game hours not yet stepped
+let renderT = 0;
+let saveT = 0;
+function frame(now) {
+  const dt = Math.min(0.25, (now - last) / 1000);
+  last = now;
+  if (ui.s.clock.phase === "open") {
+    pending += dt / HOUR_SECONDS;
+    const n = Math.floor(pending * C.STEPS_PER_HOUR);
+    if (n > 0) {
+      pending -= n / C.STEPS_PER_HOUR;
+      const events = dispatch({ type: "tick", n });
+      if (events.some((e) => e.type === "closed")) {
+        save();
+        render();
+      }
+    }
+  } else {
+    pending = 0;
+  }
+  renderT += dt;
+  saveT += dt;
+  if (renderT >= 0.1) {
+    renderT = 0;
+    render();
+  }
+  if (saveT >= 2) {
+    saveT = 0;
+    save();
+  }
+  requestAnimationFrame(frame);
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) save();
+});
+if (ui.s.clock.phase === "evening") showSummary(ui.s.shop.today);
+render();
+requestAnimationFrame(frame);
+
+/** @type {any} */ (window).__ferment = {
+  get state() {
+    return ui.s;
+  },
+  set state(v) {
+    ui.s = C.loadSave(v) ?? C.newGame(freshSeed());
+    ui.selected = null;
+    ui.sheet =
+      ui.s.clock.phase === "evening" ? { kind: "evening", summary: { ...ui.s.shop.today } } : null;
+    render();
+  },
+  dispatch(action) {
+    const events = dispatch(action);
+    save();
+    render();
+    return events;
+  },
+  core: C,
+};

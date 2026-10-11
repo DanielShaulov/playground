@@ -1,3 +1,6 @@
+// FROZEN copy of games/ferment/rules.js from main at 5d0ab90 (the demo before the
+// core split). Used only by parity.test.mjs to prove the split changed no rule.
+// Never edit; delete it together with parity.test.mjs once rules change on purpose.
 /**
  * The Brine Nook — game rules. Pure: no DOM, no clock, no Math.random.
  *
