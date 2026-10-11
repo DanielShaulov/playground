@@ -213,7 +213,8 @@
       "nextArrival": 11.977164772541729
     },
     "orders": {
-      "list": []
+      "list": [],
+      "offers": []
     },
     "bench": {
       "known": [],
@@ -225,6 +226,9 @@
         "salt": 2,
         "chili": 2
       }
+    },
+    "regulars": {
+      "met": {}
     }
   }
 }

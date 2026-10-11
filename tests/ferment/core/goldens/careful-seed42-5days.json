@@ -234,6 +234,7 @@
       "list": [
         {
           "id": 30,
+          "kind": "preorder",
           "name": "Mr. Lindqvist",
           "look": 162,
           "recipe": "kraut",
@@ -245,6 +246,7 @@
         },
         {
           "id": 70,
+          "kind": "preorder",
           "name": "Lea",
           "look": 872,
           "recipe": "kimchi",
@@ -256,6 +258,7 @@
         },
         {
           "id": 80,
+          "kind": "preorder",
           "name": "Kenji",
           "look": 156,
           "recipe": "hotsauce",
@@ -267,6 +270,7 @@
         },
         {
           "id": 83,
+          "kind": "preorder",
           "name": "Kenji",
           "look": 132,
           "recipe": "hotsauce",
@@ -278,6 +282,7 @@
         },
         {
           "id": 86,
+          "kind": "preorder",
           "name": "Felix",
           "look": 347,
           "recipe": "hotsauce",
@@ -289,6 +294,7 @@
         },
         {
           "id": 92,
+          "kind": "preorder",
           "name": "Mr. Lindqvist",
           "look": 519,
           "recipe": "hotsauce",
@@ -298,7 +304,8 @@
           "arriveAt": 8.99816419392896,
           "arrived": false
         }
-      ]
+      ],
+      "offers": []
     },
     "bench": {
       "known": [],
@@ -310,6 +317,9 @@
         "salt": 2,
         "chili": 2
       }
+    },
+    "regulars": {
+      "met": {}
     }
   }
 }
