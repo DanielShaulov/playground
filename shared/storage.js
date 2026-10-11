@@ -7,7 +7,13 @@
  * no-op / default.
  */
 
-const prefix = (gameId, key) => `playground:${gameId}:${key}`;
+// A PR preview is served from .../pr/<n>/ on the same origin as main (see
+// scripts/build-pages.sh), so it gets its own namespace: a half-finished
+// branch can't corrupt the real save, and two previews can't clobber each other.
+const preview = globalThis.location?.pathname.match(/\/pr\/(\d+)\//);
+const ns = preview ? `playground:pr-${preview[1]}` : "playground";
+
+const prefix = (gameId, key) => `${ns}:${gameId}:${key}`;
 
 export function createStore(gameId) {
   return {

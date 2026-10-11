@@ -91,6 +91,15 @@ flush landings keep full width. Camera follows the tower as it rises.
 Merging a PR to `main` → `.github/workflows/deploy.yml` → GitHub Pages.
 Nothing to run by hand; the site is the repo root, there's no build.
 
+**Every open PR is playable before it merges**, at
+`https://danielshaulov.github.io/playground/pr/<number>/` (all of them listed
+at `.../pr/`). The workflow posts the link as a PR comment. Each deploy
+rebuilds `main` plus every open PR (`scripts/build-pages.sh`), so a closed PR's
+preview disappears on the next one. Previews share main's origin, so
+`shared/storage.js` namespaces saves as `playground:pr-<n>:...` under a preview
+path — always go through `createStore`, never raw `localStorage`, or a branch
+will read and write the real save.
+
 Two things that have already broken this once each:
 
 - The `github-pages` **environment** carries a deployment branch rule pinned to

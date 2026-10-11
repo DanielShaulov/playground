@@ -1,17 +1,27 @@
 name: Deploy to GitHub Pages
 
-# There's no build step — the repo root *is* the site — so this just uploads it.
+# There's no build step. The site is `main` at the root plus every open PR at
+# pr/<number>/ (scripts/build-pages.sh), so each PR is playable on a phone
+# before it merges. Any push to main or to a PR rebuilds the whole site.
+#
+# pull_request_target, not pull_request: it runs on `main`'s ref, which is what
+# the github-pages environment's branch rule allows to deploy. It only copies
+# PR files as static content and never runs them, so that's safe here.
 on:
   push:
     branches: [main]
+  pull_request_target:
+    types: [opened, synchronize, reopened, closed]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  pull-requests: write
 
-# Let an in-flight deploy finish rather than cancelling it mid-upload.
+# Let an in-flight deploy finish rather than cancelling it mid-upload. Queued
+# runs collapse to the newest, which is fine: every run builds everything.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -24,9 +34,35 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: scripts/build-pages.sh _site
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Comment the preview link on the PR
+        if: github.event_name == 'pull_request_target' && github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          marker="<!-- pr-preview -->"
+          body="$marker
+          **Playtest this PR:** ${BASE}pr/${PR}/ (at ${SHA:0:7})
+
+          Saves here are separate from main's. All open PRs: ${BASE}pr/"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" >/dev/null
+          fi
