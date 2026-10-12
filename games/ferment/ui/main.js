@@ -19,6 +19,7 @@ import { HOUR_SECONDS } from "../content/tuning.js";
 import { createStore } from "../../../shared/storage.js";
 import { mountShop, renderShop } from "./shop.js";
 import { mountBench, renderBench, benchAct } from "./bench.js";
+import { boardAct, boardReact } from "./board.js";
 import { toast } from "./dom.js";
 import { lower, LINES } from "./text.js";
 
@@ -61,6 +62,7 @@ function dispatch(action) {
 }
 
 function react(e) {
+  boardReact(e, (text) => toast(els.toasts, text));
   switch (e.type) {
     case "popped":
       toast(els.toasts, `A ${lower(e.jar.recipe)} jar popped its lid!`);
@@ -118,6 +120,8 @@ els.root.addEventListener("click", (e) => {
   const s = ui.s;
   if (benchAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
     // handled by the bench
+  } else if (boardAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
+    // handled by the board
   } else if (act === "slot") {
     const i = Number(t.dataset.slot);
     if (!s.shelf.slots[i]) {

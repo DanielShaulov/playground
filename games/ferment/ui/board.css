@@ -1,0 +1,531 @@
+/* The Brine Nook — order board tickets and the morning planner (ui/board.js). */
+
+/* --- order board --- */
+.board {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 12px 4px;
+  scrollbar-width: none;
+  flex: none;
+}
+.board::-webkit-scrollbar {
+  display: none;
+}
+.board:empty {
+  display: none;
+}
+.ticket {
+  position: relative;
+  flex: 0 0 auto;
+  width: 140px;
+  min-height: 44px;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  color: var(--fg);
+  background: var(--card);
+  border: 1.5px dashed var(--wood);
+  border-radius: 10px;
+  padding: 5px 8px 9px;
+  font-size: 11.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ticket.today {
+  border-style: solid;
+  border-color: var(--good);
+}
+.ticket.here {
+  background: #eef6e6;
+}
+.ticket .who {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  min-width: 0;
+}
+.ticket .face {
+  flex: none;
+  width: 20px;
+  height: 22px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #f3e3c9;
+}
+.ticket .face svg,
+.plan .face svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.ticket .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ticket .what {
+  font-weight: 700;
+  font-size: 12.5px;
+  line-height: 1.25;
+}
+.ticket .due {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-dim);
+  margin-bottom: 7px;
+  margin-top: auto;
+}
+.ticket.today .due {
+  color: var(--good);
+  font-weight: 700;
+}
+/* A rubber stamp: a regular, or an order on offer. */
+.ticket .stamp {
+  flex: none;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #b0473a;
+  border: 1.5px solid #b0473a;
+  border-radius: 4px;
+  padding: 0 3px;
+  transform: rotate(-4deg);
+}
+.ticket.k-standing {
+  background: #fff8e8;
+}
+.ticket.k-standing .stamp {
+  color: var(--good);
+  border-color: var(--good);
+}
+/* Jars started for an order: a dark pin at the spot they'll reach by pickup. */
+.strip .mark.jarmark {
+  border-top-color: var(--wood-dark);
+}
+.strip .mark.jarmark::after {
+  background: var(--wood-dark);
+}
+.strip .mark.jarmark.over {
+  border-top-color: var(--funky);
+}
+.strip.fits .win {
+  background: rgba(61, 139, 61, 0.18);
+}
+/* Bulk orders: one pip per jar — handed over, brewing, still to start. */
+.ticket .pips {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: -1px;
+}
+.ticket .pips i {
+  width: 9px;
+  height: 12px;
+  border-radius: 3px 3px 4px 4px;
+  border: 1.5px dashed var(--wood);
+}
+.ticket .pips i.brewing {
+  border-style: solid;
+  background: var(--tangy);
+}
+.ticket .pips i.got {
+  border-style: solid;
+  border-color: var(--good);
+  background: var(--good);
+}
+.ticket.offer {
+  border-style: solid;
+  border-color: var(--wood);
+  background: #fbefd9;
+}
+.ticket.hint {
+  border-color: var(--funky);
+  background: #f6eefa;
+}
+.ticket.hint .stamp {
+  color: var(--funky);
+  border-color: var(--funky);
+}
+.ticket.hint .what {
+  font-style: italic;
+}
+.ticket .try {
+  font-weight: 700;
+  color: var(--funky);
+}
+
+/* --- the planner (a bottom sheet over the shop) --- */
+.plan .phead {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.plan .phead .face {
+  flex: none;
+  width: 52px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--card);
+}
+.plan .phead p {
+  margin: 0;
+}
+.plan .have {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  margin-bottom: 8px;
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+.plan .kept {
+  appearance: none;
+  font: inherit;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 2px 4px;
+  border-radius: 10px;
+  border: 1.5px solid var(--wood);
+  background: #fbefd9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--fg-dim);
+}
+.plan .kept svg {
+  width: 26px;
+  height: 34px;
+}
+.plan .kept small {
+  font-size: 10px;
+  font-weight: 700;
+}
+.plan .have > small {
+  margin-left: 6px;
+}
+/* Which jar for the order: each shelf jar where it'll be at pickup, or a new one. */
+.plan .opts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+.plan .opt {
+  appearance: none;
+  font: inherit;
+  color: var(--fg);
+  text-align: left;
+  min-height: 52px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--wood);
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.plan .opt.sel {
+  border-style: solid;
+  border-color: var(--go-dark);
+  background: #e7f2dc;
+}
+.plan .opt .ojar {
+  flex: none;
+  width: 26px;
+  height: 36px;
+}
+.plan .opt .ojar svg {
+  width: 100%;
+  height: 100%;
+}
+.plan .opt .otext {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.plan .opt .fit {
+  flex: none;
+  width: 72px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+}
+.plan .opt .fit.good {
+  color: var(--good);
+}
+.plan .opt .fit.bad {
+  color: var(--sour);
+}
+.plan .pickup {
+  margin: 16px 2px 4px;
+}
+/* now → pickup: open hours shaded, the jar's best stretch in green, the customer pinned */
+.timeline {
+  position: relative;
+  height: 40px;
+  margin: 22px 2px 20px;
+  border-bottom: 2px solid var(--line);
+}
+.timeline .open {
+  position: absolute;
+  bottom: 0;
+  height: 22px;
+  background: #f0e2c8;
+  border-radius: 4px 4px 0 0;
+}
+.timeline .midnight {
+  position: absolute;
+  bottom: -4px;
+  height: 30px;
+  border-left: 1.5px dotted var(--fg-dim);
+  opacity: 0.5;
+}
+.timeline .dlabel {
+  position: absolute;
+  top: calc(100% + 3px);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  padding-left: 3px;
+}
+.timeline .best {
+  position: absolute;
+  bottom: 4px;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--tangy);
+  opacity: 0.85;
+}
+.timeline .best.fits {
+  background: var(--good);
+}
+.timeline .pin {
+  position: absolute;
+  bottom: -2px;
+  width: 0;
+  height: 30px;
+  border-left: 2.5px solid var(--fg);
+}
+.timeline .pin .face {
+  position: absolute;
+  top: -22px;
+  left: -13px;
+  width: 24px;
+  height: 26px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1.5px solid var(--fg);
+}
+.timeline .now {
+  position: absolute;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: var(--fg);
+}
+.plan .verdict {
+  margin: 12px 0 10px;
+  font-size: 15px;
+}
+.plan .verdict .good {
+  color: var(--good);
+}
+.plan .verdict .bad {
+  color: var(--sour);
+}
+.plan .verdict .tip {
+  display: block;
+  color: var(--fg-dim);
+  font-size: 14px;
+  margin-top: 2px;
+}
+.plan .adds {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.plan .add {
+  flex: 1;
+  min-height: 48px;
+  appearance: none;
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--wood);
+  background: var(--card);
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.plan .add small {
+  font-weight: 400;
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+.plan .add.on {
+  border-style: solid;
+  border-color: var(--go-dark);
+  background: #e7f2dc;
+}
+.plan .add:disabled {
+  opacity: 0.4;
+}
+.plan .spots {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 3px;
+  margin-bottom: 10px;
+}
+.plan .spot {
+  appearance: none;
+  padding: 2px 0;
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+  background: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.plan .spot svg {
+  width: 100%;
+  height: 38px;
+}
+.plan .spot.full {
+  opacity: 0.45;
+}
+.plan .spot.sel {
+  border-color: var(--go-dark);
+  background: #e7f2dc;
+}
+.plan .btns button small {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* --- portions left in a jar, and who they're kept back for --- */
+/* A chip per portion beside the jar's name: a face if it's kept back, plain if it's free. */
+.portions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  vertical-align: -2px;
+  pointer-events: none;
+}
+.portions i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fffaf0;
+  border: 1.5px solid var(--wood);
+}
+.portions i.held {
+  width: 15px;
+  height: 15px;
+  overflow: hidden;
+  background: #fff8e8;
+  border-color: var(--wood-dark);
+  box-shadow: 0 1px 2px rgba(60, 40, 20, 0.2);
+}
+.portions i.held svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.slot {
+  position: relative;
+}
+.slot.held .lbl small {
+  color: var(--wood-dark);
+  font-weight: 700;
+}
+.plan .spot {
+  position: relative;
+}
+.plan .spot .portions {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  margin: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+.plan .spot .portions i {
+  width: 6px;
+  height: 6px;
+  border-width: 1px;
+}
+.plan .spot .portions i.held {
+  width: 13px;
+  height: 13px;
+}
+.actions button.main.hold {
+  background: var(--wood);
+  border-color: var(--wood-dark);
+}
+
+/* --- a regular's rhythm in the planner --- */
+.plan .regular {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -2px 0 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fff8e8;
+  border: 1.5px solid var(--line);
+  font-size: 13.5px;
+}
+.plan .visits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 40%;
+  justify-content: flex-end;
+}
+.plan .visits.new {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--good);
+}
+.plan .visits i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--tangy);
+}
+.plan .visits i.v-happy {
+  background: var(--good);
+}
+.plan .visits i.v-missed {
+  background: none;
+  border: 2px solid var(--sour);
+}
+.plan .spot .portions i.held svg {
+  height: auto;
+}

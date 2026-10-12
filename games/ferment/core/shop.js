@@ -11,7 +11,7 @@ import { clamp } from "./util.js";
 import { flavour, isOver, makeJar } from "./jars.js";
 import { judge } from "./customers.js";
 import { checkMix, useMix } from "./bench.js";
-import { deliver, settle } from "./orders.js";
+import { deliver, settle, freePortions, welcome } from "./orders.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Today} Today */
@@ -64,6 +64,8 @@ export function serve(s, { slot }, events) {
   if (!jar) return "empty slot";
   if (jar.recipe !== c.recipe) return "wrong recipe";
   if (isOver(jar)) return "jar has gone over";
+  if (freePortions(s, jar, c.orderId) < (c.kind === "bulk" ? jar.servings : 1))
+    return "set aside for someone else";
   const f = flavour(jar);
   const verdict = judge(c, f);
   if (c.kind === "bulk") {
@@ -80,4 +82,5 @@ export function serve(s, { slot }, events) {
   events.push({ type: "served", slot, customer: c, f, ...verdict });
   const order = c.orderId ? s.orders.list.find((o) => o.id === c.orderId) : null;
   if (order) settle(s, order, verdict.mood, events);
+  else if (c.regular) welcome(s, c.regular, verdict.mood, events);
 }

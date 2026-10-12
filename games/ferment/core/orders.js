@@ -53,10 +53,63 @@ export function preorder(s, _action, events) {
     ...dueFor(s, c),
     arrived: false,
   };
+  // A regular dropping in for the first time who books ahead keeps coming from then on.
+  if (c.regular) Object.assign(order, { kind: "standing", regular: c.regular });
   s.orders.list.push(order);
   s.shop.today.preorders++;
   s.customers.queue.shift();
   events.push({ type: "preordered", order, customer: c });
+  if (c.regular) welcome(s, c.regular, null, events);
+}
+
+/**
+ * A regular-to-be dropping in as a walk-in around their usual hour, once a
+ * day until they are served or book ahead. Null when nobody is due to.
+ * @returns {import("./types.js").Customer | null}
+ */
+export function dropIn(/** @type {State} */ s) {
+  const day = s.clock.day;
+  for (const id of REGULAR_IDS) {
+    const r = REGULARS[id];
+    const met = s.regulars.met[id];
+    if (!met?.pending || met.seen === day || s.clock.hour < r.hour - 1) continue;
+    met.seen = day;
+    return {
+      id: nextId(s),
+      name: r.name,
+      look: r.look,
+      recipe: r.recipe,
+      lo: clamp(r.spot - WINDOW / 2, 0, 1),
+      hi: clamp(r.spot + WINDOW / 2, 0, 1),
+      patience: PATIENCE,
+      regular: id,
+    };
+  }
+  return null;
+}
+
+/**
+ * A regular-to-be was served (`mood`) or booked ahead (`mood` null): from now
+ * on they are a regular. Served, their next visit goes on the board; booked,
+ * it follows once that order is settled.
+ */
+export function welcome(
+  /** @type {State} */ s,
+  /** @type {string} */ id,
+  /** @type {string | null} */ mood,
+  events,
+) {
+  const met = s.regulars.met[id];
+  if (!met?.pending) return;
+  delete met.pending;
+  delete met.seen;
+  met.since = s.clock.day;
+  if (mood) {
+    met.visits++;
+    if (mood === "delight") met.happy++;
+    book(s, id, s.clock.day + REGULARS[id].every, events);
+  }
+  events.push({ type: "regularJoined", regular: id });
 }
 
 /** Tick part: order customers come back on their due day, straight to the front. */
@@ -171,7 +224,7 @@ const joinsNow = (/** @type {State} */ s, /** @type {import("./types.js").Regula
 
 /**
  * Each new morning: regulars whose time has come start visiting (a standing
- * regular's first visit is booked for the next day), and bulk regulars whose
+ * regular drops in as a walk-in first, see dropIn), and bulk regulars whose
  * day it is offer an order, unless one of theirs is still open.
  */
 export function newDay(/** @type {State} */ s, events) {
@@ -181,8 +234,12 @@ export function newDay(/** @type {State} */ s, events) {
     if (!s.regulars.met[id]) {
       if (!joinsNow(s, r)) continue;
       s.regulars.met[id] = { since: day, visits: 0, happy: 0, missed: 0 };
+      // A standing regular first drops in as a walk-in (dropIn) and becomes one once served.
+      if (r.kind === "standing") {
+        s.regulars.met[id].pending = true;
+        continue;
+      }
       events.push({ type: "regularJoined", regular: id });
-      if (r.kind === "standing") book(s, id, day + 1, events);
     }
     if (r.kind !== "bulk") continue;
     if ((day - s.regulars.met[id].since) % r.every !== 0) continue;
@@ -254,6 +311,64 @@ export function startForOrder(s, { orderId, slot, adds }, events) {
   if (why) return why;
   (order.jars ??= []).push(s.shelf.slots[slot].id);
   events.push({ type: "startedForOrder", order, slot });
+}
+
+/**
+ * Portions of `jar` set aside for an order: a bulk buyer takes whole jars,
+ * anyone else one portion. A jar can hold portions for several orders.
+ */
+const portionsFor = (/** @type {Order} */ o, /** @type {import("./types.js").Jar} */ jar) =>
+  o.kind === "bulk" ? jar.servings : 1;
+
+/** Orders with portions set aside in a jar, each with how many. */
+export const holdsOn = (/** @type {State} */ s, /** @type {import("./types.js").Jar} */ jar) =>
+  s.orders.list
+    .filter((o) => o.jars?.includes(jar.id))
+    .map((order) => ({ order, n: portionsFor(order, jar) }));
+
+/** Portions of a jar nobody else has set aside (`orderId`'s own hold counts as free). */
+export const freePortions = (
+  /** @type {State} */ s,
+  /** @type {import("./types.js").Jar} */ jar,
+  /** @type {number | undefined} */ orderId = undefined,
+) =>
+  jar.servings -
+  holdsOn(s, jar)
+    .filter((h) => h.order.id !== orderId)
+    .reduce((sum, h) => sum + h.n, 0);
+
+/**
+ * { type: "hold", orderId, slot } — set portions of a jar already on the
+ * shelf aside for a taken order (one portion, or the whole jar for a bulk
+ * order). Only that order's customer can be served what is set aside.
+ */
+export function hold(s, { orderId, slot }, events) {
+  const order = findIn(s.orders.list, orderId);
+  if (!order) return "no such order";
+  const jar = Number.isInteger(slot) ? s.shelf.slots[slot] : null;
+  if (!jar) return "empty slot";
+  if (jar.recipe !== order.recipe) return "wrong recipe";
+  if (order.jars?.includes(jar.id)) return "already set aside";
+  if (freePortions(s, jar) < portionsFor(order, jar)) return "no portion free";
+  (order.jars ??= []).push(jar.id);
+  events.push({ type: "held", order, slot });
+}
+
+/**
+ * { type: "release", slot, orderId? } — what an order set aside in a jar
+ * goes back to everyone. Without orderId, the hold collected last goes.
+ */
+export function release(s, { slot, orderId }, events) {
+  const jar = Number.isInteger(slot) ? s.shelf.slots[slot] : null;
+  if (!jar) return "empty slot";
+  const holds = holdsOn(s, jar).map((h) => h.order);
+  const order =
+    orderId === undefined
+      ? holds.sort((a, b) => b.due - a.due || b.arriveAt - a.arriveAt)[0]
+      : holds.find((o) => o.id === orderId);
+  if (!order) return "not set aside";
+  order.jars = order.jars.filter((id) => id !== jar.id);
+  events.push({ type: "released", order, slot });
 }
 
 /** { type: "acceptOrder", orderId } — take a bulk order on offer today. */

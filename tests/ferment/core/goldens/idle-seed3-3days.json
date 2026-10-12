@@ -4,14 +4,13 @@
   "days": 3,
   "events": {
     "arrived": 21,
-    "booked": 3,
     "closed": 3,
-    "left:closed": 7,
-    "left:impatient": 14,
+    "left:closed": 6,
+    "left:impatient": 15,
     "offered": 1,
     "opened": 3,
     "popped": 3,
-    "regularJoined": 3,
+    "regularJoined": 1,
     "slept": 3
   },
   "actions": [
@@ -28,10 +27,10 @@
   "end": {
     "meta": {
       "seed": 3,
-      "nextId": 32,
+      "nextId": 29,
       "rng": {
-        "customers": -903073412,
-        "requests": -1331939111
+        "customers": -1407026688,
+        "requests": -700103441
       }
     },
     "clock": {
@@ -47,9 +46,9 @@
         "earned": 0,
         "tips": 0,
         "repStart": 0,
-        "missed": 1,
+        "missed": 0,
         "preorders": 0,
-        "left": 4
+        "left": 5
       }
     },
     "shelf": {
@@ -97,40 +96,13 @@
     },
     "customers": {
       "queue": [],
-      "nextArrival": 12.171203648785594
+      "nextArrival": 12.25518265324179
     },
     "orders": {
-      "list": [
-        {
-          "id": 22,
-          "kind": "standing",
-          "name": "Old Bram",
-          "look": 640,
-          "recipe": "kraut",
-          "lo": 0.6000000000000001,
-          "hi": 0.76,
-          "due": 4,
-          "arriveAt": 9,
-          "arrived": false,
-          "regular": "bram"
-        },
-        {
-          "id": 27,
-          "kind": "standing",
-          "name": "Mrs. Okafor",
-          "look": 212,
-          "recipe": "dill",
-          "lo": 0.16999999999999998,
-          "hi": 0.33,
-          "due": 5,
-          "arriveAt": 1.5,
-          "arrived": false,
-          "regular": "okafor"
-        }
-      ],
+      "list": [],
       "offers": [
         {
-          "id": 31,
+          "id": 28,
           "kind": "bulk",
           "name": "Mei from Lucky Noodle",
           "look": 377,
@@ -148,8 +120,8 @@
       "asked": [
         {
           "recipe": "pearkimchi",
-          "name": "Ezra",
-          "look": 887,
+          "name": "Marisol",
+          "look": 882,
           "day": 3
         }
       ]
@@ -171,13 +143,17 @@
           "since": 2,
           "visits": 0,
           "happy": 0,
-          "missed": 1
+          "missed": 0,
+          "pending": true,
+          "seen": 3
         },
         "bram": {
           "since": 3,
           "visits": 0,
           "happy": 0,
-          "missed": 0
+          "missed": 0,
+          "pending": true,
+          "seen": 3
         },
         "noodlebar": {
           "since": 4,

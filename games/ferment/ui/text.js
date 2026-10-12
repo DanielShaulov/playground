@@ -2,6 +2,7 @@
 /** Words on screen: what customers say, flavour words, the clock. */
 
 import { RECIPES } from "../content/recipes.js";
+import { REGULARS } from "../content/regulars.js";
 import { OPEN_AT } from "../content/tuning.js";
 import { bandOf } from "../core/index.js";
 
@@ -13,6 +14,7 @@ export const lower = (recipe) => RECIPES[recipe].name.toLowerCase();
 
 export function requestLine(c) {
   const mid = (c.lo + c.hi) / 2;
+  if (c.regular && c.orderId && REGULARS[c.regular]) return `“${REGULARS[c.regular].hello}”`;
   if (c.orderId) return `“My pre-order: ${lower(c.recipe)}, ${word(mid)}!”`;
   return [
     `“${RECIPES[c.recipe].name}, nice and ${word(mid)} please.”`,

@@ -13,7 +13,7 @@
 import { tick, open, close, sleep } from "./clock.js";
 import { brew, tipOut, serve } from "./shop.js";
 import { sendAway } from "./customers.js";
-import { preorder, startForOrder, acceptOrder, declineOrder } from "./orders.js";
+import { preorder, startForOrder, acceptOrder, declineOrder, hold, release } from "./orders.js";
 import { buy, experiment } from "./bench.js";
 
 /** @typedef {import("./types.js").State} State */
@@ -35,6 +35,8 @@ export const ACTIONS = {
   experiment,
   startForOrder,
   acceptOrder,
+  hold,
+  release,
   declineOrder,
 };
 
