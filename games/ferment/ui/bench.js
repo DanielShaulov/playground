@@ -17,10 +17,18 @@
  */
 
 import { RECIPES, RECIPE_IDS } from "../content/recipes.js";
-import { INGREDIENTS, INGREDIENT_IDS, MAX_ADDS, MAX_STOCK } from "../content/ingredients.js";
+import { INGREDIENTS, INGREDIENT_IDS, MAX_ADDS } from "../content/ingredients.js";
 import { BANDS } from "../content/flavour.js";
 import { SERVINGS } from "../content/tuning.js";
-import { previewCurve, recipeCard, ageAt, forecast, demand, demandAt } from "../core/index.js";
+import {
+  previewCurve,
+  recipeCard,
+  ageAt,
+  forecast,
+  demand,
+  demandAt,
+  marketToday,
+} from "../core/index.js";
 import { jarSvg } from "./art/jar.js";
 import { recipeCardHtml } from "./recipe-card.js";
 import { patch } from "./dom.js";
@@ -176,14 +184,19 @@ export function renderBench(view, ui) {
     }
   }
 
+  const market = evening ? marketToday(s) : [];
   const pantry = INGREDIENT_IDS.map((id) => {
     const g = INGREDIENTS[id];
     const have = s.pantry.stock[id] ?? 0;
     const inMix = b.adds.includes(id);
     const canAdd = inMix || (have > 0 && b.adds.length < MAX_ADDS);
-    const buy = evening
-      ? `<button class="buy" data-act="bench-buy" data-ingredient="${id}" ${have >= MAX_STOCK || s.shop.coins < g.cost ? "disabled" : ""}>+1 · 🪙${g.cost}</button>`
-      : "";
+    // Until the market screen lands, the pantry buys from today's stalls.
+    const stall = market.find((m) => m.ingredient === id);
+    const buy = !evening
+      ? ""
+      : !stall
+        ? `<button class="buy" disabled>Not today</button>`
+        : `<button class="buy" data-act="bench-buy" data-ingredient="${id}" ${stall.room < 1 || stall.left < 1 || s.shop.coins < stall.price ? "disabled" : ""}>+1 · 🪙${stall.price}</button>`;
     return `<div class="pi${inMix ? " in" : ""}${have ? "" : " out"}"><button class="pick" data-act="bench-add" data-ingredient="${id}" ${canAdd ? "" : "disabled"}>
       <span class="ico">${g.icon}</span><b>${g.name}</b><i class="n">×${have}</i>${tagHtml(g.tag)}</button>${buy}</div>`;
   }).join("");

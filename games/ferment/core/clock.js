@@ -75,5 +75,5 @@ export function sleep(s, _action, events) {
   s.clock.phase = "morning";
   events.push({ type: "slept", day: s.clock.day, popped });
   newDay(s, events);
-  openMarket(s);
+  openMarket(s, events);
 }

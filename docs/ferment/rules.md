@@ -97,6 +97,8 @@ part-way along so day 1 has something to sell.
 | Honey      | faster | ripens at 1.2× speed                                        | 4    |
 | Pear       | sweet  | flavour only: no change to timing; makes discovered recipes | 3    |
 | Garlic     | funk   | flavour only: no change to timing; makes discovered recipes | 2    |
+| Oak leaves | slower | ripens at 0.9× speed                                        | 2    |
+| Whey       | faster | ripens at 1.6× speed (rare at the market)                   | 6    |
 
 Speeds multiply. A jar's life is its recipe's hours divided by its speed, and
 flavour = age / life. A plain jar is exactly as before. (The core also
@@ -247,15 +249,39 @@ decisions **(Hadash)**, not just layout:
 
 ## The market
 
-The market sets out its stalls every morning (and on day 1):
-`state.market.items` is ingredient → `{ price, left }` for that day. In the
-evening `buy` pays today's price and takes from the stall; it is refused when
-the ingredient isn't at the market today, the stall has too few left ("sold
-out"), the pantry would go over `MAX_STOCK`, or coins are short.
-`marketToday(state)` lists today's stalls for the screen. For now every
-ingredient is out every day at its listed cost, 9 of each.
+Every morning (and on day 1) the market sets out its stalls, rolled from its
+own "market" random stream so no other draws move: `state.market.items` is
+ingredient → `{ price, left }` for that day. In the evening `buy` pays today's
+price and takes from the stall. It is refused when the ingredient isn't at
+the market today, the stall has too few left ("sold out"), the pantry would
+go over `MAX_STOCK`, or coins are short. `marketToday(state)` lists today's
+stalls for the screen. Until the market screen lands, the bench pantry's +1
+buttons buy from today's stalls at today's price, and read "Not today" for an
+ingredient that isn't out.
+
+- **Stalls** (`STALLS` in `content/market.js`, by each ingredient's `stall`):
+
+| Stall  | Out on      | Stock | Ingredients         |
+| ------ | ----------- | ----- | ------------------- |
+| staple | every day   | 5–9   | salt, chili, garlic |
+| often  | 65% of days | 2–6   | honey, pear, oak    |
+| rare   | 20% of days | 1–3   | whey                |
+
+Day 1 has every stall but the rare ones. A rare stall being out pushes a
+`rareAtMarket` event. Ingredients a discovered recipe needs are never rare.
+
+- **Prices.** The table cost above is an ingredient's usual price. Each
+  morning its price multiplier (`state.market.drift`) moves by up to 12%
+  of the cost either way (`PRICE_STEP`), whether its stall is out or not,
+  and never strays more than 30% from it (`PRICE_BAND`). Today's price is
+  the cost times that, rounded, at least 1 coin.
+- **New ingredients.** A timing ingredient is just a row in
+  `content/ingredients.js` with a `speed` and a `stall`: the bench, the
+  board planner (which lists every timing add-in) and the market pick it up.
+  An add-in that turns the recipe into another is locked in the planner
+  automatically, because `planFor` reports it as not `right`.
 
 ## Not in the game yet
 
-Rolled market stock and prices, upgrades and the goals ladder (Milestone 3). The game is endless with a
+Upgrades and the goals ladder (Milestone 3). The game is endless with a
 goals ladder; there is no season end.

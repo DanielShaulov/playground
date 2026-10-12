@@ -1,28 +1,61 @@
 // @ts-check
 /**
- * The market: where the pantry is restocked. Each morning the market sets out
- * today's stalls (state.market.items: ingredient → { price, left }), and in
- * the evening `buy` takes from them at today's price.
+ * The market: where the pantry is restocked. Each morning (and on day 1) the
+ * market sets out today's stalls (state.market.items: ingredient →
+ * { price, left }), and in the evening `buy` takes from them at today's price.
+ *
+ * Stalls are rolled from the "market" random stream, ingredient by ingredient
+ * in content order, so nothing else's draws move. Staples are out every day;
+ * the rest only on some days (content/market.js), except that day 1 has
+ * every stall but the rare ones. Each ingredient's price
+ * multiplier (state.market.drift) takes a small random step every morning,
+ * whether its stall is out or not, and stays within a band around its cost.
  *
  * state.market.day is the day the stalls were set out; on any other day
  * nothing is on sale (an old save sees the market from its next morning).
- *
- * Interface stub: every ingredient is on sale at its listed cost, with a
- * pantry's worth of stock. The full rules roll stock and prices from the
- * "market" random stream.
  */
 
 import { INGREDIENTS, INGREDIENT_IDS, MAX_STOCK } from "../content/ingredients.js";
+import { STALLS, PRICE_BAND, PRICE_STEP } from "../content/market.js";
+import { between, random } from "./rng.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").MarketItem} MarketItem */
 
-/** Set out today's stalls. Called by newGame (day 1) and every morning. */
-export function openMarket(/** @type {State} */ s) {
+const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+
+/** Today's price for an ingredient at a drift multiplier: whole coins, at least 1. */
+export const priceAt = (/** @type {string} */ id, /** @type {number} */ drift) =>
+  Math.max(1, Math.round(INGREDIENTS[id].cost * drift));
+
+/**
+ * Set out today's stalls. Called by newGame (day 1) and every morning.
+ * Pushes `rareAtMarket` when a rare ingredient is out.
+ */
+export function openMarket(/** @type {State} */ s, events = []) {
+  /** @type {State["market"]["items"]} */
+  const items = {};
+  const rare = [];
+  for (const id of INGREDIENT_IDS) {
+    const g = INGREDIENTS[id];
+    const drift = clamp(
+      (s.market.drift[id] ?? 1) + between(s, "market", -PRICE_STEP, PRICE_STEP),
+      1 - PRICE_BAND,
+      1 + PRICE_BAND,
+    );
+    s.market.drift[id] = Math.round(drift * 1000) / 1000;
+    const stall = STALLS[g.stall];
+    // Day 1 shows everything but the rare stalls, so a new shop sees what the market can have.
+    const firstDay = s.clock.day === 1 && g.stall !== "rare";
+    if (stall.chance < 1 && random(s, "market") >= stall.chance && !firstDay) continue;
+    const [lo, hi] = stall.stock;
+    const left = lo + Math.floor(random(s, "market") * (hi - lo + 1));
+    items[id] = { price: priceAt(id, s.market.drift[id]), left };
+    if (g.stall === "rare") rare.push(id);
+  }
   s.market.day = s.clock.day;
-  s.market.items = Object.fromEntries(
-    INGREDIENT_IDS.map((id) => [id, { price: INGREDIENTS[id].cost, left: MAX_STOCK }]),
-  );
+  s.market.items = items;
+  if (rare.length) events.push({ type: "rareAtMarket", ingredients: rare });
 }
 
 /**
