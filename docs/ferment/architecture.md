@@ -51,7 +51,8 @@ games/ferment/
     clock.js        day cycle and the fixed-step tick
     shop.js         coins, reputation, brew / tipOut / serve
     customers.js    walk-ins, judging a jar, leaving
-    orders.js       pre-orders, regulars, bulk orders, planFor
+    orders.js       pre-orders, regulars (dropIn/welcome), bulk orders,
+                    planFor, kept portions (hold/release)
     jars.js         flavour, ageing, add-in maths
     bench.js        pantry, experiments, discovery, recipe card, previewCurve
     rng.js          named random streams
@@ -59,6 +60,7 @@ games/ferment/
   content/          data: recipes, flavour bands, names, tuning numbers
   ui/               main.js (state, input, loop, saving), shop.js (screen),
                     bench.js + recipe-card.js + bench.css (brewing bench),
+                    board.js + board.css (order board and planner),
                     sheets.js, strip.js, text.js, dom.js, art/, style.css
 ```
 
@@ -77,25 +79,36 @@ games/ferment/
   the recipe the mix makes), `recipeCard(state, recipe)`, `resolveMix`,
   `menu(state)`, `lifeOf`, `ageAt`, `mixOf`, and `demand(recipe)` /
   `demandAt(recipe, f)` (the bell curve of where walk-ins want a recipe).
+  For orders: `planFor(state, order, adds)` (where a jar started at the
+  state's clock lands at pickup; the board passes the next morning after
+  closing), `holdsOn(state, jar)` and `freePortions(state, jar, orderId?)`.
 
 The state's slices are `meta` (seed, id counter, `rng` stream positions),
 `clock` (`day`, `phase`: morning | open | evening, `hour` since opening),
 `shop` (`coins`, `rep`, `today`), `shelf` (`slots`), `customers` (`queue`,
-`nextArrival`), `orders` (`list`, `offers`), `bench` (`known` discovered recipes,
+`nextArrival`), `orders` (`list`, `offers`, `asked`), `bench` (`known` discovered recipes,
 `hints`, `tried`: base recipe → ingredients mixed in) `pantry` (`stock`:
-ingredient → count) and `regulars` (`met`: regular → visits). A jar with add-ins carries `adds`; a plain jar has none. A new system adds its slice with one
+ingredient → count) and `regulars` (`met`: regular → visits, plus `pending`/`seen` while a
+standing regular is still dropping in as a walk-in). A jar with add-ins carries `adds`; a plain jar has none. A new system adds its slice with one
 line in `SLICES`.
 
 The actions are `tick { n }` (n fixed steps of 1/120 in-game hour; the screen
 turns real time into whole steps at `HOUR_SECONDS` per hour), `open`, `close`,
 `sleep`, `brew { slot, recipe, adds? }`, `tipOut { slot }`, `serve { slot }`,
 `preorder`, `sendAway`, `buy { ingredient, n? }` (evening) and
-`experiment { recipe, adds }` (evening). A new action is one line in `ACTIONS` pointing at a
+`experiment { recipe, adds }` (evening), and for orders
+`startForOrder { orderId, slot, adds? }`, `hold { orderId, slot }`,
+`release { slot, orderId? }`, `acceptOrder { orderId }` and
+`declineOrder { orderId }`. A new action is one line in `ACTIONS` pointing at a
 handler `(state, action, events) => reason | undefined` that mutates the copy
 `step()` made. The events are `popped`, `arrived`, `left` (with `why`:
 impatient | sent | closed), `served`, `preordered`, `brewed`, `tippedOut`,
-`opened`, `closed`, `slept`, `bought`, `experimented` (with its `curve`) and
-`discovered` (`recipe`, `base`, `adds`).
+`opened`, `closed`, `slept`, `bought`, `experimented` (with its `curve`),
+`discovered` (`recipe`, `base`, `adds`), and for orders `booked`, `offered`,
+`accepted`, `declined`, `regularJoined`, `startedForOrder`, `held`,
+`released`, `delivered` (one per whole jar a bulk buyer takes) and `hinted`.
+The rules themselves, including the playtest decisions behind orders and the
+board, are in rules.md.
 
 The browser test hook is `window.__ferment`: `state` (get or set),
 `dispatch(action)` returning the events, and `core`.
