@@ -1,9 +1,10 @@
 # Rules
 
-How The Brine Nook plays as of Milestone 2's rules (regulars, bulk orders and
-off-menu requests; the order board screen is a separate task). Numbers are the
-current tuning; the code is the source of truth, and a PR that changes a rule
-updates this file. Constant names are in brackets.
+How The Brine Nook plays as of Milestone 2 (regulars, bulk orders, off-menu
+requests, kept portions and the order board). Numbers are the current tuning;
+the code is the source of truth, and a PR that changes a rule updates this
+file. Constant names are in brackets. Rules marked **(Hadash)** came from a
+playtest decision; don't change them without asking Hadash.
 
 ## Time
 
@@ -25,7 +26,11 @@ Everything is in in-game hours. A day has three phases:
   (to 0.8) and funky (to 1).
 - At 1 the lid pops: the jar has gone over, can't be sold and can only be
   tipped out.
-- Each jar holds 2 servings (`SERVINGS`) and empties after the second sale.
+- Each jar holds 2 servings, or portions (`SERVINGS`), and empties after the
+  last sale. Nothing assumes 2: the count may go to 3 later **(Hadash)**, so
+  code reads `jar.servings`, never a literal 2.
+- Portions can be kept for orders (see Kept portions below); walk-ins can only
+  buy portions nobody has kept.
 
 | Recipe       | Ripens in | Price | Cost |
 | ------------ | --------- | ----- | ---- |
@@ -53,13 +58,18 @@ part-way along so day 1 has something to sell.
   the middle of its sweet spot. If it was hidden, the bench now hints at it.
   The request stays on the board (`state.orders.asked`, the latest asker per
   recipe) until that recipe is discovered.
-  Sending them away, or letting them give up, costs no reputation; they can
-  also pre-order it, which gives you until the due day to discover it.
+  Sending them away, or letting them give up, costs no reputation. They can
+  also pre-order it, which gives you until the due day to discover it: pre-
+  ordering an undiscovered recipe is allowed **(Hadash)**. Only starting a jar
+  for it from the board is not (see The order board).
 - The customer at the counter can be:
   - **served** a jar of their recipe that hasn't gone over;
   - **pre-ordered**: they leave and come back on a later day, at the hour when
     a jar started right now would sit in the middle of their window;
   - **sent away**, costing 1 reputation (2 for a pre-order customer).
+- A walk-in can't be served a jar whose free portions are all kept for other
+  orders (`serve` rejects it: "set aside for someone else"). The screen offers
+  "tap to sell it anyway", which lets go of one kept portion first.
 
 ## Pay and reputation
 
@@ -135,10 +145,23 @@ reputation when served inside their window.
 **Regulars** (`content/regulars.js`) have a favourite recipe and their own spot
 on the strip, always within one spread of where walk-ins want that recipe.
 Each starts coming on a given day, some only once the shop's reputation is
-high enough too. On their first morning their first visit is booked for the
-next day; after every visit, served or missed, the next one is booked
-`every` days later. `state.regulars.met` counts each one's visits, delighted
-visits and misses.
+high enough too.
+
+- **First visit is a plain walk-in (Hadash).** A standing regular's first
+  visit never goes on the board, because you'd have no time to prepare. From
+  their start day they are `pending` in `state.regulars.met` and drop in as an
+  ordinary walk-in at about their usual hour (`dropIn`, at most once a day,
+  `seen`). Serving them, or taking their pre-order, makes them a regular
+  (`welcome`, event `regularJoined`). If they're sent away or give up, they
+  drop in again the next day.
+- Served on that first visit, their next visit is booked `every` days later.
+  Pre-ordered, the pre-order becomes their first standing order (kind
+  `standing`), and the next one is booked when it is settled.
+- After every booked visit, served or missed, the next one is booked `every`
+  days after its due day. `state.regulars.met` counts each one's visits,
+  delighted visits and misses.
+- Bulk regulars don't drop in: their first contact is an offer with `lead`
+  days of notice (below).
 
 | Regular                  | Kind     | Wants               | Every  | Arrives | Starts              |
 | ------------------------ | -------- | ------------------- | ------ | ------- | ------------------- |
@@ -160,14 +183,68 @@ takes **whole jars**: each serve hands over the whole jar and pays the
 per-serving price for every serving left in it. They wait, with fresh
 patience after each jar, until they have them all (+2 reputation).
 
-**Planning.** `planFor(state, order, adds)` says where a jar started right
-now, with those add-ins, would be at pickup: its flavour, whether it fits,
-and the day and hour it enters and leaves the window. `startForOrder` starts
-that jar (brewed from the base with whatever the recipe needs, so a correct
-mix for an undiscovered recipe discovers it) and remembers the jar on the
-order.
+**Planning.** `planFor(state, order, adds)` says where a jar started at the
+state's clock, with those add-ins, would be at pickup: its flavour, whether it
+fits, and the day and hour it enters and leaves the window. `right` is false
+when the add-ins turn the recipe into another one (chili on sauerkraut makes
+fire kraut); such a plan never fits. `startForOrder` starts that jar (brewed
+from the base with whatever the recipe needs, so the core would discover an
+undiscovered recipe this way; the board never offers it, see below) and keeps
+a portion of the new jar for the order.
+
+**Kept portions (Hadash).** Holding is per portion, not per jar.
+
+- An order with a jar in `order.jars` keeps one portion of it; a bulk order
+  keeps the whole jar. One jar can hold portions for several orders.
+- `hold { orderId, slot }` keeps a portion of a jar already on the shelf
+  (same recipe, enough free portions). `release { slot, orderId? }` lets it
+  go; without `orderId` the hold due latest goes. `holdsOn(state, jar)` and
+  `freePortions(state, jar, orderId?)` are the read helpers.
+- The order's own customer can be served from their kept portion; everyone
+  else only from free ones. Once an order is settled its holds vanish with
+  it. A kept jar that is tipped out or emptied simply stops counting.
+
+## The order board
+
+The board (`ui/board.js`) is the morning planning screen. These are playtest
+decisions **(Hadash)**, not just layout:
+
+- **Tickets** show each order's face, recipe and window on the strip, when
+  they come, a "regular" stamp, and pips for a bulk order's jars. Today's bulk
+  offers show too (Take it / Pass); off-menu requests get their own ticket
+  that opens the bench.
+- **The planner is a choice of which jar serves the order.** Every free,
+  un-popped shelf jar of the recipe that won't have popped by pickup is listed
+  with its marker on the strip at pickup and a word ("Just right", "Not
+  ready", "Gone sour"), followed by "A new jar, started now"
+  (or "in the morning" after closing). The best-fitting one is preselected.
+  The big strip, the day timeline and the verdict follow the choice.
+- **The main button matches the choice:** "Keep a portion for Sam" (or "Keep it"
+  for bulk) or "Start a jar". Options stop at what the order still needs, so
+  you can never keep more than it needs. A covered order shows "All set" and
+  the kept jars with Let go.
+- **A kept jar that won't suit** by pickup turns the main button into "Pick
+  another jar", which lets it go and brings the list back.
+- **Add-ins** on a new jar: only timing add-ins (speed ≠ 1) the recipe
+  doesn't already contain are shown. One that would turn the jar into another
+  recipe is locked and labelled with what it makes ("makes fire kraut", or
+  "makes something new" if undiscovered). The verdict's tips only suggest
+  add-ins that are in the pantry and keep the recipe.
+- **After closing** (including closing early) a new jar is previewed as
+  started at the next morning's opening, since that's the earliest it can go
+  on, and "start it at …" tips never suggest a time the shop is closed.
+- **Undiscovered recipes:** the order can exist (pre-order is fine), but the
+  planner offers no new jar for it. It says we don't know how to make it yet
+  and the main button goes to the bench. Once discovered it plans like any
+  other order.
+- **Regulars' planner** explains the rhythm ("comes in every other day for
+  crisp dill pickles") and shows past visits as dots (delighted, fine,
+  missed), because "regular" was otherwise unexplained.
+- **On the shelf** each jar shows one chip per portion; a chip with a face is
+  kept for that customer. A walk-in picking a jar whose free portions are all
+  kept sees "For Sam, tap to sell it anyway".
 
 ## Not in the game yet
 
-The market, upgrades and goals ladder (3). The game is endless with a
+The market, upgrades and goals ladder (Milestone 3). The game is endless with a
 goals ladder; there is no season end.

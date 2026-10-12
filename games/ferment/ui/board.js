@@ -326,9 +326,11 @@ export function bestStart(s, o, plan) {
   const from = pick - ageAt(plan.recipe, plan.adds, o.hi);
   const to = pick - ageAt(plan.recipe, plan.adds, o.lo);
   const aim = (from + to) / 2;
+  // After closing (even early) the first chance is the next morning.
+  const start = fromStart(s).clock;
   let best = null;
-  for (let d = s.clock.day; d * 24 <= to; d++) {
-    const lo = Math.max(from, d * 24 + (d === s.clock.day ? s.clock.hour : 0));
+  for (let d = start.day; d * 24 <= to; d++) {
+    const lo = Math.max(from, d * 24 + (d === start.day ? start.hour : 0));
     const hi = Math.min(to, d * 24 + OPEN_HOURS - 0.5); // before closing
     if (lo > hi) continue;
     const t = Math.min(hi, Math.max(lo, aim));
