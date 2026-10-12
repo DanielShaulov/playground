@@ -20,6 +20,7 @@ import { createStore } from "../../../shared/storage.js";
 import { mountShop, renderShop } from "./shop.js";
 import { mountBench, renderBench, benchAct } from "./bench.js";
 import { boardAct, boardReact } from "./board.js";
+import { mountEvening, renderEvening, openEvening, eveningAct, eveningReact } from "./evening.js";
 import { toast } from "./dom.js";
 import { lower, LINES } from "./text.js";
 
@@ -31,7 +32,8 @@ const ui = {
   s: C.loadSave(store.get("save")) ?? C.newGame(freshSeed()),
   selected: null, // shelf slot index
   departing: null, // { customer, mood, line, pay, f, until }
-  sheet: null, // { kind: "brew", slot } | { kind: "evening", summary }
+  sheet: null, // { kind: "brew", slot }
+  evening: null, // the evening screen when open (ui/evening.js)
   bench: null, // the brewing bench when open (ui/bench.js)
 };
 
@@ -42,15 +44,11 @@ function save() {
 const els = mountShop(document.body);
 document.title = "The Brine Nook · Playground";
 const bench = mountBench(els.root);
-const render = () => (renderShop(els, ui), renderBench(bench, ui));
+const evening = mountEvening(els.root);
+const render = () => (renderShop(els, ui), renderEvening(evening, ui), renderBench(bench, ui));
 
 function depart(customer, mood, line, extra = {}) {
   ui.departing = { customer, mood, line, until: performance.now() + 1500, ...extra };
-}
-
-function showSummary(today) {
-  ui.sheet = { kind: "evening", summary: { ...today } };
-  ui.departing = null;
 }
 
 /** Apply one action through the core and react to what happened. */
@@ -63,6 +61,7 @@ function dispatch(action) {
 
 function react(e) {
   boardReact(e, (text) => toast(els.toasts, text));
+  eveningReact(e, (text) => toast(els.toasts, text));
   switch (e.type) {
     case "popped":
       toast(els.toasts, `A ${lower(e.jar.recipe)} jar popped its lid!`);
@@ -93,7 +92,7 @@ function react(e) {
       ui.selected = null;
       break;
     case "closed":
-      showSummary(e.today);
+      openEvening(ui);
       break;
     case "slept":
       if (e.popped.length)
@@ -122,6 +121,8 @@ els.root.addEventListener("click", (e) => {
     // handled by the bench
   } else if (boardAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
     // handled by the board
+  } else if (eveningAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
+    // handled by the evening
   } else if (act === "slot") {
     const i = Number(t.dataset.slot);
     if (!s.shelf.slots[i]) {
@@ -145,11 +146,6 @@ els.root.addEventListener("click", (e) => {
     dispatch({ type: "tipOut", slot: ui.selected });
   } else if (act === "close") {
     dispatch({ type: "close" });
-  } else if (act === "summary") {
-    showSummary(s.shop.today);
-  } else if (act === "sleep") {
-    ui.sheet = null;
-    dispatch({ type: "sleep" });
   } else if (act === "restart") {
     if (confirm("Start a fresh shop? This day and your jars are lost.")) {
       ui.s = C.newGame(freshSeed());
@@ -199,7 +195,7 @@ function frame(now) {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) save();
 });
-if (ui.s.clock.phase === "evening") showSummary(ui.s.shop.today);
+if (ui.s.clock.phase === "evening") openEvening(ui);
 render();
 requestAnimationFrame(frame);
 
@@ -211,8 +207,9 @@ requestAnimationFrame(frame);
     ui.s = C.loadSave(v) ?? C.newGame(freshSeed());
     ui.selected = null;
     ui.bench = null;
-    ui.sheet =
-      ui.s.clock.phase === "evening" ? { kind: "evening", summary: { ...ui.s.shop.today } } : null;
+    ui.sheet = null;
+    ui.evening = null;
+    if (ui.s.clock.phase === "evening") openEvening(ui);
     render();
   },
   dispatch(action) {
