@@ -15,6 +15,7 @@ import { SLOTS, START_COINS, START_REP, START_SHELF } from "../content/tuning.js
 import { makeJar, validAdds } from "./jars.js";
 import { freshToday } from "./shop.js";
 import { freshProgress } from "./progress.js";
+import { openMarket } from "./market.js";
 
 /** @typedef {import("./types.js").State} State */
 
@@ -30,6 +31,7 @@ export const SLICES = {
   pantry: () => ({ stock: { ...START_PANTRY } }),
   regulars: () => ({ met: {} }),
   progress: freshProgress,
+  market: () => ({ day: 0, items: {} }),
 };
 
 /** @returns {State} */
@@ -46,6 +48,7 @@ export function newGame(seed = 1) {
   for (const [slot, recipe, f] of START_SHELF) {
     s.shelf.slots[slot] = makeJar(s, recipe, f * RECIPES[recipe].hours);
   }
+  openMarket(s);
   return s;
 }
 

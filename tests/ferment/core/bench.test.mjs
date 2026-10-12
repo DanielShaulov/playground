@@ -1,5 +1,5 @@
 // Bench rules: add-ins bending how a jar ripens, the time-lapse preview, the
-// evening pantry, experiments, recipe discovery and the recipe card.
+// pantry, experiments, recipe discovery and the recipe card.
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as C from "../../../games/ferment/core/index.js";
@@ -130,26 +130,6 @@ test("a mix that covers a discovered recipe's needs makes that recipe", () => {
   assert.equal(C.resolveMix("kimchi", ["garlic"]).recipe, "kimchi");
   assert.deepEqual(C.resolveMix("pearkimchi", ["salt"]).adds, ["pear", "salt"]);
   assert.equal(C.resolveMix("kimchi", []).recipe, "kimchi");
-});
-
-test("the pantry sells ingredients in the evening only", () => {
-  const s = evening({ coins: 10 });
-  const r = ok(s, { type: "buy", ingredient: "salt", n: 2 });
-  assert.equal(r.state.shop.coins, 10 - 2 * INGREDIENTS.salt.cost);
-  assert.equal(r.state.pantry.stock.salt, 2);
-  assert.deepEqual(r.events, [{ type: "bought", ingredient: "salt", n: 2, cost: 4 }]);
-  assert.equal(why(s, { type: "buy", ingredient: "honey", n: 3 }), "not enough coins");
-  assert.equal(why(s, { type: "buy", ingredient: "butter" }), "no such ingredient");
-  assert.equal(why(s, { type: "buy", ingredient: "toString" }), "no such ingredient");
-  assert.equal(why(s, { type: "buy", ingredient: "salt", n: 0 }), "bad amount");
-  assert.equal(why(s, { type: "buy", ingredient: "salt", n: 1.5 }), "bad amount");
-  const full = evening({ stock: { garlic: MAX_STOCK - 1 } });
-  ok(full, { type: "buy", ingredient: "garlic" });
-  assert.equal(why(full, { type: "buy", ingredient: "garlic", n: 2 }), "pantry is full");
-  assert.equal(
-    why(C.newGame(1), { type: "buy", ingredient: "salt" }),
-    "pantry opens in the evening",
-  );
 });
 
 test("an experiment uses up its add-ins, teaches the card and can discover a recipe", () => {

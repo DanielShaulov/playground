@@ -3,8 +3,8 @@
  * The bench and the pantry: add-ins, experiments, recipe discovery and the
  * recipe card.
  *
- * Ingredients are bought in the evening ({ type: "buy" }) and kept in
- * state.pantry.stock. Mixing them into a jar bends how it ripens (the maths is
+ * Ingredients are bought at the market in the evening (market.js) and kept
+ * in state.pantry.stock. Mixing them into a jar bends how it ripens (the maths is
  * in jars.js). Some mixes make a different recipe: a base recipe brewed with
  * every ingredient a discovered recipe `needs` becomes that recipe, and the
  * first time that happens (on the shelf or in an evening experiment) the
@@ -16,7 +16,7 @@
  */
 
 import { RECIPES, RECIPE_IDS, VARIANT_IDS } from "../content/recipes.js";
-import { INGREDIENTS, INGREDIENT_IDS, MAX_STOCK } from "../content/ingredients.js";
+import { INGREDIENTS, INGREDIENT_IDS } from "../content/ingredients.js";
 import { ageAt, forecast, mixOf, validAdds } from "./jars.js";
 
 /** @typedef {import("./types.js").State} State */
@@ -161,21 +161,6 @@ export function useMix(
     s.orders.asked = s.orders.asked.filter((x) => x.recipe !== mix.recipe);
     events.push({ type: "discovered", recipe: mix.recipe, base: mix.base, adds: [...mix.adds] });
   }
-}
-
-/** { type: "buy", ingredient, n? } — buy n (default 1) of an ingredient in the evening. */
-export function buy(s, { ingredient, n = 1 }, events) {
-  if (typeof ingredient !== "string" || !Object.hasOwn(INGREDIENTS, ingredient))
-    return "no such ingredient";
-  if (!Number.isInteger(n) || n < 1) return "bad amount";
-  if (s.clock.phase !== "evening") return "pantry opens in the evening";
-  const have = s.pantry.stock[ingredient] ?? 0;
-  if (have + n > MAX_STOCK) return "pantry is full";
-  const cost = INGREDIENTS[ingredient].cost * n;
-  if (s.shop.coins < cost) return "not enough coins";
-  s.shop.coins -= cost;
-  s.pantry.stock[ingredient] = have + n;
-  events.push({ type: "bought", ingredient, n, cost });
 }
 
 /**

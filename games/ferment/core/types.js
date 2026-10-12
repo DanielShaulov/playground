@@ -68,7 +68,7 @@
  * @typedef {{
  *   meta: MetaSlice, clock: ClockSlice, shop: ShopSlice, shelf: ShelfSlice,
  *   customers: CustomersSlice, orders: OrdersSlice, bench: BenchSlice, pantry: PantrySlice,
- *   regulars: RegularsSlice, progress: ProgressSlice
+ *   regulars: RegularsSlice, progress: ProgressSlice, market: MarketSlice
  * }} State
  *
  * @typedef {{ type: string, [key: string]: any }} Action
@@ -156,6 +156,11 @@
  *   next: the next level to buy, null when maxed. locked: the next level needs a higher tier.
  * @typedef {{ i: number, goal: Goal, text: string, have: number, ready: boolean }} GoalNow
  *   goalNow(): the open rung, how far along it is, and whether it can be claimed.
+ * @typedef {{ day: number, items: Record<string, { price: number, left: number }> }} MarketSlice
+ *   day: the day these stalls were set out (nothing is on sale on any other day).
+ *   items: ingredient id → today's price per unit and how many are left.
+ * @typedef {{ ingredient: string, price: number, left: number, have: number, room: number }} MarketItem
+ *   marketToday(): one stall. have: in the pantry now; room: how many more the pantry takes.
  */
 
 export {};

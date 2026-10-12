@@ -84,8 +84,9 @@ part-way along so day 1 has something to sell.
 
 ## The bench and the pantry
 
-- **Pantry.** In the evening you can buy ingredients (`buy`). A pantry holds
-  up to 9 of each (`MAX_STOCK`). A new game starts with 2 salt and 2 chili.
+- **Pantry.** In the evening you can buy ingredients at the market (`buy`,
+  see The market). A pantry holds up to 9 of each (`MAX_STOCK`). A new game
+  starts with 2 salt and 2 chili.
 - **Add-ins.** Starting a jar can mix in up to 3 different ingredients
   (`MAX_ADDS`), one of each from the pantry. Each has a tag the screen shows:
 
@@ -244,7 +245,17 @@ decisions **(Hadash)**, not just layout:
   kept for that customer. A walk-in picking a jar whose free portions are all
   kept sees "For Sam, tap to sell it anyway".
 
+## The market
+
+The market sets out its stalls every morning (and on day 1):
+`state.market.items` is ingredient → `{ price, left }` for that day. In the
+evening `buy` pays today's price and takes from the stall; it is refused when
+the ingredient isn't at the market today, the stall has too few left ("sold
+out"), the pantry would go over `MAX_STOCK`, or coins are short.
+`marketToday(state)` lists today's stalls for the screen. For now every
+ingredient is out every day at its listed cost, 9 of each.
+
 ## Not in the game yet
 
-The market, upgrades and goals ladder (Milestone 3). The game is endless with a
+Rolled market stock and prices, upgrades and the goals ladder (Milestone 3). The game is endless with a
 goals ladder; there is no season end.
