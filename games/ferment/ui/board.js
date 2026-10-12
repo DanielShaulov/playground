@@ -365,6 +365,8 @@ function renderPlan(ui) {
   }
   const r = RECIPES[o.recipe];
   const evening = s.clock.phase === "evening";
+  // A recipe not worked out at the bench yet can be ordered, but not started.
+  const unknown = !!r.base && !s.bench.known.includes(o.recipe);
   const jars = jarsFor(s, o);
   const need = (o.qty ?? 1) - (o.got ?? 0);
   const left = offer ? need : stillNeeds(s, o);
@@ -412,7 +414,7 @@ function renderPlan(ui) {
         : `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`,
     )
     .join("");
-  const newJar = !offer && left > 0 && p.src === "new";
+  const newJar = !offer && !unknown && left > 0 && p.src === "new";
 
   const missing = fresh.adds.filter((a) => (s.pantry.stock[a] ?? 0) < 1);
   let go;
@@ -423,6 +425,8 @@ function renderPlan(ui) {
   else if (left <= 0) go = `<button class="main" data-act="board-close">All set</button>`;
   else if (chosen)
     go = `<button class="main" data-act="board-hold" data-slot="${chosen.i}">Keep ${portion} for ${o.name}</button>`;
+  else if (unknown)
+    go = `<button class="main" data-act="board-hint" data-recipe="${o.recipe}">🧪 To the bench</button>`;
   else if (evening) go = `<button class="main" disabled>Start it in the morning</button>`;
   else if (firstEmpty(s) < 0) go = `<button class="main" disabled>No room on the shelf</button>`;
   else if (missing.length)
@@ -442,7 +446,11 @@ function renderPlan(ui) {
       left <= 0 ? [] : jars.map((x) => x.at),
     )}${stripLabels}</div>
     ${timelineHtml(s, o, plan)}
-    <div class="verdict">${verdict(s, o, plan)}</div>
+    <div class="verdict">${
+      unknown && !chosen && left > 0
+        ? `<b class="bad">We don't know how to make ${r.name.toLowerCase()} yet.</b> <span class="tip">Work it out at the bench, then start ${o.name}'s jar here.</span>`
+        : verdict(s, o, plan)
+    }</div>
     ${newJar ? `${adds ? `<div class="adds">${adds}</div>` : ""}<div class="spots">${spots}</div>` : ""}
     <div class="btns">${offer ? `<button data-act="board-pass" data-order="${o.id}">Pass</button>` : `<button data-act="board-close">Not now</button>`}${go}</div></div>`;
   patch(el, html);
@@ -478,6 +486,7 @@ export function boardAct(act, t, ui, dispatch, toast) {
     ui.plan = null;
   } else if (act === "board-hint") {
     const r = RECIPES[t.dataset.recipe];
+    ui.plan = null;
     openBench(ui, s.clock.phase === "evening" ? null : firstEmpty(s) < 0 ? null : firstEmpty(s));
     ui.bench.recipe = r.base ?? t.dataset.recipe;
   } else if (act === "board-release") {

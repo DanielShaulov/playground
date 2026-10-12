@@ -4,15 +4,15 @@
   "days": 5,
   "events": {
     "accepted": 1,
-    "arrived": 52,
+    "arrived": 53,
     "booked": 5,
     "brewed": 24,
     "closed": 5,
-    "left:sent": 3,
+    "left:sent": 2,
     "offered": 1,
     "opened": 5,
     "popped": 3,
-    "preordered": 8,
+    "preordered": 10,
     "regularJoined": 3,
     "served:delight": 6,
     "served:meh": 30,
@@ -26,7 +26,7 @@
     { "type": "brew", "slot": 8, "recipe": "hotsauce" },
     { "type": "open" },
     { "type": "tick", "n": 30 },
-    { "type": "sendAway" },
+    { "type": "preorder" },
     { "type": "tick", "n": 114 },
     { "type": "serve", "slot": 0 },
     { "type": "tick", "n": 132 },
@@ -91,7 +91,7 @@
     { "type": "tick", "n": 114 },
     { "type": "serve", "slot": 1 },
     { "type": "tick", "n": 90 },
-    { "type": "sendAway" },
+    { "type": "preorder" },
     { "type": "tick", "n": 204 },
     { "type": "serve", "slot": 3 },
     { "type": "tick", "n": 216 },
@@ -106,7 +106,7 @@
     { "type": "serve", "slot": 1 },
     { "type": "tick", "n": 126 },
     { "type": "sleep" },
-    { "type": "acceptOrder", "orderId": 58 },
+    { "type": "acceptOrder", "orderId": 60 },
     { "type": "tipOut", "slot": 7 },
     { "type": "brew", "slot": 0, "recipe": "dill" },
     { "type": "brew", "slot": 1, "recipe": "hotsauce" },
@@ -125,7 +125,9 @@
     { "type": "serve", "slot": 5 },
     { "type": "tick", "n": 162 },
     { "type": "serve", "slot": 5 },
-    { "type": "tick", "n": 72 },
+    { "type": "tick", "n": 30 },
+    { "type": "sendAway" },
+    { "type": "tick", "n": 42 },
     { "type": "serve", "slot": 0 },
     { "type": "tick", "n": 174 },
     { "type": "serve", "slot": 0 },
@@ -173,7 +175,7 @@
   "end": {
     "meta": {
       "seed": 1,
-      "nextId": 97,
+      "nextId": 100,
       "rng": {
         "customers": -657696260,
         "requests": -1771434648
@@ -200,39 +202,39 @@
     "shelf": {
       "slots": [
         {
-          "id": 76,
+          "id": 79,
           "recipe": "hotsauce",
           "age": 24,
           "servings": 1
         },
         null,
         {
-          "id": 78,
+          "id": 81,
           "recipe": "kraut",
           "age": 24,
           "servings": 2
         },
         null,
         {
-          "id": 80,
+          "id": 83,
           "recipe": "hotsauce",
           "age": 24,
           "servings": 2
         },
         {
-          "id": 81,
+          "id": 84,
           "recipe": "kimchi",
           "age": 24,
           "servings": 2
         },
         {
-          "id": 82,
+          "id": 85,
           "recipe": "kraut",
           "age": 24,
           "servings": 2
         },
         {
-          "id": 62,
+          "id": 64,
           "recipe": "kraut",
           "age": 47.99999999999936,
           "servings": 1
@@ -247,7 +249,19 @@
     "orders": {
       "list": [
         {
-          "id": 58,
+          "id": 52,
+          "kind": "preorder",
+          "name": "Theo",
+          "look": 652,
+          "recipe": "firekraut",
+          "lo": 0.5700000000000001,
+          "hi": 0.73,
+          "due": 6,
+          "arriveAt": 8.299999999999994,
+          "arrived": false
+        },
+        {
+          "id": 60,
           "kind": "bulk",
           "name": "Mei from Lucky Noodle",
           "look": 377,
@@ -262,7 +276,7 @@
           "got": 0
         },
         {
-          "id": 72,
+          "id": 75,
           "kind": "standing",
           "name": "Old Bram",
           "look": 640,
@@ -275,7 +289,7 @@
           "regular": "bram"
         },
         {
-          "id": 86,
+          "id": 89,
           "kind": "standing",
           "name": "Mrs. Okafor",
           "look": 212,
@@ -288,7 +302,7 @@
           "regular": "okafor"
         },
         {
-          "id": 89,
+          "id": 92,
           "kind": "preorder",
           "name": "Wren",
           "look": 818,
@@ -300,7 +314,7 @@
           "arrived": false
         },
         {
-          "id": 91,
+          "id": 94,
           "kind": "preorder",
           "name": "Mr. Lindqvist",
           "look": 669,
@@ -312,7 +326,7 @@
           "arrived": false
         },
         {
-          "id": 94,
+          "id": 97,
           "kind": "preorder",
           "name": "Wren",
           "look": 623,

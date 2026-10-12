@@ -44,7 +44,7 @@ export const BOTS = {
     if (!c) return { type: "tick", n: BOT_TICK };
     const best = bestJar(s, c);
     if (best >= 0) return { type: "serve", slot: best };
-    return c.orderId || !C.onMenu(s, c.recipe) ? { type: "sendAway" } : { type: "preorder" };
+    return c.orderId ? { type: "sendAway" } : { type: "preorder" };
   },
   /** Serves the first jar of the right recipe whatever its flavour; never pre-orders. */
   careless(s) {

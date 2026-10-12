@@ -183,16 +183,6 @@ test("the shop closes itself at the end of the day, and sleeping ages jars to a 
   assert.equal(r.events[0].type, "slept");
 });
 
-test("a recipe not worked out at the bench yet can't be pre-ordered", () => {
-  const s = openShop(4);
-  s.customers.queue = [cust("firekraut", 0.6, 0.7, { id: 71, name: "Ama", offMenu: true })];
-  const r = C.step(s, { type: "preorder" });
-  assert.equal(r.events[0].type, "rejected");
-  assert.equal(r.events[0].why, "not on the menu yet");
-  s.bench.known.push("firekraut");
-  assert.equal(C.step(s, { type: "preorder" }).events[0].type, "preordered");
-});
-
 test("a pre-order comes back on its due day, and a jar started today can make it", () => {
   let s = openShop(4);
   s.customers.queue = [cust("kimchi", 0.3, 0.52, { id: 70, name: "Ama" })];

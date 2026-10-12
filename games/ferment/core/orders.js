@@ -36,16 +36,11 @@ export function dueFor(
   return { due: s.clock.day + k, arriveAt: clamp(need - 24 * k + s.clock.hour, 0.5, 9) };
 }
 
-/** Can the shop take orders for `recipe`: a plain recipe, or a variant worked out at the bench? */
-export const onMenu = (/** @type {State} */ s, /** @type {string} */ recipe) =>
-  !RECIPES[recipe].base || s.bench.known.includes(recipe);
-
 /** { type: "preorder" } — the customer at the counter books a later day. */
 export function preorder(s, _action, events) {
   const c = s.customers.queue[0];
   if (!c) return "nobody at the counter";
   if (c.orderId) return "already a pre-order";
-  if (!onMenu(s, c.recipe)) return "not on the menu yet";
   /** @type {Order} */
   const order = {
     id: nextId(s),

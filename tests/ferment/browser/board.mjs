@@ -232,7 +232,6 @@ export async function run(page, snap) {
   assert.deepEqual((await state()).orders.list.find((o) => o.id === 902).jars, [], "let go");
   await page.locator('.plan .btns [data-act="board-close"]').tap();
 
-  // Chili is already in fire kraut, so it isn't offered as a timing add-in.
   await page.evaluate(() => {
     const s = structuredClone(window.__ferment.state);
     s.orders.list.push({
@@ -247,6 +246,17 @@ export async function run(page, snap) {
       arriveAt: 6.5,
       arrived: false,
     });
+    window.__ferment.state = s;
+  });
+  // Chili is already in fire kraut, so once it's known chili isn't offered as a
+  // timing add-in; until then the order sends you to the bench instead.
+  await page.locator('.ticket[data-order="905"]').tap();
+  assert.equal(await page.locator(".plan .add").count(), 0, "no jar for an unknown recipe");
+  assert.match(await page.locator(".plan .btns .main").innerText(), /bench/);
+  await page.locator('.plan .btns [data-act="board-close"]').tap();
+  await page.evaluate(() => {
+    const s = structuredClone(window.__ferment.state);
+    s.bench.known.push("firekraut");
     window.__ferment.state = s;
   });
   await page.locator('.ticket[data-order="905"]').tap();
