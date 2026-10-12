@@ -8,6 +8,8 @@ import {
   INGREDIENT_IDS,
   MAX_STOCK,
 } from "../../../games/ferment/content/ingredients.js";
+import { STALLS, PRICE_BAND } from "../../../games/ferment/content/market.js";
+import { RECIPES } from "../../../games/ferment/content/recipes.js";
 
 function ok(s, action) {
   const r = C.step(s, action);
@@ -36,9 +38,13 @@ function evening({ seed = 5, day = 1, coins = 200, stock = {} } = {}) {
 }
 
 test("the market is out from day 1 and every morning after", () => {
-  const s = C.newGame(1);
-  assert.equal(s.market.day, 1);
-  assert.ok(C.marketToday(s).length > 0);
+  for (let seed = 0; seed < 20; seed++) {
+    const s = C.newGame(seed);
+    assert.equal(s.market.day, 1);
+    const out = C.marketToday(s).map((m) => m.ingredient);
+    for (const id of INGREDIENT_IDS)
+      if (INGREDIENTS[id].stall !== "rare") assert.ok(out.includes(id), `${id} on day 1`);
+  }
   const day2 = evening({ day: 2 });
   assert.equal(day2.market.day, 2);
   for (const item of C.marketToday(day2)) {
@@ -95,10 +101,113 @@ test("an old save without a market loads, and the stalls come out next morning",
   assert.ok(C.marketToday(next).length > 0);
 });
 
-test("every ingredient has a cost and a speed", () => {
+test("every ingredient has a cost, a speed and a stall", () => {
   for (const id of INGREDIENT_IDS) {
     const g = INGREDIENTS[id];
     assert.ok(Number.isInteger(g.cost) && g.cost > 0, id);
     assert.ok(g.speed > 0, id);
+    assert.ok(Object.hasOwn(STALLS, g.stall), id);
   }
+  // Every discovered recipe's needs can be bought on most days.
+  for (const r of Object.values(RECIPES))
+    for (const n of r.needs ?? []) assert.notEqual(INGREDIENTS[n].stall, "rare", n);
+});
+
+/** The market of each morning for `days` days of an idle game. */
+function mornings(seed, days) {
+  let s = C.newGame(seed);
+  const out = [{ s, events: [] }];
+  while (out.length < days) {
+    s = ok(s, { type: "open" }).state;
+    s = ok(s, { type: "close" }).state;
+    const r = ok(s, { type: "sleep" });
+    s = r.state;
+    out.push({ s, events: r.events });
+  }
+  return out;
+}
+
+test("staples are out every day; the rest come and go; stock and prices stay in their bands", () => {
+  const seen = Object.fromEntries(INGREDIENT_IDS.map((id) => [id, 0]));
+  const prices = Object.fromEntries(INGREDIENT_IDS.map((id) => [id, new Set()]));
+  const DAYS = 120;
+  for (const { s } of mornings(3, DAYS)) {
+    for (const id of INGREDIENT_IDS) {
+      const g = INGREDIENTS[id];
+      const item = s.market.items[id];
+      if (g.stall === "staple") assert.ok(item, `${id} missing on day ${s.clock.day}`);
+      if (!item) continue;
+      seen[id]++;
+      prices[id].add(item.price);
+      const [lo, hi] = STALLS[g.stall].stock;
+      assert.ok(Number.isInteger(item.left) && item.left >= lo && item.left <= hi, id);
+      assert.ok(item.price >= 1, id);
+      assert.ok(Math.abs(s.market.drift[id] - 1) <= PRICE_BAND + 1e-9, id);
+      assert.ok(
+        Math.abs(item.price - g.cost) <= Math.ceil(g.cost * PRICE_BAND),
+        `${id} ${item.price}`,
+      );
+    }
+  }
+  for (const id of INGREDIENT_IDS) {
+    const rate = seen[id] / DAYS;
+    const want = STALLS[INGREDIENTS[id].stall].chance;
+    assert.ok(Math.abs(rate - want) < 0.15, `${id} out ${rate}, want about ${want}`);
+  }
+  // Prices move: a pricier ingredient sees several prices over a few months.
+  assert.ok(prices.honey.size >= 2 && prices.whey.size >= 2, "prices never drift");
+});
+
+test("prices drift a little each day, not jump", () => {
+  const days = mornings(8, 40);
+  for (let i = 1; i < days.length; i++) {
+    for (const id of INGREDIENT_IDS) {
+      const a = days[i - 1].s.market.drift[id];
+      const b = days[i].s.market.drift[id];
+      assert.ok(Math.abs(a - b) <= 0.12 + 1e-3, `${id}: ${a} → ${b}`);
+    }
+  }
+});
+
+test("a rare ingredient at the market is announced", () => {
+  const days = mornings(1, 60);
+  const rareDays = days.filter(({ s }) => s.market.items.whey);
+  assert.ok(rareDays.length > 0, "whey never came");
+  for (const { s, events } of days.slice(1)) {
+    const e = events.find((x) => x.type === "rareAtMarket");
+    assert.deepEqual(e?.ingredients ?? [], s.market.items.whey ? ["whey"] : []);
+  }
+});
+
+test("the market replays exactly from a seed, and seeds differ", () => {
+  const a = mornings(12, 10).map(({ s }) => s.market);
+  const b = mornings(12, 10).map(({ s }) => s.market);
+  assert.deepEqual(a, b);
+  assert.notDeepEqual(mornings(12, 5).at(-1).s.market, mornings(13, 5).at(-1).s.market);
+});
+
+test("a new timing ingredient works in the planner and the bench with no other code", () => {
+  // Whey and oak leaves are only rows in content/ingredients.js.
+  const order = { recipe: "kimchi", lo: 0.37, hi: 0.53, due: 3, arriveAt: 2 };
+  const s = C.newGame(1);
+  const plain = C.planFor(s, order, []);
+  const whey = C.planFor(s, order, ["whey"]);
+  const oak = C.planFor(s, order, ["oak"]);
+  assert.ok(whey.right && oak.right);
+  assert.ok(whey.f > plain.f && oak.f < plain.f);
+  assert.ok(C.previewCurve("dill", ["whey"]).sooner > 0);
+  assert.ok(C.previewCurve("dill", ["oak"]).sooner < 0);
+});
+
+test("an add-in that makes another recipe never plans as the order's recipe", () => {
+  const s = C.newGame(1);
+  for (const recipe of Object.keys(RECIPES))
+    for (const id of INGREDIENT_IDS) {
+      const order = { recipe, lo: 0.3, hi: 0.46, due: 4, arriveAt: 3 };
+      const p = C.planFor(s, order, [id]);
+      const mix = C.resolveMix(recipe, [id]);
+      if (!p) continue;
+      assert.equal(p.right, mix.recipe === recipe, `${recipe} + ${id}`);
+      if (!p.right) assert.equal(p.fits, false);
+    }
 });

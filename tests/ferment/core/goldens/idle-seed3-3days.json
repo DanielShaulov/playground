@@ -29,6 +29,7 @@
       "seed": 3,
       "nextId": 29,
       "rng": {
+        "market": -1170423646,
         "customers": -1407026688,
         "requests": -700103441
       }
@@ -180,25 +181,30 @@
       "day": 4,
       "items": {
         "salt": {
-          "price": 2,
-          "left": 9
+          "price": 1,
+          "left": 6
         },
         "chili": {
           "price": 3,
-          "left": 9
-        },
-        "honey": {
-          "price": 4,
-          "left": 9
-        },
-        "pear": {
-          "price": 3,
-          "left": 9
+          "left": 7
         },
         "garlic": {
           "price": 2,
-          "left": 9
+          "left": 7
+        },
+        "oak": {
+          "price": 2,
+          "left": 4
         }
+      },
+      "drift": {
+        "salt": 0.7,
+        "chili": 1.047,
+        "honey": 0.889,
+        "pear": 1.005,
+        "garlic": 1.07,
+        "oak": 1.076,
+        "whey": 1.078
       }
     }
   }

@@ -13,6 +13,7 @@
     "opened": 5,
     "popped": 1,
     "preordered": 8,
+    "rareAtMarket": 1,
     "regularJoined": 3,
     "served:delight": 5,
     "served:meh": 27,
@@ -169,6 +170,7 @@
       "seed": 1,
       "nextId": 91,
       "rng": {
+        "market": -1991733867,
         "customers": -1225590733,
         "requests": 691966835
       }
@@ -382,21 +384,26 @@
           "left": 9
         },
         "chili": {
-          "price": 3,
+          "price": 4,
           "left": 9
         },
         "honey": {
           "price": 4,
-          "left": 9
-        },
-        "pear": {
-          "price": 3,
-          "left": 9
+          "left": 5
         },
         "garlic": {
           "price": 2,
           "left": 9
         }
+      },
+      "drift": {
+        "salt": 0.851,
+        "chili": 1.19,
+        "honey": 1.077,
+        "pear": 0.937,
+        "garlic": 0.783,
+        "oak": 0.7,
+        "whey": 0.898
       }
     }
   }

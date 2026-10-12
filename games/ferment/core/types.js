@@ -74,8 +74,13 @@
  * @typedef {{ type: string, [key: string]: any }} Action
  * @typedef {{ type: string, [key: string]: any }} GameEvent
  *
- * @typedef {{ name: string, icon: string, tag: string, speed: number, shift: number, cost: number }} Ingredient
+ * @typedef {"staple" | "often" | "rare"} StallKind
+ * @typedef {{
+ *   name: string, icon: string, tag: string, speed: number, shift: number, cost: number,
+ *   stall: StallKind
+ * }} Ingredient
  *   speed multiplies ripening speed; shift moves the jar along the strip (jars.js).
+ *   cost: the usual market price; stall: how often the market has it (content/market.js).
  *
  * @typedef {{
  *   recipe: string, base: string, adds: string[], speed: number, shift: number, popAt: number,
@@ -156,9 +161,13 @@
  *   next: the next level to buy, null when maxed. locked: the next level needs a higher tier.
  * @typedef {{ i: number, goal: Goal, text: string, have: number, ready: boolean }} GoalNow
  *   goalNow(): the open rung, how far along it is, and whether it can be claimed.
- * @typedef {{ day: number, items: Record<string, { price: number, left: number }> }} MarketSlice
+ * @typedef {{
+ *   day: number, items: Record<string, { price: number, left: number }>,
+ *   drift: Record<string, number>
+ * }} MarketSlice
  *   day: the day these stalls were set out (nothing is on sale on any other day).
  *   items: ingredient id → today's price per unit and how many are left.
+ *   drift: ingredient id → price multiplier on its cost (missing = 1), stepped each morning.
  * @typedef {{ ingredient: string, price: number, left: number, have: number, room: number }} MarketItem
  *   marketToday(): one stall. have: in the pantry now; room: how many more the pantry takes.
  */

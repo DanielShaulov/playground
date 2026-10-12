@@ -31,7 +31,7 @@ export const SLICES = {
   pantry: () => ({ stock: { ...START_PANTRY } }),
   regulars: () => ({ met: {} }),
   progress: freshProgress,
-  market: () => ({ day: 0, items: {} }),
+  market: () => ({ day: 0, items: {}, drift: {} }),
 };
 
 /** @returns {State} */

@@ -33,4 +33,4 @@ export {
   goalNow,
   measure,
 } from "./progress.js";
-export { marketToday } from "./market.js";
+export { marketToday, priceAt } from "./market.js";
