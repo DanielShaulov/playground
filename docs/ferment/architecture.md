@@ -56,6 +56,7 @@ games/ferment/
     jars.js         flavour, ageing, add-in maths
     bench.js        pantry, experiments, discovery, recipe card, previewCurve
     progress.js     upgrades, reputation tiers, goals ladder (state.progress)
+    market.js       today's stalls (stock, prices), buy, marketToday
     rng.js          named random streams
     types.js        JSDoc types for the state, actions and events
   content/          data: recipes, flavour bands, names, tuning numbers,
@@ -91,13 +92,14 @@ The state's slices are `meta` (seed, id counter, `rng` stream positions),
 `nextArrival`), `orders` (`list`, `offers`, `asked`), `bench` (`known` discovered recipes,
 `hints`, `tried`: base recipe → ingredients mixed in) `pantry` (`stock`:
 ingredient → count) and `regulars` (`met`: regular → visits, plus `pending`/`seen` while a
-standing regular is still dropping in as a walk-in). A jar with add-ins carries `adds`; a plain jar has none. A new system adds its slice with one
+standing regular is still dropping in as a walk-in) and `market` (`day` the stalls were
+set out, `items`: ingredient → `{ price, left }` for today). A jar with add-ins carries `adds`; a plain jar has none. A new system adds its slice with one
 line in `SLICES`.
 
 The actions are `tick { n }` (n fixed steps of 1/120 in-game hour; the screen
 turns real time into whole steps at `HOUR_SECONDS` per hour), `open`, `close`,
 `sleep`, `brew { slot, recipe, adds? }`, `tipOut { slot }`, `serve { slot }`,
-`preorder`, `sendAway`, `buy { ingredient, n? }` (evening) and
+`preorder`, `sendAway`, `buy { ingredient, n? }` (evening, at today's market) and
 `experiment { recipe, adds }` (evening), and for orders
 `startForOrder { orderId, slot, adds? }`, `hold { orderId, slot }`,
 `release { slot, orderId? }`, `acceptOrder { orderId }` and

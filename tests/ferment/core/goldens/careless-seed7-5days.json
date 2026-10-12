@@ -317,6 +317,31 @@
         "bestDay": 0,
         "orders": 0
       }
+    },
+    "market": {
+      "day": 6,
+      "items": {
+        "salt": {
+          "price": 2,
+          "left": 9
+        },
+        "chili": {
+          "price": 3,
+          "left": 9
+        },
+        "honey": {
+          "price": 4,
+          "left": 9
+        },
+        "pear": {
+          "price": 3,
+          "left": 9
+        },
+        "garlic": {
+          "price": 2,
+          "left": 9
+        }
+      }
     }
   }
 }

@@ -22,8 +22,8 @@ test("a save missing a slice, or a field in one, gets the defaults", () => {
 });
 
 test("unknown slices are dropped, so an old build ignores a newer one's extras", () => {
-  const s = { ...JSON.parse(JSON.stringify(C.newGame(9))), market: { stock: [] } };
-  assert.equal("market" in C.loadSave(s), false);
+  const s = { ...JSON.parse(JSON.stringify(C.newGame(9))), futureThing: { stock: [] } };
+  assert.equal("futureThing" in C.loadSave(s), false);
 });
 
 test("the demo's flat v1 save and garbage start a fresh game", () => {
