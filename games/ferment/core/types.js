@@ -10,13 +10,19 @@
 /**
  * @typedef {{
  *   name: string, hours: number, price: number, cost: number, sweet: [number, number],
- *   brine: string, bits: string, base?: string, needs?: string[], hinted?: boolean
+ *   brine: string, bits: string, base?: string, needs?: string[], hinted?: boolean, tier?: number
  * }} Recipe
  *   sweet is the recipe's best stretch of the flavour strip. base/needs mark a discovered recipe.
+ *   tier: the reputation tier (content/goals.js) at which it joins the menu.
  *
- * @typedef {{ id: number, recipe: string, age: number, servings: number, adds?: string[] }} Jar
+ * @typedef {{
+ *   id: number, recipe: string, age: number, servings: number, size?: number,
+ *   adds?: string[], pace?: number
+ * }} Jar
  *   age is in-game hours since it was started; flavour = age / recipe.hours for a
  *   plain jar. adds (absent on a plain jar) are its add-ins, which bend that (jars.js).
+ *   servings: portions left; size: portions it was started with. pace: the speed
+ *   of the crock it was started in (absent: 1), multiplying its add-ins' speed.
  *
  * @typedef {{
  *   id: number, name: string, look: number, recipe: string,
@@ -62,7 +68,7 @@
  * @typedef {{
  *   meta: MetaSlice, clock: ClockSlice, shop: ShopSlice, shelf: ShelfSlice,
  *   customers: CustomersSlice, orders: OrdersSlice, bench: BenchSlice, pantry: PantrySlice,
- *   regulars: RegularsSlice
+ *   regulars: RegularsSlice, progress: ProgressSlice
  * }} State
  *
  * @typedef {{ type: string, [key: string]: any }} Action
@@ -91,12 +97,13 @@
  *
  * @typedef {{
  *   name: string, look: number, kind: "standing" | "bulk", recipe: string, spot: number,
- *   every: number, hour: number, joins: { day?: number, rep?: number }, hello: string,
+ *   every: number, hour: number, joins: { day?: number, rep?: number, tier?: number }, hello: string,
  *   qty?: number, lead?: number
  * }} Regular
  *   content/regulars.js. spot: middle of the window they want (inside the walk-in bell
  *   curve). every: days between visits (standing) or offers (bulk). hour: hours since
- *   opening they arrive. joins: from which day, and at what reputation, they start coming.
+ *   opening they arrive. joins: from which day, at what reputation, and from which
+ *   reputation tier they start coming (all that are given must hold).
  *   qty/lead (bulk): whole jars wanted, and days from the offer to the due day.
  *
  * @typedef {{ since: number, visits: number, happy: number, missed: number, pending?: boolean, seen?: number }} RegularMet
@@ -117,6 +124,38 @@
  *   fits: right and inside the window at pickup. lands/leaves: when it enters and
  *   leaves the window. late: hours the pickup comes after the window's middle
  *   (negative: before it; 0 is perfect).
+ */
+
+/**
+ * @typedef {{ cost: number, tier: number }} UpgradeLevel
+ * @typedef {{
+ *   name: string, kind: "shelf" | "jars" | "crock", text: string,
+ *   levels: UpgradeLevel[], slots?: number, pace?: number
+ * }} Upgrade
+ *   content/upgrades.js. slots: spots a shelf level adds. pace: a crock's ripening speed.
+ * @typedef {{ name: string, rep: number }} Tier
+ *   content/goals.js. Reached the first time reputation gets to `rep`; never lost.
+ * @typedef {"served" | "earned" | "delight" | "bestDay" | "orders" | "recipes" | "regulars" | "rep" | "upgrades"} GoalKind
+ * @typedef {{ coins: number, stock?: Record<string, number> }} Reward
+ * @typedef {{ kind: GoalKind, n: number, reward: Reward }} Goal
+ * @typedef {{ served: number, earned: number, delight: number, bestDay: number, orders: number }} Stats
+ *   Lifetime counts the goals read: portions sold, coins taken, delighted
+ *   customers, the best day's takings, and orders handed over.
+ * @typedef {{
+ *   upgrades: Record<string, number>, crocks: Record<string, string>,
+ *   tier: number, goal: number, stats: Stats
+ * }} ProgressSlice
+ *   upgrades: shelf / jars upgrade id → levels bought. crocks: shelf spot → crock
+ *   upgrade id (a spot with none has a plain crock). tier: highest tier reached
+ *   (index into TIERS). goal: index of the open rung of the goals ladder.
+ * @typedef {{
+ *   id: string, name: string, kind: Upgrade["kind"], text: string, level: number,
+ *   next: (UpgradeLevel & { level: number }) | null, locked: boolean, pace?: number
+ * }} UpgradeOffer
+ *   upgradeOffers(): one per upgrade. level: levels bought (crocks: spots fitted).
+ *   next: the next level to buy, null when maxed. locked: the next level needs a higher tier.
+ * @typedef {{ i: number, goal: Goal, text: string, have: number, ready: boolean }} GoalNow
+ *   goalNow(): the open rung, how far along it is, and whether it can be claimed.
  */
 
 export {};

@@ -15,6 +15,7 @@ import { brew, tipOut, serve } from "./shop.js";
 import { sendAway } from "./customers.js";
 import { preorder, startForOrder, acceptOrder, declineOrder, hold, release } from "./orders.js";
 import { buy, experiment } from "./bench.js";
+import { upgrade, claimGoal } from "./progress.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Action} Action */
@@ -38,6 +39,8 @@ export const ACTIONS = {
   hold,
   release,
   declineOrder,
+  upgrade,
+  claimGoal,
 };
 
 /** @returns {{ state: State, events: GameEvent[] }} */

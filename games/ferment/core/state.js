@@ -14,6 +14,7 @@ import { START_PANTRY } from "../content/ingredients.js";
 import { SLOTS, START_COINS, START_REP, START_SHELF } from "../content/tuning.js";
 import { makeJar, validAdds } from "./jars.js";
 import { freshToday } from "./shop.js";
+import { freshProgress } from "./progress.js";
 
 /** @typedef {import("./types.js").State} State */
 
@@ -28,6 +29,7 @@ export const SLICES = {
   bench: () => ({ known: [], hints: VARIANT_IDS.filter((id) => RECIPES[id].hinted), tried: {} }),
   pantry: () => ({ stock: { ...START_PANTRY } }),
   regulars: () => ({ met: {} }),
+  progress: freshProgress,
 };
 
 /** @returns {State} */
