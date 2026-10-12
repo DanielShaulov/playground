@@ -16,10 +16,10 @@ export async function run(page, snap) {
   await page.locator(`.slot[data-slot="${empty}"]`).tap();
   await page.locator(".sheet .recipe").first().waitFor();
   await snap("2-brew-sheet");
-  await page.locator('.recipe[data-recipe="hotsauce"]').tap();
+  await page.locator('.recipe[data-recipe="kimchi"]').tap();
   s = await state();
-  assert.equal(s.shelf.slots[empty].recipe, "hotsauce");
-  assert.equal(s.shop.coins, 40 - 9);
+  assert.equal(s.shelf.slots[empty].recipe, "kimchi");
+  assert.equal(s.shop.coins, 40 - 11);
 
   // Open, wait for a customer, serve the best matching jar (or pre-order).
   await page.locator('[data-act="open"]').tap();

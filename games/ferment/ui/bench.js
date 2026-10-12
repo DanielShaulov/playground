@@ -157,7 +157,7 @@ export function renderBench(view, ui) {
   const secret = made !== b.recipe && !s.bench.known.includes(made);
   const evening = s.clock.phase === "evening";
 
-  // Every recipe on the menu that isn't a discovered one: the starting four and those a tier unlocked.
+  // Every recipe on the menu that isn't a discovered one: the starting ones and those a tier unlocked.
   const baseIds = menu(s).filter((id) => !RECIPES[id].base);
   const bases = baseIds
     .map((id, i) => {

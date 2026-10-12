@@ -2,7 +2,7 @@
 // A bot is (state, memo) => action; the runner feeds actions through step()
 // and records them, so any bot game can be saved as a replay.
 import * as C from "../../../games/ferment/core/index.js";
-import { RECIPES, RECIPE_IDS } from "../../../games/ferment/content/recipes.js";
+import { RECIPES } from "../../../games/ferment/content/recipes.js";
 
 /** Steps per bot tick: 6 × 1/120 h = 0.05 h, the same rhythm the demo's test bot used. */
 export const BOT_TICK = 6;
@@ -25,8 +25,9 @@ function restock(s) {
     const j = s.shelf.slots[i];
     if (j && C.isOver(j)) return { type: "tipOut", slot: i };
   }
+  const bases = C.menu(s).filter((id) => !RECIPES[id].base);
   for (let i = 0; i < s.shelf.slots.length; i++) {
-    const recipe = RECIPE_IDS[(i + s.clock.day) % RECIPE_IDS.length];
+    const recipe = bases[(i + s.clock.day) % bases.length];
     if (!s.shelf.slots[i] && s.shop.coins >= RECIPES[recipe].cost)
       return { type: "brew", slot: i, recipe };
   }

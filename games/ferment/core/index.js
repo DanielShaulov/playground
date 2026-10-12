@@ -19,7 +19,7 @@ export { newGame, loadSave, SLICES } from "./state.js";
 export { step, ACTIONS } from "./step.js";
 export { STEP, STEPS_PER_HOUR } from "./clock.js";
 export { flavour, isOver, bandOf, forecast, ageAt, lifeOf, mixOf } from "./jars.js";
-export { previewCurve, recipeCard, resolveMix, menu } from "./bench.js";
+export { previewCurve, recipeCard, resolveMix, menu, unlocked } from "./bench.js";
 export { judge, demand, demandAt } from "./customers.js";
 export { dueFor, planFor, holdsOn, freePortions } from "./orders.js";
 export {

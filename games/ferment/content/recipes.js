@@ -10,8 +10,9 @@
  * experiment) puts it on the menu. `hinted` ones start with a hint on the
  * base's recipe card; the rest are a surprise.
  *
- * Rows with a `tier` join the menu once the shop's reputation reaches that
- * tier (content/goals.js TIERS) and can't be brewed before.
+ * Rows with a `tier` join the menu once the shop reaches that tier
+ * (content/goals.js TIERS) and can't be brewed before; nor can the recipes
+ * discovered from them.
  */
 
 /** @type {Record<string, import("../core/types.js").Recipe>} */
@@ -33,6 +34,7 @@ export const RECIPES = {
     sweet: [0.45, 0.65],
     brine: "#e9846c",
     bits: "#c43b2b",
+    tier: 1,
   },
   kimchi: {
     name: "Kimchi",
@@ -51,6 +53,7 @@ export const RECIPES = {
     sweet: [0.5, 0.7],
     brine: "#f1ead0",
     bits: "#d2bf63",
+    tier: 2,
   },
   garlicdill: {
     name: "Garlic dills",
@@ -119,7 +122,7 @@ export const RECIPES = {
     sweet: [0.3, 0.5],
     brine: "#c2577a",
     bits: "#7a1f3d",
-    tier: 1,
+    tier: 3,
   },
   lemons: {
     name: "Preserved lemons",
@@ -129,7 +132,7 @@ export const RECIPES = {
     sweet: [0.5, 0.7],
     brine: "#f2e4a4",
     bits: "#e0b520",
-    tier: 2,
+    tier: 4,
   },
   kombucha: {
     name: "Kombucha",
@@ -139,7 +142,7 @@ export const RECIPES = {
     sweet: [0.4, 0.6],
     brine: "#d8a25e",
     bits: "#a8784a",
-    tier: 3,
+    tier: 5,
   },
 };
 /** The starting menu: every recipe that isn't discovered or waiting for a tier. */

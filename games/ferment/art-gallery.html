@@ -130,7 +130,7 @@
       const section = (key, title, about, cells) =>
         `<section data-section="${key}"><h2>${title}</h2><p>${about}</p><div class="grid">${cells.join("")}</div></section>`;
 
-      // Every recipe that isn't discovered: the starting four, then those reputation unlocks.
+      // Every recipe that isn't discovered: the starting ones, then those a tier unlocks.
       const BASES = [...RECIPE_IDS, ...TIER_IDS];
       let html = "";
       for (const r of BASES)

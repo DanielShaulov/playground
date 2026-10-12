@@ -16,6 +16,7 @@
 import { appendFileSync } from "node:fs";
 import * as C from "../../../games/ferment/core/index.js";
 import { RECIPES } from "../../../games/ferment/content/recipes.js";
+import { TIERS } from "../../../games/ferment/content/goals.js";
 import { BOTS } from "./bots.mjs";
 
 const DAYS = 30;
@@ -38,7 +39,7 @@ const SEEDS = Array.from({ length: Number(process.env.SIM_SEEDS ?? 8) }, (_, i) 
  */
 export const BANDS = {
   CAREFUL_X: 2,
-  TIER_DAYS: { 1: [3, 10], 2: [7, 20], 3: [15, 30] },
+  TIER_DAYS: { 1: [2, 6], 2: [4, 10], 3: [6, 15], 4: [10, 22], 5: [15, 30] },
   LAST_UPGRADE: 20,
   MISS_SHARE: 0.1,
 };
@@ -129,9 +130,9 @@ function summary(r) {
     coins: state.shop.coins,
     rep: state.shop.rep,
     tier: state.progress.tier,
-    tier1: firstDay(log, (d) => d.tier >= 1),
-    tier2: firstDay(log, (d) => d.tier >= 2),
-    tier3: firstDay(log, (d) => d.tier >= 3),
+    ...Object.fromEntries(
+      TIERS.slice(1).map((_, i) => [`tier${i + 1}`, firstDay(log, (d) => d.tier >= i + 1)]),
+    ),
     earned: sum(log, "earned"),
     served: sum(log, "served"),
     kept: sum(log, "kept"),
@@ -170,7 +171,9 @@ const dash = (x) => (x === null ? "—" : String(x));
 say(`# Ferment balance sim: ${DAYS} days, seeds ${SEEDS[0]}–${SEEDS.at(-1)}`);
 say();
 say(
-  "| Bot | Took in (median) | Coins at end (median, low–high) | Reputation | Tier 1 / 2 / 3 on day (median) | Served | Orders kept / missed | Goals claimed |",
+  `| Bot | Took in (median) | Coins at end (median, low–high) | Reputation | Tier ${TIERS.slice(1)
+    .map((_, i) => i + 1)
+    .join(" / ")} on day (median) | Served | Orders kept / missed | Goals claimed |`,
 );
 say("| --- | --- | --- | --- | --- | --- | --- | --- |");
 for (const bot of ["careful", "careless", "idle"]) {
@@ -186,7 +189,11 @@ for (const bot of ["careful", "careless", "idle"]) {
   };
   const coins = ss.map((x) => x.coins);
   say(
-    `| ${bot} | ${m("earned")} | ${m("coins")} (${Math.min(...coins)}–${Math.max(...coins)}) | ${m("rep")} | ${tierDay("tier1")} / ${tierDay("tier2")} / ${tierDay("tier3")} | ${m("served")} | ${m("kept")} / ${m("missed")} | ${m("goals")} |`,
+    `| ${bot} | ${m("earned")} | ${m("coins")} (${Math.min(...coins)}–${Math.max(...coins)}) | ${m("rep")} | ${TIERS.slice(
+      1,
+    )
+      .map((_, i) => tierDay(`tier${i + 1}`))
+      .join(" / ")} | ${m("served")} | ${m("kept")} / ${m("missed")} | ${m("goals")} |`,
   );
 }
 const rec = runs.map((r) => summary(r.recover));

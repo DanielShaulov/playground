@@ -163,7 +163,9 @@ export async function run(page, snap) {
   assert.deepEqual(s.orders.list.find((o) => o.id === 902).jars, [], "let go");
   // Then each kimchi on the shelf is an option, with how it'll be at pickup.
   const opts = page.locator(".plan .opt:not([data-src=new])");
-  assert.equal(await opts.count(), 3, "every kimchi jar lasts till then");
+  const kimchis = s.shelf.slots.filter((j) => j?.recipe === "kimchi").length;
+  assert.ok(kimchis >= 2, "a starter kimchi and Sam's");
+  assert.equal(await opts.count(), kimchis, "every kimchi jar lasts till then");
   for (const t of await opts.locator(".fit").allInnerTexts())
     assert.match(t, /Just right|Not ready|Gone/);
   await page.locator(`.plan .opt[data-src="${slot}"]`).tap();
@@ -257,6 +259,7 @@ export async function run(page, snap) {
   await page.evaluate(() => {
     const s = structuredClone(window.__ferment.state);
     s.bench.known.push("firekraut");
+    s.progress.tier = Math.max(s.progress.tier, 2); // kraut on the menu
     window.__ferment.state = s;
   });
   await page.locator('.ticket[data-order="905"]').tap();

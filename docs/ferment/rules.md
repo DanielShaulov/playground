@@ -40,21 +40,28 @@ Everything is in in-game hours. A day has three phases:
 | Recipe           | Ripens in | Price | Cost | On the menu from        |
 | ---------------- | --------- | ----- | ---- | ----------------------- |
 | Dill pickles     | 48 h      | 12    | 7    | the start               |
-| Hot sauce        | 36 h      | 15    | 9    | the start               |
 | Kimchi           | 72 h      | 18    | 11   | the start               |
-| Sauerkraut       | 120 h     | 22    | 12   | the start               |
-| Pickled beets    | 60 h      | 20    | 10   | Neighbourhood favourite |
-| Preserved lemons | 96 h      | 26    | 13   | Talk of the town        |
-| Kombucha         | 30 h      | 18    | 8    | Famous brine            |
+| Hot sauce        | 36 h      | 15    | 9    | Known on the street     |
+| Sauerkraut       | 120 h     | 22    | 12   | Neighbourhood favourite |
+| Pickled beets    | 60 h      | 20    | 10   | Talk of the town        |
+| Preserved lemons | 96 h      | 26    | 13   | Famous brine            |
+| Kombucha         | 30 h      | 18    | 8    | Pride of the city       |
 
 Sweet spots: beets 0.3–0.5, lemons 0.5–0.7, kombucha 0.4–0.6. A recipe locked
-behind a tier can't be brewed and nobody asks for it until the shop reaches it.
+behind a tier can't be brewed and nobody asks for it until the shop reaches it,
+and the same goes for recipes discovered from it.
+
+The menu starts with two recipes and grows tier by tier **(Hadash)**, so a
+new shop isn't handed everything at once. The two are the easy ones to time
+from a morning start: dill is at its best late the same day, kimchi all
+through the next. Hot sauce comes next because its best stretch falls
+overnight from a morning start, so it needs a crock or an add-in to time.
 
 - Portions can be kept for orders (see Kept portions below); walk-ins can only
   buy portions nobody has kept.
 
-A new game starts with 40 coins, reputation 5 of 10, and six jars already
-part-way along so day 1 has something to sell.
+A new game starts with 40 coins, reputation 5 of 10, and three jars (two
+dill, one kimchi) already part-way along so day 1 has something to sell.
 
 ## Customers
 
@@ -186,14 +193,14 @@ walk-in first like everyone else **(Hadash)**.
 | Regular                  | Kind     | Wants               | Every  | Arrives | Starts                  |
 | ------------------------ | -------- | ------------------- | ------ | ------- | ----------------------- |
 | Mrs. Okafor              | standing | dill at 0.25        | 2 days | 09:30   | day 2                   |
-| Old Bram                 | standing | sauerkraut at 0.68  | 4 days | 17:00   | day 3                   |
+| Old Bram                 | standing | sauerkraut at 0.68  | 4 days | 17:00   | day 3, Neighbourhood f. |
 | Mei from Lucky Noodle    | bulk     | 4 dill at 0.2       | 5 days | 11:00   | day 4                   |
 | Kenji                    | standing | kimchi at 0.52      | 3 days | 13:00   | day 5, reputation 6     |
-| Noor                     | standing | hot sauce at 0.6    | 3 days | 15:30   | day 6, reputation 7     |
-| Luis from the taco truck | bulk     | 3 hot sauce at 0.52 | 6 days | 14:00   | day 7, reputation 7     |
-| Dr. Ames                 | standing | beets at 0.42       | 3 days | 12:00   | Neighbourhood favourite |
-| Lena                     | standing | lemons at 0.62      | 4 days | 14:30   | Talk of the town        |
-| Rosa from Hotel Marigold | bulk     | 3 kombucha at 0.5   | 5 days | 10:00   | Famous brine            |
+| Noor                     | standing | hot sauce at 0.6    | 3 days | 15:30   | day 6, rep 7, Known     |
+| Luis from the taco truck | bulk     | 3 hot sauce at 0.52 | 6 days | 14:00   | day 7, rep 7, Known     |
+| Dr. Ames                 | standing | beets at 0.42       | 3 days | 12:00   | Talk of the town        |
+| Lena                     | standing | lemons at 0.62      | 4 days | 14:30   | Famous brine            |
+| Rosa from Hotel Marigold | bulk     | 3 kombucha at 0.5   | 5 days | 10:00   | Pride of the city       |
 
 Each window is 0.16 wide around the spot.
 
@@ -311,25 +318,27 @@ upgrades, shop tiers and an endless goals ladder (`state.progress`,
 lifetime takings (`stats.earned`, every coin customers have paid) reach the
 tier's amount, and never drops back (event `tierUp`). Tiers go by takings,
 not hearts: reputation fills to 10 within a few days, so it can't spread
-tiers out **(Hadash)**. Reputation stays the shop's standing today. Each tier unlocks a recipe,
-a regular and upgrades:
+tiers out **(Hadash)**. Reputation stays the shop's standing today. Each tier
+unlocks a recipe, and with it regulars and upgrades:
 
-| Tier | Name                    | Taken in all | Unlocks                                                   |
-| ---- | ----------------------- | ------------ | --------------------------------------------------------- |
-| 0    | Corner nook             | start        | cellar crock                                              |
-| 1    | Neighbourhood favourite | 500          | pickled beets, Dr. Ames, warm crock, first shelf upgrade  |
-| 2    | Talk of the town        | 1800         | preserved lemons, Lena, bigger jars, second shelf upgrade |
-| 3    | Famous brine            | 4500         | kombucha, Hotel Marigold, third shelf, even bigger jars   |
+| Tier | Name                    | Taken in all | Unlocks                                                 |
+| ---- | ----------------------- | ------------ | ------------------------------------------------------- |
+| 0    | Corner nook             | start        | dill, kimchi, cellar crock                              |
+| 1    | Known on the street     | 200          | hot sauce, Noor, the taco truck                         |
+| 2    | Neighbourhood favourite | 650          | sauerkraut, Old Bram, warm crock, first shelf upgrade   |
+| 3    | Talk of the town        | 1200         | pickled beets, Dr. Ames                                 |
+| 4    | Famous brine            | 2400         | preserved lemons, Lena, bigger jars, second shelf       |
+| 5    | Pride of the city       | 4500         | kombucha, Hotel Marigold, third shelf, even bigger jars |
 
 **Upgrades** (`content/upgrades.js`) are bought in the evening
 (`upgrade { id, slot? }`), each level once its tier is reached:
 
 | Upgrade          | What it does                                                        | Cost           | Tier    |
 | ---------------- | ------------------------------------------------------------------- | -------------- | ------- |
-| More shelf space | 3 more shelf spots per level (9 → 12 → 15 → 18)                     | 200, 500, 1000 | 1, 2, 3 |
-| Bigger jars      | +1 portion per level for every jar started from then on (2 → 3 → 4) | 700, 1800      | 2, 3    |
+| More shelf space | 3 more shelf spots per level (9 → 12 → 15 → 18)                     | 200, 500, 1000 | 2, 4, 5 |
+| Bigger jars      | +1 portion per level for every jar started from then on (2 → 3 → 4) | 700, 1800      | 4, 5    |
 | Cellar crock     | fitted to one spot: jars started there ripen at 0.75×               | 60 per spot    | 0       |
-| Warm crock       | fitted to one spot: jars started there ripen at 1.3×                | 80 per spot    | 1       |
+| Warm crock       | fitted to one spot: jars started there ripen at 1.3×                | 80 per spot    | 2       |
 
 A crock's pace multiplies with the add-ins' speeds. Fitting a crock to a spot
 replaces the one there; a jar already in that spot keeps the pace it started
@@ -345,7 +354,7 @@ opens the next rung, which may already be met. The first ten are written out:
 | --- | -------------------------- | --------------------- |
 | 1   | Sell 10 portions           | 20                    |
 | 2   | Hand over 2 orders         | 25                    |
-| 3   | Have 5 recipes on the menu | 20 + a garlic, a pear |
+| 3   | Have 3 recipes on the menu | 20 + a garlic, a pear |
 | 4   | Take 120 coins in one day  | 30                    |
 | 5   | Win 2 regulars             | 40                    |
 | 6   | Buy 1 upgrade              | 30                    |

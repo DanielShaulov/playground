@@ -34,6 +34,7 @@ function evening({ coins = 200, stock = {} } = {}) {
   s = structuredClone(s);
   s.shop.coins = coins;
   s.pantry.stock = { ...stock };
+  s.progress.tier = 2; // hot sauce and kraut on the menu
   return s;
 }
 function morning(opts) {
@@ -220,11 +221,14 @@ test("discovered recipes join the menu, and walk-ins start asking for them", () 
   const s = C.newGame(2);
   assert.deepEqual(C.menu(s), RECIPE_IDS);
   s.bench.known = ["firekraut", "garlicdill"];
-  assert.deepEqual(C.menu(s), [...RECIPE_IDS, "garlicdill", "firekraut"]);
+  assert.deepEqual(C.menu(s), [...RECIPE_IDS, "garlicdill"], "fire kraut waits for kraut");
+  s.progress.tier = 2;
+  assert.deepEqual(C.menu(s), [...RECIPE_IDS, "hotsauce", "kraut", "garlicdill", "firekraut"]);
   const asked = new Set();
   for (let seed = 1; seed <= 20; seed++) {
     let g = C.newGame(seed);
     g.bench.known = [...VARIANT_IDS];
+    g.progress.tier = 2;
     g = ok(g, { type: "open" }).state;
     for (const e of ok(g, { type: "tick", n: 120 * 11 }).events)
       if (e.type === "arrived") asked.add(e.customer.recipe);
@@ -256,7 +260,7 @@ test("the recipe card ticks what you have tried and hints at what's left to find
 test("content rows are consistent", () => {
   for (const id of VARIANT_IDS) {
     const v = RECIPES[id];
-    assert.ok(RECIPE_IDS.includes(v.base), `${id} base`);
+    assert.ok(RECIPES[v.base] && !RECIPES[v.base].base, `${id} base`);
     assert.equal(v.hours, RECIPES[v.base].hours, `${id} ripens like its base`);
     assert.ok(v.needs.length >= 1 && v.needs.length <= MAX_ADDS);
     assert.ok(v.needs.every((n) => INGREDIENT_IDS.includes(n)));
@@ -345,6 +349,7 @@ test("walk-ins want a recipe on a bell curve centred on its sweet spot", () => {
   for (let seed = 1; seed <= 150; seed++) {
     let g = C.newGame(seed);
     g.bench.known = [...VARIANT_IDS];
+    g.progress.tier = 2;
     g = ok(g, { type: "open" }).state;
     for (const e of ok(g, { type: "tick", n: 120 * 11 }).events) {
       if (e.type !== "arrived" || e.customer.orderId) continue;
