@@ -67,6 +67,7 @@
       }
       .sizes {
         display: flex;
+        flex-wrap: wrap;
         align-items: flex-end;
         gap: 14px;
       }
@@ -95,7 +96,7 @@
     </p>
     <main id="gallery"></main>
     <script type="module">
-      import { RECIPES, RECIPE_IDS, VARIANT_IDS } from "./content/recipes.js";
+      import { RECIPES, RECIPE_IDS, TIER_IDS, VARIANT_IDS } from "./content/recipes.js";
       import { INGREDIENT_IDS } from "./content/ingredients.js";
       import { SERVINGS } from "./content/tuning.js";
       import { jarArt, emptyJarSvg } from "./ui/art/jar.js";
@@ -120,6 +121,7 @@
         f: Math.min(f, 1),
         over: f >= 1,
         servings: SERVINGS,
+        size: SERVINGS,
         adds: [],
         ...more,
       });
@@ -128,8 +130,10 @@
       const section = (key, title, about, cells) =>
         `<section data-section="${key}"><h2>${title}</h2><p>${about}</p><div class="grid">${cells.join("")}</div></section>`;
 
+      // Every recipe that isn't discovered: the starting four, then those reputation unlocks.
+      const BASES = [...RECIPE_IDS, ...TIER_IDS];
       let html = "";
-      for (const r of RECIPE_IDS)
+      for (const r of BASES)
         html += section(
           r,
           RECIPES[r].name,
@@ -141,15 +145,23 @@
         );
 
       const sold = [];
-      for (const r of RECIPE_IDS)
+      for (const r of BASES)
         for (let s = SERVINGS; s >= 1; s--)
           sold.push(
             fig(look(r, 0.4, { servings: s }), RECIPES[r].name, `${s} of ${SERVINGS} left`),
           );
+      for (let s = SERVINGS + 1; s >= 1; s--)
+        sold.push(
+          fig(
+            look("dill", 0.4, { servings: s, size: SERVINGS + 1 }),
+            "Bigger jar",
+            `${s} of ${SERVINGS + 1} left`,
+          ),
+        );
       html += section(
         "servings",
         "Sold down",
-        "The brine drops to the next notch on the glass with each serving sold.",
+        "The brine drops to the next notch on the glass with each serving sold. A bigger jar has a notch for every portion it holds.",
         sold,
       );
 
@@ -184,7 +196,7 @@
 
       html += `<section data-section="sizes"><h2>Other uses</h2><p>The empty shelf spot, and the small jar on the start-a-jar sheet.</p>
         <div class="grid sizes"><figure>${emptyJarSvg}<figcaption>empty</figcaption></figure>
-        ${RECIPE_IDS.map((r) => `<figure>${jarArt(look(r, 0), "icon")}<figcaption>${RECIPES[r].name}</figcaption></figure>`).join("")}</div></section>`;
+        ${BASES.map((r) => `<figure>${jarArt(look(r, 0), "icon")}<figcaption>${RECIPES[r].name}</figcaption></figure>`).join("")}</div></section>`;
 
       const person = (look, mood, name, note = "") =>
         `<figure>${faceSvg(look, mood)}<figcaption>${name}<small>${note}</small></figcaption></figure>`;

@@ -10,6 +10,10 @@
  * along the strip, so flavour = (age + shift × life) / life. A plain jar has
  * speed 1 and shift 0, and every formula below reduces to the plain one
  * exactly (same floating-point operations), which keeps old games replaying.
+ *
+ * A crock (content/upgrades.js) multiplies a jar's speed by its `pace`. The
+ * pace is stored on the jar when it is started, so a jar ripens the same way
+ * wherever it sits later, and every forecast of it stays true.
  */
 
 import { RECIPES } from "../content/recipes.js";
@@ -43,54 +47,76 @@ export function mixOf(/** @type {readonly string[] | undefined} */ adds) {
   return { speed, shift: clamp(shift, -MAX_SHIFT, MAX_SHIFT) };
 }
 
-/** Hours a jar of `recipe` with `adds` takes to cross the whole strip. */
-export const lifeOf = (/** @type {string} */ recipe, /** @type {readonly string[]} */ adds) =>
-  RECIPES[recipe].hours / mixOf(adds).speed;
+/**
+ * Hours a jar of `recipe` with `adds`, in a crock of `pace`, takes to cross
+ * the whole strip.
+ */
+export const lifeOf = (
+  /** @type {string} */ recipe,
+  /** @type {readonly string[]} */ adds,
+  pace = 1,
+) => RECIPES[recipe].hours / (mixOf(adds).speed * pace);
 
 /** Head start in hours along the strip (negative: a lag before it starts to turn). */
 const leadOf = (
   /** @type {string} */ recipe,
   /** @type {readonly string[] | undefined} */ adds,
+  pace = 1,
 ) => {
   const { speed, shift } = mixOf(adds);
-  return shift * (RECIPES[recipe].hours / speed);
+  return shift * (RECIPES[recipe].hours / (speed * pace));
 };
 
-/** Flavour of a jar of `recipe` with `adds` at `age` hours, unclamped. */
-const rawFlavour = (recipe, adds, age) =>
-  (age + leadOf(recipe, adds)) / (RECIPES[recipe].hours / mixOf(adds).speed);
+/** Flavour of a jar of `recipe` with `adds` in a crock of `pace` at `age` hours, unclamped. */
+const rawFlavour = (recipe, adds, age, pace = 1) =>
+  (age + leadOf(recipe, adds, pace)) / (RECIPES[recipe].hours / (mixOf(adds).speed * pace));
 
 export const flavour = (/** @type {Jar} */ jar) =>
-  clamp(rawFlavour(jar.recipe, jar.adds, jar.age), 0, 1);
+  clamp(rawFlavour(jar.recipe, jar.adds, jar.age, jar.pace ?? 1), 0, 1);
 export const isOver = (/** @type {Jar} */ jar) =>
-  jar.age + leadOf(jar.recipe, jar.adds) >= RECIPES[jar.recipe].hours / mixOf(jar.adds).speed;
+  jar.age + leadOf(jar.recipe, jar.adds, jar.pace ?? 1) >=
+  RECIPES[jar.recipe].hours / (mixOf(jar.adds).speed * (jar.pace ?? 1));
 export const bandOf = (/** @type {number} */ x) =>
   BANDS.find((b) => x < b.hi) ?? BANDS[BANDS.length - 1];
 
-/** Where a jar of `recipe` (with `adds`) started now will sit after `hours` more hours. */
+/**
+ * Where a jar of `recipe` (with `adds`, in a crock of `pace`) will sit at
+ * `hours` old. For a jar on the shelf pass its own adds and pace.
+ */
 export const forecast = (
   /** @type {string} */ recipe,
   /** @type {number} */ hours,
   /** @type {readonly string[]} */ adds = [],
-) => (adds.length ? clamp(rawFlavour(recipe, adds, hours), 0, 1) : hours / RECIPES[recipe].hours);
+  pace = 1,
+) =>
+  adds.length || pace !== 1
+    ? clamp(rawFlavour(recipe, adds, hours, pace), 0, 1)
+    : hours / RECIPES[recipe].hours;
 
-/** Age (hours since started) at which a jar of `recipe` with `adds` reaches flavour `f`. */
+/** Age (hours since started) at which a jar of `recipe` with `adds` in a crock of `pace` reaches flavour `f`. */
 export const ageAt = (
   /** @type {string} */ recipe,
   /** @type {readonly string[]} */ adds,
   /** @type {number} */ f,
-) => Math.max(0, f * lifeOf(recipe, adds) - leadOf(recipe, adds));
+  pace = 1,
+) => Math.max(0, f * lifeOf(recipe, adds, pace) - leadOf(recipe, adds, pace));
 
-/** @returns {Jar} */
+/**
+ * A new jar holding `size` portions, started in a crock of `pace` (stored on
+ * the jar only when it isn't 1, like `adds`).
+ * @returns {Jar}
+ */
 export function makeJar(
   /** @type {State} */ s,
   /** @type {string} */ recipe,
   age = 0,
   /** @type {string[]} */ adds = [],
+  { pace = 1, size = SERVINGS } = {},
 ) {
   /** @type {Jar} */
-  const jar = { id: nextId(s), recipe, age, servings: SERVINGS };
+  const jar = { id: nextId(s), recipe, age, servings: size, size };
   if (adds.length) jar.adds = [...adds];
+  if (pace !== 1) jar.pace = pace;
   return jar;
 }
 

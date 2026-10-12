@@ -15,7 +15,7 @@
  * (base recipe → ingredients mixed into it at least once, which the card ticks).
  */
 
-import { RECIPES, RECIPE_IDS, VARIANT_IDS } from "../content/recipes.js";
+import { RECIPES, RECIPE_IDS, TIER_IDS, VARIANT_IDS } from "../content/recipes.js";
 import { INGREDIENTS, INGREDIENT_IDS } from "../content/ingredients.js";
 import { ageAt, forecast, mixOf, validAdds } from "./jars.js";
 
@@ -25,9 +25,16 @@ import { ageAt, forecast, mixOf, validAdds } from "./jars.js";
 
 const isRecipe = (r) => typeof r === "string" && Object.hasOwn(RECIPES, r);
 
-/** Recipes on the menu right now: the starting four, then whatever has been discovered. */
+/**
+ * Recipes on the menu right now: the starting four, those the shop's
+ * tier has unlocked, then whatever has been discovered.
+ */
 export function menu(/** @type {State} */ s) {
-  return [...RECIPE_IDS, ...VARIANT_IDS.filter((id) => s.bench.known.includes(id))];
+  return [
+    ...RECIPE_IDS,
+    ...TIER_IDS.filter((id) => (RECIPES[id].tier ?? 0) <= s.progress.tier),
+    ...VARIANT_IDS.filter((id) => s.bench.known.includes(id)),
+  ];
 }
 
 /**
@@ -140,6 +147,7 @@ export function checkMix(
   const r = RECIPES[/** @type {string} */ (recipe)];
   if (r.base && !s.bench.known.includes(/** @type {string} */ (recipe)))
     return "recipe not discovered";
+  if ((r.tier ?? 0) > s.progress.tier) return "recipe not unlocked";
   if (mix.adds.some((a) => (s.pantry.stock[a] ?? 0) < 1)) return "not in the pantry";
   return mix;
 }

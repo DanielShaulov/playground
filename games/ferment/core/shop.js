@@ -6,12 +6,13 @@
  */
 
 import { RECIPES } from "../content/recipes.js";
-import { REP_MAX, SLOTS } from "../content/tuning.js";
+import { REP_MAX } from "../content/tuning.js";
 import { clamp } from "./util.js";
 import { flavour, isOver, makeJar } from "./jars.js";
 import { judge } from "./customers.js";
 import { checkMix, useMix } from "./bench.js";
 import { deliver, settle, freePortions, welcome } from "./orders.js";
+import { crockAt, jarSize } from "./progress.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Today} Today */
@@ -25,17 +26,20 @@ export function freshToday(/** @type {number} */ rep) {
   return { served: 0, earned: 0, tips: 0, repStart: rep, missed: 0, preorders: 0, left: 0 };
 }
 
-const badSlot = (slot) => !Number.isInteger(slot) || slot < 0 || slot >= SLOTS;
+/** True unless `slot` is a spot on the shelf (which grows with upgrades). */
+const badSlot = (/** @type {State} */ s, slot) =>
+  !Number.isInteger(slot) || slot < 0 || slot >= s.shelf.slots.length;
 
 /**
  * { type: "brew", slot, recipe, adds? } — start a jar in an empty slot, with
- * optional add-ins from the pantry. A mix can make a discovered recipe (see
+ * optional add-ins from the pantry. The jar takes the pace of the crock in
+ * that slot and holds as many portions as the shop's jars now do. A mix can make a discovered recipe (see
  * bench.js); a discovered recipe can be brewed by name once it is known.
  */
 export function brew(s, { slot, recipe, adds }, events) {
   if (typeof recipe !== "string" || !Object.hasOwn(RECIPES, recipe)) return "no such recipe";
   const r = RECIPES[recipe];
-  if (badSlot(slot)) return "no such slot";
+  if (badSlot(s, slot)) return "no such slot";
   if (s.clock.phase === "evening") return "shop is closed";
   if (s.shelf.slots[slot]) return "slot is full";
   if (s.shop.coins < r.cost) return "not enough coins";
@@ -43,14 +47,18 @@ export function brew(s, { slot, recipe, adds }, events) {
   if (typeof mix === "string") return mix;
   s.shop.coins -= r.cost;
   useMix(s, mix, events);
-  const jar = makeJar(s, mix.recipe, 0, mix.adds);
+  // The crock's pace and the jar's size are fixed on the jar now, so nothing later changes them.
+  const jar = makeJar(s, mix.recipe, 0, mix.adds, {
+    pace: crockAt(s, slot).pace,
+    size: jarSize(s),
+  });
   s.shelf.slots[slot] = jar;
   events.push({ type: "brewed", slot, jar });
 }
 
 /** { type: "tipOut", slot } — throw a jar away. */
 export function tipOut(s, { slot }, events) {
-  if (badSlot(slot) || !s.shelf.slots[slot]) return "empty slot";
+  if (badSlot(s, slot) || !s.shelf.slots[slot]) return "empty slot";
   const jar = s.shelf.slots[slot];
   s.shelf.slots[slot] = null;
   events.push({ type: "tippedOut", slot, jar });
@@ -59,7 +67,7 @@ export function tipOut(s, { slot }, events) {
 /** { type: "serve", slot } — sell a serving from `slot` to whoever is at the counter. */
 export function serve(s, { slot }, events) {
   const c = s.customers.queue[0];
-  const jar = badSlot(slot) ? null : s.shelf.slots[slot];
+  const jar = badSlot(s, slot) ? null : s.shelf.slots[slot];
   if (!c) return "nobody at the counter";
   if (!jar) return "empty slot";
   if (jar.recipe !== c.recipe) return "wrong recipe";

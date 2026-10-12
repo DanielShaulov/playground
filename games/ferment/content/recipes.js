@@ -9,6 +9,9 @@
  * every ingredient in `needs` becomes one, and the first such jar (or bench
  * experiment) puts it on the menu. `hinted` ones start with a hint on the
  * base's recipe card; the rest are a surprise.
+ *
+ * Rows with a `tier` join the menu once the shop's reputation reaches that
+ * tier (content/goals.js TIERS) and can't be brewed before.
  */
 
 /** @type {Record<string, import("../core/types.js").Recipe>} */
@@ -108,8 +111,42 @@ export const RECIPES = {
     base: "kimchi",
     needs: ["garlic", "chili"],
   },
+  beets: {
+    name: "Pickled beets",
+    hours: 60,
+    price: 20,
+    cost: 10,
+    sweet: [0.3, 0.5],
+    brine: "#c2577a",
+    bits: "#7a1f3d",
+    tier: 1,
+  },
+  lemons: {
+    name: "Preserved lemons",
+    hours: 96,
+    price: 26,
+    cost: 13,
+    sweet: [0.5, 0.7],
+    brine: "#f2e4a4",
+    bits: "#e0b520",
+    tier: 2,
+  },
+  kombucha: {
+    name: "Kombucha",
+    hours: 30,
+    price: 18,
+    cost: 8,
+    sweet: [0.4, 0.6],
+    brine: "#d8a25e",
+    bits: "#a8784a",
+    tier: 3,
+  },
 };
-/** The starting menu: every recipe that isn't discovered. */
-export const RECIPE_IDS = Object.keys(RECIPES).filter((id) => !RECIPES[id].base);
+/** The starting menu: every recipe that isn't discovered or waiting for a tier. */
+export const RECIPE_IDS = Object.keys(RECIPES).filter(
+  (id) => !RECIPES[id].base && !RECIPES[id].tier,
+);
+/** Recipes that join the menu when the shop reaches their tier (content/goals.js). */
+export const TIER_IDS = Object.keys(RECIPES).filter((id) => !RECIPES[id].base && RECIPES[id].tier);
 /** Recipes found at the bench, in the order a menu lists them. */
 export const VARIANT_IDS = Object.keys(RECIPES).filter((id) => RECIPES[id].base);

@@ -14,7 +14,7 @@ import { START_PANTRY } from "../content/ingredients.js";
 import { SLOTS, START_COINS, START_REP, START_SHELF } from "../content/tuning.js";
 import { makeJar, validAdds } from "./jars.js";
 import { freshToday } from "./shop.js";
-import { freshProgress } from "./progress.js";
+import { freshProgress, slotCount } from "./progress.js";
 import { openMarket } from "./market.js";
 
 /** @typedef {import("./types.js").State} State */
@@ -66,7 +66,10 @@ export function loadSave(/** @type {any} */ raw) {
     const saved = raw[name];
     s[name] = isObj(saved) ? { ...make(), ...saved } : make();
   }
-  if (!Array.isArray(s.shelf.slots) || s.shelf.slots.length !== SLOTS) return null;
+  if (!isObj(s.progress.upgrades) || !isObj(s.progress.crocks) || !isObj(s.progress.stats))
+    return null;
+  s.progress.stats = { ...freshProgress().stats, ...s.progress.stats };
+  if (!Array.isArray(s.shelf.slots) || s.shelf.slots.length !== slotCount(s)) return null;
   if (s.shelf.slots.some((j) => j && !Object.hasOwn(RECIPES, j.recipe))) return null;
   if (s.shelf.slots.some((j) => j && !validAdds(j.adds))) return null;
   return s;

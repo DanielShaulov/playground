@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * Progression: shop upgrades, reputation tiers and the endless goals ladder.
+ * Progression: shop upgrades, shop tiers and the endless goals ladder.
  *
  * state.progress keeps what the shop has bought (`upgrades`, `crocks`), the
- * highest reputation tier it has reached (`tier`, never lost), the open rung
+ * highest tier it has reached (by lifetime takings) (`tier`, never lost), the open rung
  * of the goals ladder (`goal`) and the lifetime `stats` the goals read.
  *
  * Content: content/upgrades.js (what can be bought), content/goals.js (tiers,
@@ -13,6 +13,7 @@
 import { UPGRADES, UPGRADE_IDS } from "../content/upgrades.js";
 import { GOALS, GOAL_TEXT, MORE, TIERS } from "../content/goals.js";
 import { SERVINGS, SLOTS } from "../content/tuning.js";
+import { MAX_STOCK } from "../content/ingredients.js";
 import { menu } from "./bench.js";
 
 /** @typedef {import("./types.js").State} State */
@@ -30,7 +31,7 @@ export function freshProgress() {
   };
 }
 
-/** The highest reputation tier the shop has reached (index into TIERS). */
+/** The highest tier the shop has reached (index into TIERS). */
 export const tierOf = (/** @type {State} */ s) => s.progress.tier;
 
 /** Levels bought of a shelf or jars upgrade. */
@@ -123,13 +124,78 @@ export function goalNow(/** @type {State} */ s) {
 
 /**
  * { type: "upgrade", id, slot? } — buy the next level of an upgrade in the
- * evening; a crock needs the shelf `slot` to fit it to.
+ * evening. A crock needs the shelf `slot` to fit it to (it replaces whatever
+ * crock was there; jars already started keep their own pace).
  */
-export function upgrade(_s, _action, _events) {
-  return "not open yet";
+export function upgrade(s, { id, slot }, events) {
+  if (typeof id !== "string" || !Object.hasOwn(UPGRADES, id)) return "no such upgrade";
+  if (s.clock.phase !== "evening") return "only in the evening";
+  const u = UPGRADES[id];
+  const offer = /** @type {import("./types.js").UpgradeOffer} */ (
+    upgradeOffers(s).find((o) => o.id === id)
+  );
+  if (!offer.next) return "nothing more to buy";
+  if (offer.locked) return "needs a higher tier";
+  if (u.kind === "crock") {
+    if (!Number.isInteger(slot) || slot < 0 || slot >= s.shelf.slots.length) return "no such slot";
+    if (s.progress.crocks[slot] === id) return "already fitted";
+  }
+  if (s.shop.coins < offer.next.cost) return "not enough coins";
+  s.shop.coins -= offer.next.cost;
+  if (u.kind === "crock") s.progress.crocks[slot] = id;
+  else s.progress.upgrades[id] = offer.next.level;
+  if (u.kind === "shelf") for (let k = 0; k < (u.slots ?? 0); k++) s.shelf.slots.push(null);
+  /** @type {import("./types.js").GameEvent} */
+  const e = { type: "upgraded", id, level: offer.next.level, cost: offer.next.cost };
+  if (u.kind === "crock") e.slot = slot;
+  events.push(e);
 }
 
-/** { type: "claimGoal" } — take the reward for the open goal once it is met. */
-export function claimGoal(_s, _action, _events) {
-  return "not open yet";
+/** { type: "claimGoal" } — take the reward for the open goal once it is met; the next one opens. */
+export function claimGoal(s, _action, events) {
+  const now = goalNow(s);
+  if (!now.ready) return "not done yet";
+  const { coins, stock = {} } = now.goal.reward;
+  s.shop.coins += coins;
+  for (const [id, n] of Object.entries(stock))
+    s.pantry.stock[id] = Math.min(MAX_STOCK, (s.pantry.stock[id] ?? 0) + n);
+  s.progress.goal++;
+  events.push({ type: "claimedGoal", i: now.i, goal: now.goal });
+}
+
+/** True when the shop has taken in all the coins a tier asks for. */
+const reached = (/** @type {State} */ s, /** @type {import("./types.js").Tier} */ t) =>
+  s.progress.stats.earned >= t.earned;
+
+/**
+ * Runs after every accepted action (step.js): counts what the goals read from
+ * its events, climbs tiers, and says when the open goal is met.
+ */
+export function track(
+  /** @type {State} */ before,
+  /** @type {State} */ s,
+  /** @type {import("./types.js").GameEvent[]} */ events,
+) {
+  const st = s.progress.stats;
+  for (const e of events) {
+    if (e.type === "served") {
+      st.served++;
+      st.earned += e.pay;
+      if (e.mood === "delight") st.delight++;
+      if (e.customer.orderId) st.orders++;
+    } else if (e.type === "delivered") {
+      st.served += e.jar.servings;
+      st.earned += e.pay;
+      if (e.done && e.mood === "delight") st.delight++;
+      if (e.done) st.orders++;
+    } else if (e.type === "closed") st.bestDay = Math.max(st.bestDay, e.today.earned);
+  }
+  const p = s.progress;
+  while (p.tier + 1 < TIERS.length && reached(s, TIERS[p.tier + 1])) {
+    p.tier++;
+    events.push({ type: "tierUp", tier: p.tier });
+  }
+  const now = goalNow(s);
+  if (now.ready && (before.progress.goal !== now.i || !goalNow(before).ready))
+    events.push({ type: "goalReady", i: now.i, goal: now.goal });
 }

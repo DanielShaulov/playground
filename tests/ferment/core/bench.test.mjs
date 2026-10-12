@@ -212,7 +212,7 @@ test("brewing with add-ins uses the pantry, and a discovering mix brews the new 
   // A plain brew stores no adds, so a plain jar looks exactly as it always did.
   assert.deepEqual(
     Object.keys(ok(s, { type: "brew", slot: 0, recipe: "dill" }).state.shelf.slots[0]).sort(),
-    ["age", "id", "recipe", "servings"],
+    ["age", "id", "recipe", "servings", "size"],
   );
 });
 

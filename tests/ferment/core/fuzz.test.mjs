@@ -5,6 +5,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as C from "../../../games/ferment/core/index.js";
 import { RECIPE_IDS } from "../../../games/ferment/content/recipes.js";
+import { UPGRADE_IDS } from "../../../games/ferment/content/upgrades.js";
+import { TIERS } from "../../../games/ferment/content/goals.js";
 import {
   MAX_QUEUE,
   OPEN_HOURS,
@@ -20,7 +22,7 @@ const LENGTH = 400;
 function randomAction(rnd, s, { validSlots = false } = {}) {
   const slot = () =>
     validSlots || rnd() < 0.9
-      ? Math.floor(rnd() * SLOTS)
+      ? Math.floor(rnd() * s.shelf.slots.length)
       : [-1, 9, 1.5, "2", null][Math.floor(rnd() * 5)];
   const r = rnd();
   // Mostly let time run while open; otherwise anything goes, valid or not.
@@ -38,6 +40,8 @@ function randomAction(rnd, s, { validSlots = false } = {}) {
     "startForOrder",
     "acceptOrder",
     "declineOrder",
+    "upgrade",
+    "claimGoal",
   ];
   const type = kinds[Math.floor(rnd() * kinds.length)];
   if (type === "brew")
@@ -47,6 +51,12 @@ function randomAction(rnd, s, { validSlots = false } = {}) {
       recipe: rnd() < 0.95 ? RECIPE_IDS[Math.floor(rnd() * RECIPE_IDS.length)] : "toString",
     };
   if (type === "tipOut" || type === "serve") return { type, slot: slot() };
+  if (type === "upgrade")
+    return {
+      type,
+      id: rnd() < 0.95 ? UPGRADE_IDS[Math.floor(rnd() * UPGRADE_IDS.length)] : "toString",
+      slot: slot(),
+    };
   if (type === "tick") return { type, n: 1 + Math.floor(rnd() * 30) };
   if (type === "startForOrder" || type === "acceptOrder" || type === "declineOrder") {
     const list = type === "startForOrder" ? s.orders.list : s.orders.offers;
@@ -73,7 +83,11 @@ function checkInvariants(s) {
   );
   assert.ok(["morning", "open", "evening"].includes(s.clock.phase));
   assert.ok(s.clock.hour >= 0 && s.clock.hour <= OPEN_HOURS, `hour ${s.clock.hour}`);
-  assert.equal(s.shelf.slots.length, SLOTS);
+  assert.equal(s.shelf.slots.length, C.slotCount(s));
+  assert.ok(s.shelf.slots.length >= SLOTS);
+  for (const k of Object.keys(s.progress.crocks)) assert.ok(Number(k) < s.shelf.slots.length);
+  assert.ok(s.progress.tier >= 0 && s.progress.tier < TIERS.length);
+  assert.ok(TIERS[s.progress.tier].earned <= s.progress.stats.earned);
   const ids = new Set();
   const own = (id) => {
     assert.ok(Number.isInteger(id) && id < s.meta.nextId, `id ${id} not yet handed out`);
@@ -83,7 +97,9 @@ function checkInvariants(s) {
   for (const j of s.shelf.slots) {
     if (!j) continue;
     own(j.id);
-    assert.ok(j.servings >= 1 && j.servings <= SERVINGS, `jar servings ${j.servings}`);
+    assert.ok(j.size >= SERVINGS, `jar size ${j.size}`);
+    assert.ok(j.servings >= 1 && j.servings <= j.size, `jar servings ${j.servings}/${j.size}`);
+    if (j.pace !== undefined) assert.ok(j.pace > 0 && j.pace !== 1, `jar pace ${j.pace}`);
     assert.ok(j.age >= 0);
   }
   for (const o of s.orders.list) {
@@ -119,9 +135,17 @@ function checkInvariants(s) {
 
 test(`fuzz: ${RUNS} random games of ${LENGTH} actions keep every invariant`, () => {
   let accepted = 0;
+  const seen = {};
   for (let run = 0; run < RUNS; run++) {
     const rnd = testRng(run * 7919 + 1);
-    let s = deepFreeze(C.newGame(Math.floor(rnd() * 2 ** 31)));
+    const fresh = C.newGame(Math.floor(rnd() * 2 ** 31));
+    // Every fourth game is rich and well liked, so upgrades and tiers get bought and climbed.
+    if (run % 4 === 0) {
+      Object.assign(fresh.shop, { coins: 3000, rep: 9 });
+      fresh.progress.stats.served = 9;
+      fresh.progress.stats.earned = 5000;
+    }
+    let s = deepFreeze(fresh);
     for (let i = 0; i < LENGTH; i++) {
       const action = randomAction(rnd, s);
       const r = C.step(s, action); // throws on a frozen input if step() mutates it
@@ -131,9 +155,12 @@ test(`fuzz: ${RUNS} random games of ${LENGTH} actions keep every invariant`, () 
         continue;
       }
       accepted++;
+      for (const e of r.events) seen[e.type] = (seen[e.type] ?? 0) + 1;
       checkInvariants(r.state);
       s = deepFreeze(r.state);
     }
   }
   assert.ok(accepted > RUNS * LENGTH * 0.4, `only ${accepted} actions were accepted`);
+  for (const type of ["upgraded", "tierUp", "goalReady", "claimedGoal"])
+    assert.ok(seen[type] > 0, `no ${type} in ${RUNS} games`);
 });

@@ -1,29 +1,33 @@
 // @ts-check
 /** Bottom sheets: starting a jar, and the evening takings. */
 
-import { RECIPES, RECIPE_IDS } from "../content/recipes.js";
-import { SERVINGS } from "../content/tuning.js";
-import { forecast } from "../core/index.js";
+import { RECIPES } from "../content/recipes.js";
+import { crockAt, forecast, jarSize, menu } from "../core/index.js";
 import { jarSvg } from "./art/jar.js";
 import { strip } from "./strip.js";
 
 export function sheetHtml(s, sheet) {
   if (sheet.kind === "brew") {
-    const rows = RECIPE_IDS.map((id, i) => {
-      const r = RECIPES[id];
-      const ticks = [];
-      for (let d = 1; d <= 5; d++) {
-        const at = forecast(id, d * 24);
-        if (at >= 1) break;
-        ticks.push({ at, label: d + "d" });
-      }
-      const order = s.orders.list.find((o) => o.recipe === id);
-      const fresh = { id: 900 + i, recipe: id, age: 0, servings: SERVINGS };
-      return `<button class="recipe" data-act="brew" data-recipe="${id}" ${s.shop.coins < r.cost ? "disabled" : ""}>
+    const pace = crockAt(s, sheet.slot).pace;
+    const bases = menu(s).filter((id) => !RECIPES[id].base);
+    const rows = bases
+      .map((id, i) => {
+        const r = RECIPES[id];
+        const ticks = [];
+        for (let d = 1; d <= 5; d++) {
+          const at = forecast(id, d * 24, [], pace);
+          if (at >= 1) break;
+          ticks.push({ at, label: d + "d" });
+        }
+        const order = s.orders.list.find((o) => o.recipe === id);
+        const size = jarSize(s);
+        const fresh = { id: 900 + i, recipe: id, age: 0, servings: size, size };
+        return `<button class="recipe" data-act="brew" data-recipe="${id}" ${s.shop.coins < r.cost ? "disabled" : ""}>
         ${jarSvg(fresh, "icon")}
         <div class="info"><div class="name"><span>${r.name}</span><span>🪙 ${r.cost}</span></div>
         ${strip({ ticks, win: order ?? null })}</div></button>`;
-    }).join("");
+      })
+      .join("");
     return `<div class="panel"><h2>Start a jar</h2>
       <p>Dots show where the jar will be after each day. A green box is a pre-order you could time it for.</p>
       ${rows}<div class="btns"><button data-act="cancel">Cancel</button><button data-act="bench" data-slot="${sheet.slot}">🧪 Add-ins…</button></div></div>`;

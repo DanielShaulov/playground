@@ -8,6 +8,7 @@
     "booked": 3,
     "brewed": 21,
     "closed": 5,
+    "goalReady": 1,
     "left:sent": 4,
     "offered": 1,
     "opened": 5,
@@ -201,38 +202,44 @@
           "id": 76,
           "recipe": "kraut",
           "age": 24,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         {
           "id": 58,
           "recipe": "kraut",
           "age": 47.99999999999936,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         null,
         {
           "id": 77,
           "recipe": "kimchi",
           "age": 24,
-          "servings": 1
+          "servings": 1,
+          "size": 2
         },
         {
           "id": 78,
           "recipe": "kraut",
           "age": 24,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         {
           "id": 60,
           "recipe": "kraut",
           "age": 47.99999999999936,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         {
           "id": 44,
           "recipe": "kraut",
           "age": 71.99999999999872,
-          "servings": 1
+          "servings": 1,
+          "size": 2
         }
       ]
     },
@@ -369,11 +376,11 @@
       "tier": 0,
       "goal": 0,
       "stats": {
-        "served": 0,
-        "earned": 0,
-        "delight": 0,
-        "bestDay": 0,
-        "orders": 0
+        "served": 39,
+        "earned": 384,
+        "delight": 5,
+        "bestDay": 103,
+        "orders": 2
       }
     },
     "market": {

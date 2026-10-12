@@ -32,7 +32,7 @@ export async function run(page, snap) {
   const same = await page.evaluate(async () => {
     const { jarArt } = await import("./ui/art/jar.js");
     const { RECIPES } = await import("./content/recipes.js");
-    const base = { id: 1, f: 0, over: false, servings: 2, adds: [] };
+    const base = { id: 1, f: 0, over: false, servings: 2, size: 2, adds: [] };
     const out = [];
     for (const recipe of Object.keys(RECIPES)) {
       const draw = (more) => jarArt({ ...base, recipe, ...more });
@@ -43,6 +43,7 @@ export async function run(page, snap) {
         funky: draw({ f: 0.9 }),
         over: draw({ f: 1, over: true }),
         sold: draw({ servings: 1 }),
+        bigger: draw({ servings: 3, size: 3 }),
         addin: draw({ adds: ["garlic"] }),
       };
       const seen = new Map();

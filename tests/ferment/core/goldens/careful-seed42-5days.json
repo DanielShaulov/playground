@@ -8,6 +8,7 @@
     "booked": 3,
     "brewed": 21,
     "closed": 5,
+    "goalReady": 1,
     "hinted": 1,
     "left:sent": 4,
     "offered": 1,
@@ -198,39 +199,45 @@
           "id": 56,
           "recipe": "dill",
           "age": 47.99999999999936,
-          "servings": 1
+          "servings": 1,
+          "size": 2
         },
         {
           "id": 72,
           "recipe": "kimchi",
           "age": 24,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         {
           "id": 58,
           "recipe": "kimchi",
           "age": 47.99999999999936,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         null,
         {
           "id": 24,
           "recipe": "kimchi",
           "age": 96.00000000000831,
-          "servings": 1
+          "servings": 1,
+          "size": 2
         },
         {
           "id": 74,
           "recipe": "kimchi",
           "age": 24,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         null,
         {
           "id": 76,
           "recipe": "dill",
           "age": 24,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         null
       ]
@@ -398,11 +405,11 @@
       "tier": 0,
       "goal": 0,
       "stats": {
-        "served": 0,
-        "earned": 0,
-        "delight": 0,
-        "bestDay": 0,
-        "orders": 0
+        "served": 36,
+        "earned": 296,
+        "delight": 6,
+        "bestDay": 90,
+        "orders": 2
       }
     },
     "market": {

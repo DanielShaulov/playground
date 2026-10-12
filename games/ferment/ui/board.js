@@ -68,7 +68,9 @@ function jarsFor(s, o) {
     .filter(Boolean)
     .map((jar) => ({
       jar,
-      at: isOver(jar) ? 1 : Math.min(1, forecast(jar.recipe, jar.age + dt, jar.adds ?? [])),
+      at: isOver(jar)
+        ? 1
+        : Math.min(1, forecast(jar.recipe, jar.age + dt, jar.adds ?? [], jar.pace ?? 1)),
     }));
 }
 
@@ -191,11 +193,13 @@ function shelfPlan(s, o, j) {
   const now = s.clock.day * 24 + s.clock.hour;
   const adds = j.adds ?? [];
   const dt = Math.max(0, hoursUntil(s, o.due, o.arriveAt));
-  const f = isOver(j) ? 1 : Math.min(1, forecast(j.recipe, j.age + dt, adds));
-  const from = (x) => dayHour(now + Math.max(0, ageAt(j.recipe, adds, x) - j.age));
+  const pace = j.pace ?? 1;
+  const f = isOver(j) ? 1 : Math.min(1, forecast(j.recipe, j.age + dt, adds, pace));
+  const from = (x) => dayHour(now + Math.max(0, ageAt(j.recipe, adds, x, pace) - j.age));
   return {
     recipe: j.recipe,
     adds,
+    pace,
     right: true,
     f,
     fits: f < 1 && f >= o.lo && f <= o.hi,
@@ -283,7 +287,7 @@ function verdict(s, o, plan) {
         ? `Not ready yet when ${o.name} comes in.`
         : `Gone ${bandWord(plan.f)} by the time ${o.name} comes in.`;
   if (plan.shelf) {
-    const fresh = planFor(fromStart(s), o, []);
+    const fresh = planFor(fromStart(s), o, [], firstEmpty(s));
     const better = fresh && (fresh.fits || bestStart(s, o, fresh));
     return `<b class="bad">${now}</b>${better ? ` <span class="tip">A fresh jar would suit ${o.name} better.</span>` : ""}`;
   }
@@ -323,8 +327,8 @@ function verdict(s, o, plan) {
  */
 export function bestStart(s, o, plan) {
   const pick = o.due * 24 + o.arriveAt;
-  const from = pick - ageAt(plan.recipe, plan.adds, o.hi);
-  const to = pick - ageAt(plan.recipe, plan.adds, o.lo);
+  const from = pick - ageAt(plan.recipe, plan.adds, o.hi, plan.pace);
+  const to = pick - ageAt(plan.recipe, plan.adds, o.lo, plan.pace);
   const aim = (from + to) / 2;
   // After closing (even early) the first chance is the next morning.
   const start = fromStart(s).clock;
@@ -372,7 +376,7 @@ function renderPlan(ui) {
   }
   el.hidden = false;
   if (p.slot >= 0 && s.shelf.slots[p.slot]) p.slot = firstEmpty(s);
-  const fresh = planFor(fromStart(s), o, p.adds);
+  const fresh = planFor(fromStart(s), o, p.adds, p.slot);
   if (!fresh) {
     p.adds = [];
     return;
