@@ -31,6 +31,21 @@ jobs:
       - run: npm run test:ferment
       - run: npm run typecheck
 
+  # Bots play 30 days on several seeds. The report lands in the job summary.
+  # A broken balance band is a warning on the PR, never a failure (Hadash):
+  # builds stay playable while the numbers are being tuned.
+  balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ferment:sim
+
   phone:
     runs-on: ubuntu-latest
     timeout-minutes: 10
