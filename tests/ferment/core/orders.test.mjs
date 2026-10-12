@@ -139,7 +139,7 @@ function tickUntil(s, pred) {
     const r = ok(s, { type: "tick", n: 3 });
     s = r.state;
     // Keep walk-ins away from the counter so the test is about orders.
-    while (s.customers.queue[0] && !s.customers.queue[0].orderId)
+    while (s.customers.queue[0] && !s.customers.queue[0].orderId && !s.customers.queue[0].regular)
       s = ok(s, { type: "sendAway" }).state;
     if (pred(s, r.events)) return s;
   }
@@ -152,46 +152,100 @@ const plainJar = (recipe, f, id) => ({
   servings: 2,
 });
 
-test("a regular joins on their day and their first visit is booked for the next", () => {
+/** Mrs. Okafor's first day: she drops in as a walk-in and is served at her spot. */
+function okaforJoins(seed = 5) {
+  let s = structuredClone(toMorning(C.newGame(seed), 2));
+  s = ok(s, { type: "open" }).state;
+  s = tickUntil(s, (x) => x.customers.queue[0]?.regular === "okafor");
+  s = structuredClone(s);
+  s.shelf.slots[8] = plainJar("dill", REGULARS.okafor.spot, 9000);
+  s.meta.nextId = Math.max(s.meta.nextId, 9001);
+  return ok(s, { type: "serve", slot: 8 });
+}
+
+test("a regular-to-be drops in as a walk-in first, with nothing on the board", () => {
   const s = toMorning(C.newGame(5), 2);
-  assert.ok(s.regulars.met.okafor, "Mrs. Okafor started coming on day 2");
-  assert.equal(s.regulars.met.okafor.since, 2);
-  const visit = s.orders.list.find((o) => o.regular === "okafor");
-  assert.equal(visit.kind, "standing");
-  assert.equal(visit.due, 3);
-  assert.equal(visit.arriveAt, REGULARS.okafor.hour);
-  assert.ok(visit.lo < REGULARS.okafor.spot && REGULARS.okafor.spot < visit.hi);
+  assert.ok(s.regulars.met.okafor?.pending, "Mrs. Okafor started dropping in on day 2");
+  assert.equal(
+    s.orders.list.find((o) => o.regular === "okafor"),
+    undefined,
+    "no visit booked",
+  );
   assert.equal(s.regulars.met.kenji, undefined, "Kenji waits for a better reputation");
+  let open = ok(s, { type: "open" }).state;
+  open = tickUntil(open, (x) => x.customers.queue[0]?.regular === "okafor");
+  const c = open.customers.queue[0];
+  assert.equal(c.orderId, undefined, "a walk-in, not an order");
+  assert.equal(c.recipe, REGULARS.okafor.recipe);
+  assert.ok(c.lo < REGULARS.okafor.spot && REGULARS.okafor.spot < c.hi);
+});
+
+test("served, a regular-to-be becomes a regular and their next visit is booked", () => {
+  const r = okaforJoins();
+  const s = r.state;
+  assert.equal(r.events[0].mood, "delight");
+  assert.ok(r.events.some((e) => e.type === "regularJoined" && e.regular === "okafor"));
+  const met = s.regulars.met.okafor;
+  assert.equal(met.pending, undefined);
+  assert.deepEqual(
+    { since: met.since, visits: met.visits, happy: met.happy },
+    { since: 2, visits: 1, happy: 1 },
+  );
+  const next = s.orders.list.find((o) => o.regular === "okafor");
+  assert.equal(next.kind, "standing");
+  assert.equal(next.due, 2 + REGULARS.okafor.every);
+  assert.equal(next.arriveAt, REGULARS.okafor.hour);
+});
+
+test("a regular-to-be who books ahead becomes a regular from that order", () => {
+  let s = structuredClone(toMorning(C.newGame(5), 2));
+  s = ok(s, { type: "open" }).state;
+  s = tickUntil(s, (x) => x.customers.queue[0]?.regular === "okafor");
+  const r = ok(s, { type: "preorder" });
+  const order = r.state.orders.list.find((o) => o.regular === "okafor");
+  assert.equal(order.kind, "standing");
+  assert.equal(r.state.regulars.met.okafor.pending, undefined);
+  assert.ok(r.events.some((e) => e.type === "regularJoined"));
+});
+
+test("a regular-to-be who isn't served drops in again the next day", () => {
+  let s = structuredClone(toMorning(C.newGame(5), 2));
+  s = ok(s, { type: "open" }).state;
+  s = tickUntil(s, (x) => x.customers.queue[0]?.regular === "okafor");
+  s = ok(s, { type: "sendAway" }).state;
+  s = toMorning(s, 3);
+  assert.ok(s.regulars.met.okafor.pending);
+  s = ok(s, { type: "open" }).state;
+  tickUntil(s, (x) => x.customers.queue[0]?.regular === "okafor");
 });
 
 test("a regular's visit: served at their spot, they come back `every` days later", () => {
-  let s = structuredClone(toMorning(C.newGame(5), 3));
+  let s = structuredClone(toMorning(okaforJoins().state, 4));
   const visit = s.orders.list.find((o) => o.regular === "okafor");
-  assert.equal(visit.due, 3);
-  s.shelf.slots[8] = plainJar("dill", REGULARS.okafor.spot - visit.arriveAt / 48, 9000);
-  s.meta.nextId = 9001;
+  assert.equal(visit.due, 4);
+  s.shelf.slots[7] = plainJar("dill", REGULARS.okafor.spot - visit.arriveAt / 48, 9100);
   s = ok(s, { type: "open" }).state;
   s = tickUntil(s, (x) => x.customers.queue[0]?.regular === "okafor");
-  const r = ok(s, { type: "serve", slot: 8 });
+  const r = ok(s, { type: "serve", slot: 7 });
   assert.equal(r.events[0].mood, "delight");
   s = r.state;
   assert.deepEqual(
     { visits: s.regulars.met.okafor.visits, happy: s.regulars.met.okafor.happy },
-    { visits: 1, happy: 1 },
+    { visits: 2, happy: 2 },
   );
   const next = s.orders.list.find((o) => o.regular === "okafor");
-  assert.equal(next.due, 3 + REGULARS.okafor.every);
+  assert.equal(next.due, 4 + REGULARS.okafor.every);
   assert.ok(r.events.some((e) => e.type === "booked"));
 });
 
 test("a missed visit costs reputation and they still come back", () => {
-  let s = toMorning(C.newGame(5), 3);
+  let s = toMorning(okaforJoins().state, 4);
   const rep = s.shop.rep;
   s = ok(s, { type: "open" }).state;
   s = ok(s, { type: "close" }).state; // closed before she arrived
   assert.equal(s.regulars.met.okafor.missed, 1);
   assert.equal(s.shop.rep, Math.max(0, rep - 2));
-  assert.equal(s.orders.list.find((o) => o.regular === "okafor").due, 3 + REGULARS.okafor.every);
+  assert.equal(s.orders.list.find((o) => o.regular === "okafor").due, 4 + REGULARS.okafor.every);
 });
 
 test("a bulk order: offered, accepted, and filled one whole jar at a time", () => {

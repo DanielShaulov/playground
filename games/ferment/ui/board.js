@@ -243,7 +243,7 @@ function timingAdds(s, o) {
   return INGREDIENT_IDS.filter((id) => INGREDIENTS[id].speed !== 1 && !needs.includes(id)).map(
     (id) => {
       const p = planFor(fromStart(s), o, [id]);
-      return { id, ok: !!p && p.right, stock: s.pantry.stock[id] ?? 0 };
+      return { id, ok: !!p && p.right, makes: p?.recipe, stock: s.pantry.stock[id] ?? 0 };
     },
   );
 }
@@ -298,8 +298,20 @@ function verdict(s, o, plan) {
         : `Start it ${day} around ${clockAt(t.hour)} instead.`;
     const st = fromStart(s).clock;
     if (t.day === st.day && Math.abs(t.hour - st.hour) < 0.5) tip = "";
-  } else if (plan.f < o.lo) tip = "A little chili would hurry it along.";
-  else tip = "A pinch of salt would hold it back.";
+  } else {
+    // Only suggest an add-in the pantry has that keeps it the same recipe.
+    const fast = plan.f < o.lo;
+    const a = timingAdds(s, o).find(
+      (a) =>
+        a.ok && a.stock > 0 && !plan.adds.includes(a.id) && INGREDIENTS[a.id].speed > 1 === fast,
+    );
+    const n = a && INGREDIENTS[a.id].name.toLowerCase();
+    tip = !a
+      ? ""
+      : fast
+        ? `A little ${n} would hurry it along.`
+        : `A pinch of ${n} would hold it back.`;
+  }
   return `<b class="bad">${now}</b> <span class="tip">${tip}</span>`;
 }
 
@@ -404,7 +416,7 @@ function renderPlan(ui) {
   const adds = timingAdds(s, o)
     .map(
       (a) =>
-        `<button class="add${p.adds.includes(a.id) ? " on" : ""}" data-act="board-add" data-ingredient="${a.id}" ${!a.ok || (a.stock < 1 && !p.adds.includes(a.id)) ? "disabled" : ""}>${INGREDIENTS[a.id].icon} ${INGREDIENTS[a.id].name}<small>${INGREDIENTS[a.id].tag} · ${a.stock} left</small></button>`,
+        `<button class="add${p.adds.includes(a.id) ? " on" : ""}" data-act="board-add" data-ingredient="${a.id}" ${!a.ok || (a.stock < 1 && !p.adds.includes(a.id)) ? "disabled" : ""}>${INGREDIENTS[a.id].icon} ${INGREDIENTS[a.id].name}<small>${a.ok || !a.makes ? `${INGREDIENTS[a.id].tag} · ${a.stock} left` : s.bench.known.includes(a.makes) ? `makes ${RECIPES[a.makes].name.toLowerCase()}` : "makes something new"}</small></button>`,
     )
     .join("");
   const spots = s.shelf.slots
@@ -543,6 +555,8 @@ export function boardAct(act, t, ui, dispatch, toast) {
 export function boardReact(e, toast) {
   if (e.type === "offered") toast(`${e.order.name} has an order for you`);
   else if (e.type === "hinted") toast(`${e.customer.name} asked for something new`);
+  else if (e.type === "regularJoined" && REGULARS[e.regular].kind === "standing")
+    toast(`${REGULARS[e.regular].name} will keep coming back. Look for the ticket on the board.`);
   else if (e.type === "delivered" && !e.done)
     toast(`${e.customer.got} of ${e.customer.qty} jars handed over`);
 }

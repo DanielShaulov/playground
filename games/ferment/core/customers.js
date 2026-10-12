@@ -21,7 +21,7 @@ import { random, between, pick } from "./rng.js";
 import { clamp, nextId } from "./util.js";
 import { isOver } from "./jars.js";
 import { addRep } from "./shop.js";
-import { settle } from "./orders.js";
+import { settle, dropIn } from "./orders.js";
 import { menu } from "./bench.js";
 
 /** @typedef {import("./types.js").State} State */
@@ -154,8 +154,9 @@ export function walkIns(/** @type {State} */ s, events) {
   const cs = s.customers;
   while (s.clock.hour >= cs.nextArrival && cs.nextArrival < OPEN_HOURS - 0.5) {
     if (cs.queue.length < MAX_QUEUE) {
-      const c = makeWalkIn(s);
-      askOffMenu(s, c, events);
+      const regular = dropIn(s);
+      const c = regular ?? makeWalkIn(s);
+      if (!regular) askOffMenu(s, c, events);
       cs.queue.push(c);
       events.push({ type: "arrived", customer: c });
     }

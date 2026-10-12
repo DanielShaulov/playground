@@ -14,7 +14,7 @@ export const lower = (recipe) => RECIPES[recipe].name.toLowerCase();
 
 export function requestLine(c) {
   const mid = (c.lo + c.hi) / 2;
-  if (c.regular && REGULARS[c.regular]) return `“${REGULARS[c.regular].hello}”`;
+  if (c.regular && c.orderId && REGULARS[c.regular]) return `“${REGULARS[c.regular].hello}”`;
   if (c.orderId) return `“My pre-order: ${lower(c.recipe)}, ${word(mid)}!”`;
   return [
     `“${RECIPES[c.recipe].name}, nice and ${word(mid)} please.”`,

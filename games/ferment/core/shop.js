@@ -11,7 +11,7 @@ import { clamp } from "./util.js";
 import { flavour, isOver, makeJar } from "./jars.js";
 import { judge } from "./customers.js";
 import { checkMix, useMix } from "./bench.js";
-import { deliver, settle, freePortions } from "./orders.js";
+import { deliver, settle, freePortions, welcome } from "./orders.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Today} Today */
@@ -82,4 +82,5 @@ export function serve(s, { slot }, events) {
   events.push({ type: "served", slot, customer: c, f, ...verdict });
   const order = c.orderId ? s.orders.list.find((o) => o.id === c.orderId) : null;
   if (order) settle(s, order, verdict.mood, events);
+  else if (c.regular) welcome(s, c.regular, verdict.mood, events);
 }

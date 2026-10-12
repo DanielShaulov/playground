@@ -53,10 +53,63 @@ export function preorder(s, _action, events) {
     ...dueFor(s, c),
     arrived: false,
   };
+  // A regular dropping in for the first time who books ahead keeps coming from then on.
+  if (c.regular) Object.assign(order, { kind: "standing", regular: c.regular });
   s.orders.list.push(order);
   s.shop.today.preorders++;
   s.customers.queue.shift();
   events.push({ type: "preordered", order, customer: c });
+  if (c.regular) welcome(s, c.regular, null, events);
+}
+
+/**
+ * A regular-to-be dropping in as a walk-in around their usual hour, once a
+ * day until they are served or book ahead. Null when nobody is due to.
+ * @returns {import("./types.js").Customer | null}
+ */
+export function dropIn(/** @type {State} */ s) {
+  const day = s.clock.day;
+  for (const id of REGULAR_IDS) {
+    const r = REGULARS[id];
+    const met = s.regulars.met[id];
+    if (!met?.pending || met.seen === day || s.clock.hour < r.hour - 1) continue;
+    met.seen = day;
+    return {
+      id: nextId(s),
+      name: r.name,
+      look: r.look,
+      recipe: r.recipe,
+      lo: clamp(r.spot - WINDOW / 2, 0, 1),
+      hi: clamp(r.spot + WINDOW / 2, 0, 1),
+      patience: PATIENCE,
+      regular: id,
+    };
+  }
+  return null;
+}
+
+/**
+ * A regular-to-be was served (`mood`) or booked ahead (`mood` null): from now
+ * on they are a regular. Served, their next visit goes on the board; booked,
+ * it follows once that order is settled.
+ */
+export function welcome(
+  /** @type {State} */ s,
+  /** @type {string} */ id,
+  /** @type {string | null} */ mood,
+  events,
+) {
+  const met = s.regulars.met[id];
+  if (!met?.pending) return;
+  delete met.pending;
+  delete met.seen;
+  met.since = s.clock.day;
+  if (mood) {
+    met.visits++;
+    if (mood === "delight") met.happy++;
+    book(s, id, s.clock.day + REGULARS[id].every, events);
+  }
+  events.push({ type: "regularJoined", regular: id });
 }
 
 /** Tick part: order customers come back on their due day, straight to the front. */
@@ -171,7 +224,7 @@ const joinsNow = (/** @type {State} */ s, /** @type {import("./types.js").Regula
 
 /**
  * Each new morning: regulars whose time has come start visiting (a standing
- * regular's first visit is booked for the next day), and bulk regulars whose
+ * regular drops in as a walk-in first, see dropIn), and bulk regulars whose
  * day it is offer an order, unless one of theirs is still open.
  */
 export function newDay(/** @type {State} */ s, events) {
@@ -181,8 +234,12 @@ export function newDay(/** @type {State} */ s, events) {
     if (!s.regulars.met[id]) {
       if (!joinsNow(s, r)) continue;
       s.regulars.met[id] = { since: day, visits: 0, happy: 0, missed: 0 };
+      // A standing regular first drops in as a walk-in (dropIn) and becomes one once served.
+      if (r.kind === "standing") {
+        s.regulars.met[id].pending = true;
+        continue;
+      }
       events.push({ type: "regularJoined", regular: id });
-      if (r.kind === "standing") book(s, id, day + 1, events);
     }
     if (r.kind !== "bulk") continue;
     if ((day - s.regulars.met[id].since) % r.every !== 0) continue;

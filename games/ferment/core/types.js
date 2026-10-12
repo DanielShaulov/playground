@@ -99,10 +99,12 @@
  *   opening they arrive. joins: from which day, and at what reputation, they start coming.
  *   qty/lead (bulk): whole jars wanted, and days from the offer to the due day.
  *
- * @typedef {{ since: number, visits: number, happy: number, missed: number }} RegularMet
+ * @typedef {{ since: number, visits: number, happy: number, missed: number, pending?: boolean, seen?: number }} RegularMet
  * @typedef {{ met: Record<string, RegularMet> }} RegularsSlice
  *   met: regular id → since (day they first came), visits served, happy (delighted)
- *   visits, missed visits.
+ *   visits, missed visits. pending: a standing regular who has started dropping in
+ *   as a walk-in but isn't a regular yet (until served or booked); seen: the day
+ *   they last dropped in.
  *
  * @typedef {{ day: number, hour: number }} DayHour
  *   hour counts from opening (0 = 08:00) and may run past closing into the night.
