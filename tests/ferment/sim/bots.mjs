@@ -171,7 +171,7 @@ function restock(s) {
 /** Evening shopping: add-ins for every discovered or hinted recipe, and the planner's salt and chili. */
 function shop(s) {
   const wanted = new Set(["salt", "chili"]);
-  for (const id of [...s.bench.known, ...s.bench.hints])
+  for (const id of [...s.bench.known, ...s.bench.hints].filter((id) => C.unlocked(s, id)))
     for (const a of RECIPES[id].needs ?? []) wanted.add(a);
   for (const item of C.marketToday(s)) {
     if (!wanted.has(item.ingredient)) continue;
@@ -186,7 +186,7 @@ function shop(s) {
 function tryHinted(s) {
   for (const id of s.bench.hints) {
     const r = RECIPES[id];
-    if (r.needs.every((a) => (s.pantry.stock[a] ?? 0) > 0))
+    if (C.unlocked(s, id) && r.needs.every((a) => (s.pantry.stock[a] ?? 0) > 0))
       return { type: "experiment", recipe: r.base, adds: [...r.needs] };
   }
   return null;

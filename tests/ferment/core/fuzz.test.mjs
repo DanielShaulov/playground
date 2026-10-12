@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as C from "../../../games/ferment/core/index.js";
-import { RECIPE_IDS } from "../../../games/ferment/content/recipes.js";
+import { RECIPE_IDS, TIER_IDS } from "../../../games/ferment/content/recipes.js";
 import { UPGRADE_IDS } from "../../../games/ferment/content/upgrades.js";
 import { TIERS } from "../../../games/ferment/content/goals.js";
 import {
@@ -15,6 +15,8 @@ import {
   SLOTS,
 } from "../../../games/ferment/content/tuning.js";
 import { testRng } from "./helpers.mjs";
+
+const BASES = [...RECIPE_IDS, ...TIER_IDS];
 
 const RUNS = Number(process.env.FUZZ_RUNS ?? 400);
 const LENGTH = 400;
@@ -48,7 +50,7 @@ function randomAction(rnd, s, { validSlots = false } = {}) {
     return {
       type,
       slot: slot(),
-      recipe: rnd() < 0.95 ? RECIPE_IDS[Math.floor(rnd() * RECIPE_IDS.length)] : "toString",
+      recipe: rnd() < 0.95 ? BASES[Math.floor(rnd() * BASES.length)] : "toString",
     };
   if (type === "tipOut" || type === "serve") return { type, slot: slot() };
   if (type === "upgrade")

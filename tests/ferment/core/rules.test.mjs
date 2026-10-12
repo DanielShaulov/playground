@@ -3,7 +3,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as C from "../../../games/ferment/core/index.js";
 import { RECIPES } from "../../../games/ferment/content/recipes.js";
-import { SERVINGS, SLOTS, START_COINS } from "../../../games/ferment/content/tuning.js";
+import {
+  SERVINGS,
+  SLOTS,
+  START_COINS,
+  START_SHELF,
+} from "../../../games/ferment/content/tuning.js";
 import { playBot, BOTS } from "./helpers.mjs";
 
 const jar = (recipe, f, id = 1) => ({
@@ -71,19 +76,24 @@ test("a new game starts on a morning with a shelf in progress", () => {
   assert.deepEqual(s.clock, { day: 1, phase: "morning", hour: 0 });
   assert.equal(s.shop.coins, START_COINS);
   assert.equal(s.shelf.slots.length, SLOTS);
-  assert.equal(s.shelf.slots.filter(Boolean).length, 6);
+  assert.equal(s.shelf.slots.filter(Boolean).length, START_SHELF.length);
+  assert.ok(
+    s.shelf.slots.every((j) => !j || C.menu(s).includes(j.recipe)),
+    "starters are on the menu",
+  );
   assert.deepEqual(C.newGame(5), s, "same seed, same start");
 });
 
 test("brewing costs the recipe's price and fills the slot; refusals leave state alone", () => {
   const s = C.newGame(1);
-  const r = ok(s, { type: "brew", slot: 5, recipe: "kraut" });
-  assert.equal(r.state.shop.coins, START_COINS - RECIPES.kraut.cost);
-  assert.equal(r.state.shelf.slots[5].recipe, "kraut");
+  const r = ok(s, { type: "brew", slot: 5, recipe: "kimchi" });
+  assert.equal(r.state.shop.coins, START_COINS - RECIPES.kimchi.cost);
+  assert.equal(r.state.shelf.slots[5].recipe, "kimchi");
   assert.equal(r.state.shelf.slots[5].age, 0);
   assert.equal(s.shelf.slots[5], null, "step never mutates its input");
   assert.equal(rejected(r.state, { type: "brew", slot: 5, recipe: "dill" }), "slot is full");
   assert.equal(rejected(s, { type: "brew", slot: 5, recipe: "nope" }), "no such recipe");
+  assert.equal(rejected(s, { type: "brew", slot: 5, recipe: "kraut" }), "recipe not unlocked");
   assert.equal(rejected(s, { type: "brew", slot: 99, recipe: "dill" }), "no such slot");
   const poor = structuredClone(s);
   poor.shop.coins = 3;

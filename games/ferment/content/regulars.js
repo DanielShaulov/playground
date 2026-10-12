@@ -36,7 +36,7 @@ export const REGULARS = {
     spot: 0.68,
     every: 4,
     hour: 9,
-    joins: { day: 3 },
+    joins: { day: 3, tier: 2 },
     hello: "Evening. Sour enough to wake the dead, if you have it.",
   },
   noodlebar: {
@@ -71,7 +71,7 @@ export const REGULARS = {
     spot: 0.6,
     every: 3,
     hour: 7.5,
-    joins: { day: 6, rep: 7 },
+    joins: { day: 6, rep: 7, tier: 1 },
     hello: "Something hot for the weekend, please.",
   },
   tacotruck: {
@@ -84,7 +84,7 @@ export const REGULARS = {
     hour: 6,
     qty: 3,
     lead: 2,
-    joins: { day: 7, rep: 7 },
+    joins: { day: 7, rep: 7, tier: 1 },
     hello: "Three jars of the red stuff for the truck!",
   },
   ames: {
@@ -95,7 +95,7 @@ export const REGULARS = {
     spot: 0.42,
     every: 3,
     hour: 4,
-    joins: { tier: 1 },
+    joins: { tier: 3 },
     hello: "Beets, please. Doctor's orders, and I'm the doctor.",
   },
   lena: {
@@ -106,7 +106,7 @@ export const REGULARS = {
     spot: 0.62,
     every: 4,
     hour: 6.5,
-    joins: { tier: 2 },
+    joins: { tier: 4 },
     hello: "One of your lemons? My tagine is waiting.",
   },
   marigold: {
@@ -119,7 +119,7 @@ export const REGULARS = {
     hour: 2,
     qty: 3,
     lead: 2,
-    joins: { tier: 3 },
+    joins: { tier: 5 },
     hello: "Three jars of kombucha for the breakfast bar!",
   },
 };

@@ -22,7 +22,7 @@ import { clamp, nextId } from "./util.js";
 import { isOver } from "./jars.js";
 import { addRep } from "./shop.js";
 import { settle, dropIn } from "./orders.js";
-import { menu } from "./bench.js";
+import { menu, unlocked } from "./bench.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Customer} Customer */
@@ -89,7 +89,7 @@ function wantedMid(/** @type {State} */ s, /** @type {string} */ recipe) {
  */
 function askOffMenu(/** @type {State} */ s, /** @type {Customer} */ c, events) {
   if (random(s, "requests") >= OFF_MENU) return;
-  const unknown = VARIANT_IDS.filter((id) => !s.bench.known.includes(id));
+  const unknown = VARIANT_IDS.filter((id) => !s.bench.known.includes(id) && unlocked(s, id));
   if (!unknown.length) return;
   const recipe = pick(s, "requests", unknown);
   const [lo, hi] = RECIPES[recipe].sweet;

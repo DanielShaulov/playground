@@ -20,9 +20,11 @@
 /** @type {import("../core/types.js").Tier[]} */
 export const TIERS = [
   { name: "Corner nook", earned: 0 },
-  { name: "Neighbourhood favourite", earned: 500 },
-  { name: "Talk of the town", earned: 1800 },
-  { name: "Famous brine", earned: 4500 },
+  { name: "Known on the street", earned: 200 },
+  { name: "Neighbourhood favourite", earned: 650 },
+  { name: "Talk of the town", earned: 1200 },
+  { name: "Famous brine", earned: 2400 },
+  { name: "Pride of the city", earned: 4500 },
 ];
 
 /** @type {Record<import("../core/types.js").GoalKind, string>} */
@@ -42,7 +44,7 @@ export const GOAL_TEXT = {
 export const GOALS = [
   { kind: "served", n: 10, reward: { coins: 20 } },
   { kind: "orders", n: 2, reward: { coins: 25 } },
-  { kind: "recipes", n: 5, reward: { coins: 20, stock: { garlic: 1, pear: 1 } } },
+  { kind: "recipes", n: 3, reward: { coins: 20, stock: { garlic: 1, pear: 1 } } },
   { kind: "bestDay", n: 120, reward: { coins: 30 } },
   { kind: "regulars", n: 2, reward: { coins: 40 } },
   { kind: "upgrades", n: 1, reward: { coins: 30 } },

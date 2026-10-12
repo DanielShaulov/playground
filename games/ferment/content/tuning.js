@@ -24,10 +24,7 @@ export const START_REP = 5;
 /** Day 1 starts with a shelf in progress: [slot, recipe, flavour]. */
 /** @type {[number, string, number][]} */
 export const START_SHELF = [
-  [0, "dill", 0.4],
-  [1, "kimchi", 0.2],
-  [2, "hotsauce", 0.62],
-  [3, "kraut", 0.33],
-  [4, "dill", 0.08],
-  [6, "kimchi", 0.5],
+  [0, "dill", 0.3],
+  [1, "kimchi", 0.4],
+  [2, "dill", 0.1],
 ];

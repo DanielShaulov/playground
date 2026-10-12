@@ -80,7 +80,7 @@ games/ferment/
   `previewCurve(recipe, adds, n = 5)` (the time-lapse: `n` points from start
   to pop, the sweet spot in flavour and hours, `sooner` vs a plain jar, and
   the recipe the mix makes), `recipeCard(state, recipe)`, `resolveMix`,
-  `menu(state)`, `lifeOf`, `ageAt`, `mixOf`, and `demand(recipe)` /
+  `menu(state)`, `unlocked(state, recipe)`, `lifeOf`, `ageAt`, `mixOf`, and `demand(recipe)` /
   `demandAt(recipe, f)` (the bell curve of where walk-ins want a recipe).
   For orders: `planFor(state, order, adds)` (where a jar started at the
   state's clock lands at pickup; the board passes the next morning after

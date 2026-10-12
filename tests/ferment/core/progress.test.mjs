@@ -39,7 +39,7 @@ test("upgrade content is well formed", () => {
   }
 });
 
-test("tiers climb in reputation and takings from the start", () => {
+test("tiers climb in takings from the start", () => {
   assert.equal(TIERS[0].earned, 0);
   for (let i = 1; i < TIERS.length; i++) assert.ok(TIERS[i].earned > TIERS[i - 1].earned);
 });
@@ -103,15 +103,15 @@ test("upgrades are bought in the evening, need the tier and the coins", () => {
   assert.equal(rejected(s, { type: "upgrade", id: "shelf" }), "needs a higher tier");
   assert.equal(rejected(s, { type: "upgrade", id: "nope" }), "no such upgrade");
   assert.equal(rejected(s, { type: "upgrade", id: "toString" }), "no such upgrade");
-  const poor = evening({ coins: 10, tier: 1 });
+  const poor = evening({ coins: 10, tier: UPGRADES.shelf.levels[0].tier });
   assert.equal(rejected(poor, { type: "upgrade", id: "shelf" }), "not enough coins");
-  const open = evening({ tier: 1 });
+  const open = evening({ tier: UPGRADES.shelf.levels[0].tier });
   open.clock.phase = "open";
   assert.equal(rejected(open, { type: "upgrade", id: "shelf" }), "only in the evening");
 });
 
 test("more shelf space adds spots that work like any other, and saves keep them", () => {
-  const s0 = evening({ coins: 5000, tier: 3 });
+  const s0 = evening({ coins: 5000, tier: TIERS.length - 1 });
   const { state: s1, events } = ok(s0, { type: "upgrade", id: "shelf" });
   assert.deepEqual(events, [
     { type: "upgraded", id: "shelf", level: 1, cost: UPGRADES.shelf.levels[0].cost },
@@ -138,7 +138,7 @@ test("more shelf space adds spots that work like any other, and saves keep them"
 });
 
 test("a crock's pace is stored on the jar, and planFor with that slot stays true", () => {
-  let s = evening({ coins: 1000, tier: 1 });
+  let s = evening({ coins: 1000, tier: UPGRADES.warm.levels[0].tier });
   assert.equal(rejected(s, { type: "upgrade", id: "warm" }), "no such slot");
   s = ok(s, { type: "upgrade", id: "warm", slot: 2 }).state;
   assert.equal(rejected(s, { type: "upgrade", id: "warm", slot: 2 }), "already fitted");
@@ -182,7 +182,7 @@ test("a plain crock leaves a jar exactly as before", () => {
 });
 
 test("bigger jars hold one more portion, and every portion sells", () => {
-  let s = evening({ coins: 1000, tier: 2 });
+  let s = evening({ coins: 1000, tier: UPGRADES.bigjars.levels[0].tier });
   s = ok(s, { type: "upgrade", id: "bigjars" }).state;
   assert.equal(C.jarSize(s), SERVINGS + 1);
   s = morning(s);
@@ -205,21 +205,23 @@ test("bigger jars hold one more portion, and every portion sells", () => {
 
 test("tiers climb with lifetime takings, never drop, and unlock recipes and regulars", () => {
   const s0 = C.newGame(1);
-  s0.progress.stats.earned = TIERS[1].earned - 1;
+  assert.deepEqual(C.menu(s0), ["dill", "kimchi"], "a new shop starts small");
+  s0.progress.tier = 2;
+  s0.progress.stats.earned = TIERS[3].earned - 1;
   assert.deepEqual(C.menu(s0).includes("beets"), false);
   rejected(s0, { type: "brew", slot: 5, recipe: "beets" });
   // Full hearts alone don't climb a tier.
   const loved = structuredClone(s0);
   loved.shop.rep = REP_MAX;
-  assert.equal(C.tierOf(ok(loved, { type: "open" }).state), 0);
-  s0.progress.stats.earned = TIERS[1].earned;
+  assert.equal(C.tierOf(ok(loved, { type: "open" }).state), 2);
+  s0.progress.stats.earned = TIERS[3].earned;
   // Any accepted action notices the climb.
   const { state: s1, events } = ok(s0, { type: "open" });
   assert.deepEqual(
     events.filter((e) => e.type === "tierUp"),
-    [{ type: "tierUp", tier: 1 }],
+    [{ type: "tierUp", tier: 3 }],
   );
-  assert.equal(C.tierOf(s1), 1);
+  assert.equal(C.tierOf(s1), 3);
   assert.ok(C.menu(s1).includes("beets"));
   assert.ok(!C.menu(s1).includes("lemons"));
   const s2 = ok(s1, { type: "brew", slot: 5, recipe: "beets" }).state;
@@ -227,7 +229,7 @@ test("tiers climb with lifetime takings, never drop, and unlock recipes and regu
   // Reputation falls, the tier stays.
   s2.shop.rep = 0;
   const s3 = ok(s2, { type: "close" }).state;
-  assert.equal(C.tierOf(s3), 1);
+  assert.equal(C.tierOf(s3), 3);
   assert.ok(C.menu(s3).includes("beets"));
   // The tier's regular starts the next morning, as a walk-in first.
   const s4 = ok(s3, { type: "sleep" }).state;
@@ -241,7 +243,7 @@ test("several tiers at once climb one by one", () => {
   const { state, events } = ok(s, { type: "open" });
   assert.deepEqual(
     events.filter((e) => e.type === "tierUp").map((e) => e.tier),
-    [1, 2, 3],
+    TIERS.map((_, i) => i).slice(1),
   );
   assert.equal(C.tierOf(state), TIERS.length - 1);
 });

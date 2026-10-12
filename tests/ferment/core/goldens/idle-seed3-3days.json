@@ -9,7 +9,7 @@
     "left:impatient": 15,
     "offered": 1,
     "opened": 3,
-    "popped": 3,
+    "popped": 1,
     "regularJoined": 1,
     "slept": 3
   },
@@ -27,11 +27,11 @@
   "end": {
     "meta": {
       "seed": 3,
-      "nextId": 29,
+      "nextId": 26,
       "rng": {
         "market": -1170423646,
         "customers": -1407026688,
-        "requests": -700103441
+        "requests": 1131462372
       }
     },
     "clock": {
@@ -57,59 +57,41 @@
         {
           "id": 1,
           "recipe": "dill",
-          "age": 91.20000000000832,
+          "age": 86.40000000000694,
           "servings": 2,
           "size": 2
         },
         {
           "id": 2,
           "recipe": "kimchi",
-          "age": 86.40000000000694,
+          "age": 100.80000000000899,
           "servings": 2,
           "size": 2
         },
         {
           "id": 3,
-          "recipe": "hotsauce",
-          "age": 94.3200000000083,
-          "servings": 2,
-          "size": 2
-        },
-        {
-          "id": 4,
-          "recipe": "kraut",
-          "age": 111.6000000000182,
-          "servings": 2,
-          "size": 2
-        },
-        {
-          "id": 5,
           "recipe": "dill",
-          "age": 75.83999999999853,
+          "age": 76.7999999999991,
           "servings": 2,
           "size": 2
         },
         null,
-        {
-          "id": 6,
-          "recipe": "kimchi",
-          "age": 108.00000000001513,
-          "servings": 2,
-          "size": 2
-        },
+        null,
+        null,
+        null,
         null,
         null
       ]
     },
     "customers": {
       "queue": [],
-      "nextArrival": 12.25518265324179
+      "nextArrival": 11.83615800548112
     },
     "orders": {
       "list": [],
       "offers": [
         {
-          "id": 28,
+          "id": 25,
           "kind": "bulk",
           "name": "Mei from Lucky Noodle",
           "look": 377,
@@ -127,8 +109,8 @@
       "asked": [
         {
           "recipe": "pearkimchi",
-          "name": "Marisol",
-          "look": 882,
+          "name": "Tomasz",
+          "look": 706,
           "day": 3
         }
       ]
@@ -148,14 +130,6 @@
       "met": {
         "okafor": {
           "since": 2,
-          "visits": 0,
-          "happy": 0,
-          "missed": 0,
-          "pending": true,
-          "seen": 3
-        },
-        "bram": {
-          "since": 3,
           "visits": 0,
           "happy": 0,
           "missed": 0,
