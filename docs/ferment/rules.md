@@ -1,7 +1,8 @@
 # Rules
 
 How The Brine Nook plays as of Milestone 2 (regulars, bulk orders, off-menu
-requests, kept portions and the order board). Numbers are the current tuning;
+requests, kept portions and the order board) plus the Milestone 3 progression
+rules (upgrades, shop tiers, the goals ladder). Numbers are the current tuning;
 the code is the source of truth, and a PR that changes a rule updates this
 file. Constant names are in brackets. Rules marked **(Hadash)** came from a
 playtest decision; don't change them without asking Hadash.
@@ -19,8 +20,9 @@ Everything is in in-game hours. A day has three phases:
 
 ## Jars
 
-- The shelf has 9 slots (`SLOTS`). Starting a jar costs coins and fills an
-  empty slot; you can start jars in the morning or while open.
+- The shelf starts with 9 slots (`SLOTS`) and grows with upgrades (see
+  Progression). Starting a jar costs coins and fills an empty slot; you can
+  start jars in the morning or while open.
 - A jar's flavour is its age divided by its recipe's ripening time, from 0 to 1.
   The strip is split into four bands: crisp (below 0.3), tangy (to 0.55), sour
   (to 0.8) and funky (to 1).
@@ -28,16 +30,28 @@ Everything is in in-game hours. A day has three phases:
   tipped out.
 - Each jar holds 2 servings, or portions (`SERVINGS`), and empties after the
   last sale. Nothing assumes 2: the count may go to 3 later **(Hadash)**, so
-  code reads `jar.servings`, never a literal 2.
+  code reads `jar.servings`, never a literal 2. A jar stores the portions it
+  started with as `jar.size` (the Bigger jars upgrade makes new jars 3, then 4); the
+  jar art draws a notch per portion of `jar.size`.
+- A jar started in a crock (see Progression) ripens at the crock's pace for
+  its whole life: the pace is stored on the jar (`jar.pace`), so forecasts and
+  the board stay true wherever it sits and whatever crock replaces it.
+
+| Recipe           | Ripens in | Price | Cost | On the menu from        |
+| ---------------- | --------- | ----- | ---- | ----------------------- |
+| Dill pickles     | 48 h      | 12    | 7    | the start               |
+| Hot sauce        | 36 h      | 15    | 9    | the start               |
+| Kimchi           | 72 h      | 18    | 11   | the start               |
+| Sauerkraut       | 120 h     | 22    | 12   | the start               |
+| Pickled beets    | 60 h      | 20    | 10   | Neighbourhood favourite |
+| Preserved lemons | 96 h      | 26    | 13   | Talk of the town        |
+| Kombucha         | 30 h      | 18    | 8    | Famous brine            |
+
+Sweet spots: beets 0.3–0.5, lemons 0.5–0.7, kombucha 0.4–0.6. A recipe locked
+behind a tier can't be brewed and nobody asks for it until the shop reaches it.
+
 - Portions can be kept for orders (see Kept portions below); walk-ins can only
   buy portions nobody has kept.
-
-| Recipe       | Ripens in | Price | Cost |
-| ------------ | --------- | ----- | ---- |
-| Dill pickles | 48 h      | 12    | 7    |
-| Hot sauce    | 36 h      | 15    | 9    |
-| Kimchi       | 72 h      | 18    | 11   |
-| Sauerkraut   | 120 h     | 22    | 12   |
 
 A new game starts with 40 coins, reputation 5 of 10, and six jars already
 part-way along so day 1 has something to sell.
@@ -148,7 +162,10 @@ reputation when served inside their window.
 **Regulars** (`content/regulars.js`) have a favourite recipe and their own spot
 on the strip, always within one spread of where walk-ins want that recipe.
 Each starts coming on a given day, some only once the shop's reputation is
-high enough too.
+high enough, or once it has reached a shop tier (`joins.tier`). Every
+condition given must hold, and the check runs each morning, so a regular
+unlocked by a tier starts the next morning and, if standing, drops in as a
+walk-in first like everyone else **(Hadash)**.
 
 - **First visit is a plain walk-in (Hadash).** A standing regular's first
   visit never goes on the board, because you'd have no time to prepare. From
@@ -166,14 +183,17 @@ high enough too.
 - Bulk regulars don't drop in: their first contact is an offer with `lead`
   days of notice (below).
 
-| Regular                  | Kind     | Wants               | Every  | Arrives | Starts              |
-| ------------------------ | -------- | ------------------- | ------ | ------- | ------------------- |
-| Mrs. Okafor              | standing | dill at 0.25        | 2 days | 09:30   | day 2               |
-| Old Bram                 | standing | sauerkraut at 0.68  | 4 days | 17:00   | day 3               |
-| Mei from Lucky Noodle    | bulk     | 4 dill at 0.2       | 5 days | 11:00   | day 4               |
-| Kenji                    | standing | kimchi at 0.52      | 3 days | 13:00   | day 5, reputation 6 |
-| Noor                     | standing | hot sauce at 0.6    | 3 days | 15:30   | day 6, reputation 7 |
-| Luis from the taco truck | bulk     | 3 hot sauce at 0.52 | 6 days | 14:00   | day 7, reputation 7 |
+| Regular                  | Kind     | Wants               | Every  | Arrives | Starts                  |
+| ------------------------ | -------- | ------------------- | ------ | ------- | ----------------------- |
+| Mrs. Okafor              | standing | dill at 0.25        | 2 days | 09:30   | day 2                   |
+| Old Bram                 | standing | sauerkraut at 0.68  | 4 days | 17:00   | day 3                   |
+| Mei from Lucky Noodle    | bulk     | 4 dill at 0.2       | 5 days | 11:00   | day 4                   |
+| Kenji                    | standing | kimchi at 0.52      | 3 days | 13:00   | day 5, reputation 6     |
+| Noor                     | standing | hot sauce at 0.6    | 3 days | 15:30   | day 6, reputation 7     |
+| Luis from the taco truck | bulk     | 3 hot sauce at 0.52 | 6 days | 14:00   | day 7, reputation 7     |
+| Dr. Ames                 | standing | beets at 0.42       | 3 days | 12:00   | Neighbourhood favourite |
+| Lena                     | standing | lemons at 0.62      | 4 days | 14:30   | Talk of the town        |
+| Rosa from Hotel Marigold | bulk     | 3 kombucha at 0.5   | 5 days | 10:00   | Famous brine            |
 
 Each window is 0.16 wide around the spot.
 
@@ -281,7 +301,66 @@ Day 1 has every stall but the rare ones. A rare stall being out pushes a
   An add-in that turns the recipe into another is locked in the planner
   automatically, because `planFor` reports it as not `right`.
 
+## Progression
+
+The shop is endless; there is no season end **(Hadash)**. Progress comes from
+upgrades, shop tiers and an endless goals ladder (`state.progress`,
+`core/progress.js`).
+
+**Tiers** (`TIERS` in `content/goals.js`). The shop climbs a tier once its
+lifetime takings (`stats.earned`, every coin customers have paid) reach the
+tier's amount, and never drops back (event `tierUp`). Tiers go by takings,
+not hearts: reputation fills to 10 within a few days, so it can't spread
+tiers out **(Hadash)**. Reputation stays the shop's standing today. Each tier unlocks a recipe,
+a regular and upgrades:
+
+| Tier | Name                    | Taken in all | Unlocks                                                   |
+| ---- | ----------------------- | ------------ | --------------------------------------------------------- |
+| 0    | Corner nook             | start        | cellar crock                                              |
+| 1    | Neighbourhood favourite | 500          | pickled beets, Dr. Ames, warm crock, first shelf upgrade  |
+| 2    | Talk of the town        | 1800         | preserved lemons, Lena, bigger jars, second shelf upgrade |
+| 3    | Famous brine            | 4500         | kombucha, Hotel Marigold, third shelf, even bigger jars   |
+
+**Upgrades** (`content/upgrades.js`) are bought in the evening
+(`upgrade { id, slot? }`), each level once its tier is reached:
+
+| Upgrade          | What it does                                                        | Cost           | Tier    |
+| ---------------- | ------------------------------------------------------------------- | -------------- | ------- |
+| More shelf space | 3 more shelf spots per level (9 → 12 → 15 → 18)                     | 200, 500, 1000 | 1, 2, 3 |
+| Bigger jars      | +1 portion per level for every jar started from then on (2 → 3 → 4) | 700, 1800      | 2, 3    |
+| Cellar crock     | fitted to one spot: jars started there ripen at 0.75×               | 60 per spot    | 0       |
+| Warm crock       | fitted to one spot: jars started there ripen at 1.3×                | 80 per spot    | 1       |
+
+A crock's pace multiplies with the add-ins' speeds. Fitting a crock to a spot
+replaces the one there; a jar already in that spot keeps the pace it started
+with. A bigger jar costs the same to start as a small one. `planFor` takes the
+slot a new jar would go in and plans with that slot's crock.
+
+**The goals ladder** (`GOALS`, `MORE` in `content/goals.js`). One goal is open
+at a time. When it is met the core says so (`goalReady`); `claimGoal` pays its
+reward (coins, sometimes pantry stock, topped up to the pantry's limit) and
+opens the next rung, which may already be met. The first ten are written out:
+
+| #   | Goal                       | Reward                |
+| --- | -------------------------- | --------------------- |
+| 1   | Sell 10 portions           | 20                    |
+| 2   | Hand over 2 orders         | 25                    |
+| 3   | Have 5 recipes on the menu | 20 + a garlic, a pear |
+| 4   | Take 120 coins in one day  | 30                    |
+| 5   | Win 2 regulars             | 40                    |
+| 6   | Buy 1 upgrade              | 30                    |
+| 7   | Delight 15 customers       | 40 + 2 honey          |
+| 8   | Reach reputation 8         | 60                    |
+| 9   | Sell 120 portions          | 60                    |
+| 10  | Have 7 recipes on the menu | 80                    |
+
+After that the ladder repeats five kinds forever (sell portions, best day,
+delight, orders, coins in all), each round asking more and paying 15 coins
+more. Counts are lifetime totals in `state.progress.stats` (portions sold,
+coins taken, delighted customers, best day's takings, orders handed over); the
+other goals read the shop as it is (menu size, regulars won, reputation,
+upgrades bought).
+
 ## Not in the game yet
 
-Upgrades and the goals ladder (Milestone 3). The game is endless with a
-goals ladder; there is no season end.
+The screens for upgrades and the goals ladder.

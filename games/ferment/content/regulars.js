@@ -10,7 +10,8 @@
  * jars, due `lead` days later. `spot` is the middle of the window they want
  * and stays inside the walk-in bell curve (within one spread of the recipe's
  * sweet spot middle). `joins` is when they start coming: from that day, and
- * once the shop has that reputation (both, when both are given). `hello` is what they say at the counter. `look` seeds the
+ * once the shop has that reputation, and once it has reached that reputation
+ * tier (content/goals.js); every condition given must hold. `hello` is what they say at the counter. `look` seeds the
  * portrait.
  */
 
@@ -85,6 +86,41 @@ export const REGULARS = {
     lead: 2,
     joins: { day: 7, rep: 7 },
     hello: "Three jars of the red stuff for the truck!",
+  },
+  ames: {
+    name: "Dr. Ames",
+    look: 463,
+    kind: "standing",
+    recipe: "beets",
+    spot: 0.42,
+    every: 3,
+    hour: 4,
+    joins: { tier: 1 },
+    hello: "Beets, please. Doctor's orders, and I'm the doctor.",
+  },
+  lena: {
+    name: "Lena",
+    look: 818,
+    kind: "standing",
+    recipe: "lemons",
+    spot: 0.62,
+    every: 4,
+    hour: 6.5,
+    joins: { tier: 2 },
+    hello: "One of your lemons? My tagine is waiting.",
+  },
+  marigold: {
+    name: "Rosa from Hotel Marigold",
+    look: 296,
+    kind: "bulk",
+    recipe: "kombucha",
+    spot: 0.5,
+    every: 5,
+    hour: 2,
+    qty: 3,
+    lead: 2,
+    joins: { tier: 3 },
+    hello: "Three jars of kombucha for the breakfast bar!",
   },
 };
 export const REGULAR_IDS = Object.keys(REGULARS);

@@ -55,7 +55,7 @@ games/ferment/
                     planFor, kept portions (hold/release)
     jars.js         flavour, ageing, add-in maths
     bench.js        pantry, experiments, discovery, recipe card, previewCurve
-    progress.js     upgrades, reputation tiers, goals ladder (state.progress)
+    progress.js     upgrades, shop tiers, goals ladder (state.progress)
     market.js       today's stalls (stock, prices), buy, marketToday
     rng.js          named random streams
     types.js        JSDoc types for the state, actions and events
@@ -85,15 +85,24 @@ games/ferment/
   For orders: `planFor(state, order, adds)` (where a jar started at the
   state's clock lands at pickup; the board passes the next morning after
   closing), `holdsOn(state, jar)` and `freePortions(state, jar, orderId?)`.
+  `planFor(state, order, adds, slot)` uses the pace of the crock in `slot`.
+  `forecast`, `lifeOf` and `ageAt` take a last `pace` argument (default 1):
+  for a jar on the shelf pass `jar.pace ?? 1`, for a new one the slot's crock.
+  For progression: `tierOf`, `slotCount`, `jarSize`, `crockAt(state, slot)`,
+  `upgradeOffers(state)`, `goalNow(state)` (the open rung: `goal`, `text`,
+  `have`, `ready`), `goalAt(i)`, `goalText(goal)` and `measure(state, kind)`.
 
 The state's slices are `meta` (seed, id counter, `rng` stream positions),
 `clock` (`day`, `phase`: morning | open | evening, `hour` since opening),
 `shop` (`coins`, `rep`, `today`), `shelf` (`slots`), `customers` (`queue`,
 `nextArrival`), `orders` (`list`, `offers`, `asked`), `bench` (`known` discovered recipes,
 `hints`, `tried`: base recipe → ingredients mixed in) `pantry` (`stock`:
-ingredient → count) and `regulars` (`met`: regular → visits, plus `pending`/`seen` while a
-standing regular is still dropping in as a walk-in) and `market` (`day` the stalls were
-set out, `items`: ingredient → `{ price, left }` for today). A jar with add-ins carries `adds`; a plain jar has none. A new system adds its slice with one
+ingredient → count), `regulars` (`met`: regular → visits, plus `pending`/`seen` while a
+standing regular is still dropping in as a walk-in), `market` (`day` the stalls were
+set out, `items`: ingredient → `{ price, left }` for today) and `progress` (`upgrades`: id → levels,
+`crocks`: shelf spot → crock, `tier`, `goal`, `stats`). A jar carries `servings` (left)
+and `size` (portions it started with); one with add-ins carries `adds`, and one started in
+a crock other than a plain one carries `pace`. The shelf's length is `slotCount(state)`, never `SLOTS`. A new system adds its slice with one
 line in `SLICES`.
 
 The actions are `tick { n }` (n fixed steps of 1/120 in-game hour; the screen
@@ -103,14 +112,17 @@ turns real time into whole steps at `HOUR_SECONDS` per hour), `open`, `close`,
 `experiment { recipe, adds }` (evening), and for orders
 `startForOrder { orderId, slot, adds? }`, `hold { orderId, slot }`,
 `release { slot, orderId? }`, `acceptOrder { orderId }` and
-`declineOrder { orderId }`. A new action is one line in `ACTIONS` pointing at a
+`declineOrder { orderId }`, and for progression `upgrade { id, slot? }` (evening; a
+crock needs the slot) and `claimGoal`. After every accepted action `step()` calls
+`progress.track`, which counts the goal stats, climbs tiers and says when a goal is met. A new action is one line in `ACTIONS` pointing at a
 handler `(state, action, events) => reason | undefined` that mutates the copy
 `step()` made. The events are `popped`, `arrived`, `left` (with `why`:
 impatient | sent | closed), `served`, `preordered`, `brewed`, `tippedOut`,
 `opened`, `closed`, `slept`, `bought`, `experimented` (with its `curve`),
 `discovered` (`recipe`, `base`, `adds`), and for orders `booked`, `offered`,
 `accepted`, `declined`, `regularJoined`, `startedForOrder`, `held`,
-`released`, `delivered` (one per whole jar a bulk buyer takes) and `hinted`.
+`released`, `delivered` (one per whole jar a bulk buyer takes) and `hinted`, and for
+progression `upgraded`, `tierUp` (`tier`), `goalReady` and `claimedGoal` (`i`, `goal`).
 The rules themselves, including the playtest decisions behind orders and the
 board, are in rules.md.
 

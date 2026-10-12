@@ -21,30 +21,33 @@ export const UPGRADES = {
     text: "Three more spots for jars.",
     slots: 3,
     levels: [
-      { cost: 120, tier: 1 },
-      { cost: 240, tier: 2 },
-      { cost: 400, tier: 3 },
+      { cost: 200, tier: 1 },
+      { cost: 500, tier: 2 },
+      { cost: 1000, tier: 3 },
     ],
   },
   bigjars: {
     name: "Bigger jars",
     kind: "jars",
     text: "Every new jar holds one more portion.",
-    levels: [{ cost: 260, tier: 2 }],
+    levels: [
+      { cost: 700, tier: 2 },
+      { cost: 1800, tier: 3 },
+    ],
   },
   cool: {
     name: "Cellar crock",
     kind: "crock",
     text: "Stone-cool. Jars in it take their time.",
     pace: 0.75,
-    levels: [{ cost: 35, tier: 0 }],
+    levels: [{ cost: 60, tier: 0 }],
   },
   warm: {
     name: "Warm crock",
     kind: "crock",
     text: "Sits by the stove. Jars in it hurry along.",
     pace: 1.3,
-    levels: [{ cost: 45, tier: 1 }],
+    levels: [{ cost: 80, tier: 1 }],
   },
 };
 export const UPGRADE_IDS = Object.keys(UPGRADES);

@@ -1,9 +1,10 @@
 // @ts-check
 /**
- * Reputation tiers and the goals ladder. Data only.
+ * Shop tiers and the goals ladder. Data only.
  *
- * TIERS: the shop climbs a tier the first time its reputation reaches the
- * tier's `rep`, and never drops back. A recipe with a `tier` (content/recipes.js)
+ * TIERS: the shop climbs a tier once it has taken `earned` coins in all
+ * (lifetime takings, so a tier marks a shop that has done well for a while;
+ * hearts fill too fast to spread tiers out (Hadash)), and never drops back. A recipe with a `tier` (content/recipes.js)
  * joins the menu at that tier; a regular whose `joins` has a `tier`
  * (content/regulars.js) starts coming once it is reached, through the usual
  * joins rule, so a standing regular still drops in as a walk-in first.
@@ -18,10 +19,10 @@
 
 /** @type {import("../core/types.js").Tier[]} */
 export const TIERS = [
-  { name: "Corner nook", rep: 0 },
-  { name: "Neighbourhood favourite", rep: 6 },
-  { name: "Talk of the town", rep: 8 },
-  { name: "Famous brine", rep: 10 },
+  { name: "Corner nook", earned: 0 },
+  { name: "Neighbourhood favourite", earned: 500 },
+  { name: "Talk of the town", earned: 1800 },
+  { name: "Famous brine", earned: 4500 },
 ];
 
 /** @type {Record<import("../core/types.js").GoalKind, string>} */

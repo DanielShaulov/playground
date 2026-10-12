@@ -7,6 +7,7 @@
     "booked": 3,
     "brewed": 20,
     "closed": 5,
+    "goalReady": 1,
     "hinted": 1,
     "left:sent": 8,
     "offered": 1,
@@ -181,13 +182,15 @@
           "id": 61,
           "recipe": "hotsauce",
           "age": 24,
-          "servings": 1
+          "servings": 1,
+          "size": 2
         },
         {
           "id": 32,
           "recipe": "dill",
           "age": 71.99999999999872,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         null,
         null,
@@ -195,26 +198,30 @@
           "id": 49,
           "recipe": "dill",
           "age": 47.99999999999936,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         null,
         {
           "id": 64,
           "recipe": "kraut",
           "age": 24,
-          "servings": 1
+          "servings": 1,
+          "size": 2
         },
         {
           "id": 50,
           "recipe": "kraut",
           "age": 47.99999999999936,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         {
           "id": 36,
           "recipe": "kraut",
           "age": 71.99999999999872,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         }
       ]
     },
@@ -312,11 +319,11 @@
       "tier": 0,
       "goal": 0,
       "stats": {
-        "served": 0,
-        "earned": 0,
-        "delight": 0,
-        "bestDay": 0,
-        "orders": 0
+        "served": 35,
+        "earned": 277,
+        "delight": 6,
+        "bestDay": 78,
+        "orders": 1
       }
     },
     "market": {

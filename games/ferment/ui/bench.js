@@ -28,6 +28,7 @@ import {
   demand,
   demandAt,
   marketToday,
+  menu,
 } from "../core/index.js";
 import { jarSvg } from "./art/jar.js";
 import { recipeCardHtml } from "./recipe-card.js";
@@ -156,16 +157,20 @@ export function renderBench(view, ui) {
   const secret = made !== b.recipe && !s.bench.known.includes(made);
   const evening = s.clock.phase === "evening";
 
-  const bases = RECIPE_IDS.map((id) => {
-    const r = RECIPES[id];
-    const jar = {
-      id: 800 + RECIPE_IDS.indexOf(id),
-      recipe: id,
-      age: r.hours * 0.3,
-      servings: SERVINGS,
-    };
-    return `<button class="base${id === b.recipe ? " on" : ""}" data-act="bench-base" data-recipe="${id}">${jarSvg(jar, "bjar-base")}<span>${r.name}</span></button>`;
-  }).join("");
+  // Every recipe on the menu that isn't a discovered one: the starting four and those a tier unlocked.
+  const baseIds = menu(s).filter((id) => !RECIPES[id].base);
+  const bases = baseIds
+    .map((id, i) => {
+      const r = RECIPES[id];
+      const jar = {
+        id: 800 + i,
+        recipe: id,
+        age: r.hours * 0.3,
+        servings: SERVINGS,
+      };
+      return `<button class="base${id === b.recipe ? " on" : ""}" data-act="bench-base" data-recipe="${id}">${jarSvg(jar, "bjar-base")}<span>${r.name}</span></button>`;
+    })
+    .join("");
 
   const mixName =
     made === b.recipe

@@ -3,7 +3,7 @@
  * Jar art: one pure function from a jar's state to inline SVG. Everything the
  * rules know about a jar shows on the glass, so a player can read it:
  *
- * - brine level = servings left, against a notch per serving on the glass;
+ * - brine level = servings left, against a notch per portion the jar holds;
  * - flavour (crisp → funky) = the brine clouding over, more bubbles, a foam
  *   ring at the surface, a pale sediment settling, the bits dulling, and the
  *   lid doming higher and higher;
@@ -23,9 +23,10 @@ import { flavour, isOver } from "../../core/index.js";
 /**
  * @typedef {{
  *   id: number, recipe: string, f: number, over: boolean,
- *   servings: number, adds: string[]
+ *   servings: number, size: number, adds: string[]
  * }} JarLook
- *   f is flavour 0 (crisp) → 1 (funky); servings counts down from SERVINGS.
+ *   f is flavour 0 (crisp) → 1 (funky); servings counts down from size, the
+ *   portions the jar was started with.
  */
 
 /** A tiny xorshift generator for decoration only (never for rules). */
@@ -61,8 +62,8 @@ const LID = "#9a6a43";
 const LID_DARK = "#7d5435";
 const FULL = -19; // brine surface when the jar is full
 const EMPTY = 31; // and when it has nothing left to sell
-const levelAt = (/** @type {number} */ servings) =>
-  EMPTY + (FULL - EMPTY) * Math.max(0, Math.min(1, servings / SERVINGS));
+const levelAt = (/** @type {number} */ servings, /** @type {number} */ size) =>
+  EMPTY + (FULL - EMPTY) * Math.max(0, Math.min(1, servings / size));
 const BODY =
   "M-19 -31 H19 V-27.5 Q26 -26 26 -18 V25 Q26 36 15 36 H-15 Q-26 36 -26 25 V-18 Q-26 -26 -19 -27.5 Z";
 const INSIDE =
@@ -105,6 +106,27 @@ const BITS = {
     }
     return `<g transform="translate(${n1(x)} ${n1(y)}) rotate(${a.toFixed(0)})">${p}</g>`;
   },
+  // Beet slices: deep discs with paler growth rings.
+  beets: (x, y, a, c, rnd) => {
+    const r = 4.5 + rnd() * 2;
+    return `<g transform="translate(${n1(x)} ${n1(y)}) rotate(${a.toFixed(0)})">
+      <ellipse rx="${n1(r)}" ry="${n1(r * 0.8)}" fill="${c}"/>
+      <ellipse rx="${n1(r * 0.62)}" ry="${n1(r * 0.5)}" fill="none" stroke="${mix(c, "#f3c3d2", 0.45)}" stroke-width=".8"/>
+      <ellipse rx="${n1(r * 0.28)}" ry="${n1(r * 0.22)}" fill="none" stroke="${mix(c, "#f3c3d2", 0.45)}" stroke-width=".7"/></g>`;
+  },
+  // Lemon quarters: a yellow rind round a pale wedge with segment lines.
+  lemons: (x, y, a, c) =>
+    `<g transform="translate(${n1(x)} ${n1(y)}) rotate(${a.toFixed(0)})">
+      <path d="M-7 2.5 A7 7 0 0 1 7 2.5 Z" fill="${c}"/>
+      <path d="M-5.6 2.5 A5.6 5.6 0 0 1 5.6 2.5 Z" fill="#fbf1bf"/>
+      <path d="M0 2.5 L-3.6 -1.8 M0 2.5 L0 -3 M0 2.5 L3.6 -1.8" stroke="${mix(c, "#fbf1bf", 0.5)}" stroke-width=".7"/></g>`,
+  // Kombucha: a floating mother, a soft pale disc, with stray strands below.
+  kombucha: (x, y, a, c, rnd) => {
+    const w = 8 + rnd() * 4;
+    return `<g transform="translate(${n1(x)} ${n1(y)}) rotate(${(a / 4).toFixed(0)})">
+      <ellipse rx="${n1(w)}" ry="2.2" fill="${mix(c, "#f2e2c4", 0.55)}" opacity=".9"/>
+      <path d="M${n1(-w / 2)} 2 q1 3 -0.5 5 M${n1(w / 3)} 2 q-1 2.5 0.5 4.5" stroke="${c}" stroke-width=".8" fill="none" opacity=".7"/></g>`;
+  },
 };
 
 /** A plain chunk, for a recipe that has no drawing of its own yet. */
@@ -146,6 +168,7 @@ export function jarLook(/** @type {import("../../core/types.js").Jar} */ jar) {
     f: flavour(jar),
     over: isOver(jar),
     servings: jar.servings,
+    size: jar.size ?? SERVINGS,
     adds: jar.adds ?? [],
   };
 }
@@ -156,7 +179,8 @@ export function jarArt(/** @type {JarLook} */ look, cls = "jar") {
   const f = Math.round(Math.max(0, Math.min(1, look.f)) * 40) / 40;
   const over = look.over;
   const rnd = seeded(look.id + 7);
-  const level = levelAt(look.servings);
+  const size = look.size ?? SERVINGS;
+  const level = levelAt(look.servings, size);
   const depth = EMPTY + 3 - level; // how much brine there is to draw in
   const uid = `j${look.id}${cls}`;
 
@@ -164,7 +188,7 @@ export function jarArt(/** @type {JarLook} */ look, cls = "jar") {
   // soften towards olive-brown as the jar ferments.
   const bitColour = mix(r.bits, "#8c7a4e", f * 0.45);
   const draw = BITS[look.recipe] ?? BITS[r.base] ?? chunk;
-  const nBits = Math.max(1, Math.round(2 + 6 * (look.servings / SERVINGS)));
+  const nBits = Math.max(1, Math.round(2 + 6 * (look.servings / size)));
   let bits = "";
   for (let i = 0; i < nBits; i++) {
     const x = -15 + rnd() * 30;
@@ -212,8 +236,8 @@ export function jarArt(/** @type {JarLook} */ look, cls = "jar") {
 
   // Serving notches on the glass, one per serving, so the level reads at a glance.
   let notches = "";
-  for (let k = 1; k <= SERVINGS; k++) {
-    const y = levelAt(k);
+  for (let k = 1; k <= size; k++) {
+    const y = levelAt(k, size);
     notches += `<path d="M20.5 ${n1(y)} H24" stroke="${GLASS}" stroke-width="1.4" stroke-linecap="round"/>`;
   }
 

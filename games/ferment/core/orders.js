@@ -20,6 +20,7 @@ import { clamp, nextId } from "./util.js";
 import { addRep, brew } from "./shop.js";
 import { resolveMix } from "./bench.js";
 import { ageAt, forecast } from "./jars.js";
+import { crockAt, tierOf } from "./progress.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Order} Order */
@@ -218,9 +219,11 @@ function book(/** @type {State} */ s, /** @type {string} */ id, /** @type {numbe
   events.push({ type: "booked", order });
 }
 
-/** True once a regular's `joins` condition is met. */
+/** True once a regular's `joins` condition is met (day, reputation and tier, where given). */
 const joinsNow = (/** @type {State} */ s, /** @type {import("./types.js").Regular} */ r) =>
-  s.clock.day >= (r.joins.day ?? 1) && s.shop.rep >= (r.joins.rep ?? 0);
+  s.clock.day >= (r.joins.day ?? 1) &&
+  s.shop.rep >= (r.joins.rep ?? 0) &&
+  tierOf(s) >= (r.joins.tier ?? 0);
 
 /**
  * Each new morning: regulars whose time has come start visiting (a standing
@@ -259,28 +262,34 @@ const dayHourOf = (/** @type {number} */ t) => {
 };
 
 /**
- * Where a jar for `order`, started right now with `adds`, will be when the
- * order is collected. `adds` work as they do for brew: the order's recipe
- * plus them must still make that recipe (`right`), and a discovered recipe
- * brings what it needs. Null when the recipe or the add-ins are not valid.
+ * Where a jar for `order`, started right now with `adds` in shelf `slot`, will
+ * be when the order is collected. `adds` work as they do for brew: the
+ * order's recipe plus them must still make that recipe (`right`), and a
+ * discovered recipe brings what it needs. The jar ripens at the pace of the
+ * crock in `slot` (a plain crock when no slot is given). Null when the recipe
+ * or the add-ins are not valid.
  * @returns {Plan | null}
  */
 export function planFor(
   /** @type {State} */ s,
   /** @type {{ recipe: string, lo: number, hi: number, due: number, arriveAt: number }} */ order,
   /** @type {unknown} */ adds = [],
+  /** @type {number | undefined} */ slot = undefined,
 ) {
   const mix = resolveMix(order?.recipe, adds ?? []);
   if (!mix) return null;
+  const pace =
+    Number.isInteger(slot) && slot >= 0 && slot < s.shelf.slots.length ? crockAt(s, slot).pace : 1;
   const now = timeOf(s.clock.day, s.clock.hour);
   const age = Math.max(0, timeOf(order.due, order.arriveAt) - now);
-  const f = Math.min(1, forecast(mix.recipe, age, mix.adds));
+  const f = Math.min(1, forecast(mix.recipe, age, mix.adds, pace));
   const right = mix.recipe === order.recipe;
-  const enter = ageAt(mix.recipe, mix.adds, order.lo);
-  const exit = ageAt(mix.recipe, mix.adds, order.hi);
+  const enter = ageAt(mix.recipe, mix.adds, order.lo, pace);
+  const exit = ageAt(mix.recipe, mix.adds, order.hi, pace);
   return {
     recipe: mix.recipe,
     adds: mix.adds,
+    pace,
     right,
     f,
     fits: right && f < 1 && f >= order.lo && f <= order.hi,

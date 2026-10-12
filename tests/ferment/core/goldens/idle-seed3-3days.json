@@ -58,38 +58,44 @@
           "id": 1,
           "recipe": "dill",
           "age": 91.20000000000832,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         {
           "id": 2,
           "recipe": "kimchi",
           "age": 86.40000000000694,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         {
           "id": 3,
           "recipe": "hotsauce",
           "age": 94.3200000000083,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         {
           "id": 4,
           "recipe": "kraut",
           "age": 111.6000000000182,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         {
           "id": 5,
           "recipe": "dill",
           "age": 75.83999999999853,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         null,
         {
           "id": 6,
           "recipe": "kimchi",
           "age": 108.00000000001513,
-          "servings": 2
+          "servings": 2,
+          "size": 2
         },
         null,
         null

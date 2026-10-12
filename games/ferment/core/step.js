@@ -16,7 +16,7 @@ import { sendAway } from "./customers.js";
 import { preorder, startForOrder, acceptOrder, declineOrder, hold, release } from "./orders.js";
 import { experiment } from "./bench.js";
 import { buy } from "./market.js";
-import { upgrade, claimGoal } from "./progress.js";
+import { upgrade, claimGoal, track } from "./progress.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Action} Action */
@@ -54,5 +54,6 @@ export function step(/** @type {State} */ state, /** @type {Action} */ action) {
   const events = [];
   const why = handler(next, action, events);
   if (why) return { state, events: [{ type: "rejected", action: action.type, why }] };
+  track(state, next, events);
   return { state: next, events };
 }

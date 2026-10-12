@@ -13,7 +13,7 @@
  *   brine: string, bits: string, base?: string, needs?: string[], hinted?: boolean, tier?: number
  * }} Recipe
  *   sweet is the recipe's best stretch of the flavour strip. base/needs mark a discovered recipe.
- *   tier: the reputation tier (content/goals.js) at which it joins the menu.
+ *   tier: the shop tier (content/goals.js) at which it joins the menu.
  *
  * @typedef {{
  *   id: number, recipe: string, age: number, servings: number, size?: number,
@@ -108,7 +108,7 @@
  *   content/regulars.js. spot: middle of the window they want (inside the walk-in bell
  *   curve). every: days between visits (standing) or offers (bulk). hour: hours since
  *   opening they arrive. joins: from which day, at what reputation, and from which
- *   reputation tier they start coming (all that are given must hold).
+ *   shop tier they start coming (all that are given must hold).
  *   qty/lead (bulk): whole jars wanted, and days from the offer to the due day.
  *
  * @typedef {{ since: number, visits: number, happy: number, missed: number, pending?: boolean, seen?: number }} RegularMet
@@ -121,11 +121,12 @@
  * @typedef {{ day: number, hour: number }} DayHour
  *   hour counts from opening (0 = 08:00) and may run past closing into the night.
  * @typedef {{
- *   recipe: string, adds: string[], right: boolean, f: number, fits: boolean,
+ *   recipe: string, adds: string[], pace: number, right: boolean, f: number, fits: boolean,
  *   lands: DayHour, leaves: DayHour, late: number
  * }} Plan
  *   planFor(): a jar of the order's recipe started now with `adds`. recipe: what that
- *   mix makes (right: it is the order's). f: its flavour at pickup (1 = gone over).
+ *   mix makes (right: it is the order's). pace: the crock's speed in the chosen slot.
+ *   f: its flavour at pickup (1 = gone over).
  *   fits: right and inside the window at pickup. lands/leaves: when it enters and
  *   leaves the window. late: hours the pickup comes after the window's middle
  *   (negative: before it; 0 is perfect).
@@ -138,8 +139,8 @@
  *   levels: UpgradeLevel[], slots?: number, pace?: number
  * }} Upgrade
  *   content/upgrades.js. slots: spots a shelf level adds. pace: a crock's ripening speed.
- * @typedef {{ name: string, rep: number }} Tier
- *   content/goals.js. Reached the first time reputation gets to `rep`; never lost.
+ * @typedef {{ name: string, earned: number }} Tier
+ *   content/goals.js. Reached once `earned` coins have been taken in all; never lost.
  * @typedef {"served" | "earned" | "delight" | "bestDay" | "orders" | "recipes" | "regulars" | "rep" | "upgrades"} GoalKind
  * @typedef {{ coins: number, stock?: Record<string, number> }} Reward
  * @typedef {{ kind: GoalKind, n: number, reward: Reward }} Goal
