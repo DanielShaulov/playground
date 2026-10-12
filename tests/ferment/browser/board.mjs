@@ -134,7 +134,7 @@ export async function run(page, snap) {
   const salted = await planned(902, ["salt"]);
   assert.ok(salted.f < plain.f, "salt slows it");
   assert.ok(Math.abs((await markAt()) - salted.f) < 0.002, "marker follows the salt");
-  assert.match(await page.locator(".plan .verdict").innerText(), /Still too/);
+  assert.match(await page.locator(".plan .verdict").innerText(), /Not ready yet/);
   await snap("3-salted");
   await page.locator('.plan [data-act="board-add"][data-ingredient="salt"]').tap();
 
@@ -165,7 +165,7 @@ export async function run(page, snap) {
   const opts = page.locator(".plan .opt:not([data-src=new])");
   assert.equal(await opts.count(), 3, "every kimchi jar lasts till then");
   for (const t of await opts.locator(".fit").allInnerTexts())
-    assert.match(t, /Just right|Still|Gone/);
+    assert.match(t, /Just right|Not ready|Gone/);
   await page.locator(`.plan .opt[data-src="${slot}"]`).tap();
   assert.match(await page.locator(".plan .btns .main").innerText(), /Keep a portion for Sam/);
   assert.equal(await page.locator(".plan .add").count(), 0, "no add-ins for a jar already going");
@@ -215,6 +215,44 @@ export async function run(page, snap) {
     s.customers.queue = [];
     window.__ferment.state = s;
   });
+
+  // A jar kept that won't suit by pickup: the planner offers to pick another.
+  await page.evaluate(() => {
+    const s = structuredClone(window.__ferment.state);
+    const old = s.shelf.slots
+      .filter((j) => j && j.recipe === "kimchi")
+      .sort((a, b) => b.age - a.age)[0];
+    s.orders.list.find((o) => o.id === 902).jars = [old.id];
+    window.__ferment.state = s;
+  });
+  await page.locator('.ticket[data-order="902"]').tap();
+  assert.match(await page.locator(".plan .verdict").innerText(), /Gone|popped/);
+  await page.locator('.plan .btns .main:text("Pick another jar")').tap();
+  await page.locator(".plan .opt").first().waitFor();
+  assert.deepEqual((await state()).orders.list.find((o) => o.id === 902).jars, [], "let go");
+  await page.locator('.plan .btns [data-act="board-close"]').tap();
+
+  // Chili is already in fire kraut, so it isn't offered as a timing add-in.
+  await page.evaluate(() => {
+    const s = structuredClone(window.__ferment.state);
+    s.orders.list.push({
+      id: 905,
+      kind: "preorder",
+      name: "Ama",
+      look: 50,
+      recipe: "firekraut",
+      lo: 0.55,
+      hi: 0.75,
+      due: 4,
+      arriveAt: 6.5,
+      arrived: false,
+    });
+    window.__ferment.state = s;
+  });
+  await page.locator('.ticket[data-order="905"]').tap();
+  await page.locator('.plan .add[data-ingredient="salt"]').waitFor();
+  assert.equal(await page.locator('.plan .add[data-ingredient="chili"]').count(), 0);
+  await page.locator('.plan .btns [data-act="board-close"]').tap();
 
   // The bulk order with a jar started too soon says when to start instead.
   await page.locator('.ticket[data-order="903"]').tap();

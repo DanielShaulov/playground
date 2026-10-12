@@ -233,12 +233,19 @@ function pickSrc(s, o) {
 /** How many more jars (or portions) an order still needs kept or started. */
 const stillNeeds = (s, o) => (o.qty ?? 1) - (o.got ?? 0) - jarsFor(s, o).length;
 
+/** The shop as it will be when a new jar can go on: now, or tomorrow morning after closing. */
+const fromStart = (s) =>
+  s.clock.phase === "evening" ? { ...s, clock: { ...s.clock, day: s.clock.day + 1, hour: 0 } } : s;
+
 /** Timing add-ins the pantry has that keep the jar the order's recipe. */
 function timingAdds(s, o) {
-  return INGREDIENT_IDS.filter((id) => INGREDIENTS[id].speed !== 1).map((id) => {
-    const p = planFor(s, o, [id]);
-    return { id, ok: !!p && p.right, stock: s.pantry.stock[id] ?? 0 };
-  });
+  const needs = RECIPES[o.recipe].needs ?? [];
+  return INGREDIENT_IDS.filter((id) => INGREDIENTS[id].speed !== 1 && !needs.includes(id)).map(
+    (id) => {
+      const p = planFor(fromStart(s), o, [id]);
+      return { id, ok: !!p && p.right, stock: s.pantry.stock[id] ?? 0 };
+    },
+  );
 }
 
 /** Day timeline: now → a little past pickup, with the jar's best stretch and the pickup pin. */
@@ -273,10 +280,10 @@ function verdict(s, o, plan) {
     plan.f >= 1
       ? "By then its lid will have popped."
       : plan.f < o.lo
-        ? `Still too ${bandWord(plan.f)} when ${o.name} comes in.`
+        ? `Not ready yet when ${o.name} comes in.`
         : `Gone ${bandWord(plan.f)} by the time ${o.name} comes in.`;
   if (plan.shelf) {
-    const fresh = planFor(s, o, []);
+    const fresh = planFor(fromStart(s), o, []);
     const better = fresh && (fresh.fits || bestStart(s, o, fresh));
     return `<b class="bad">${now}</b>${better ? ` <span class="tip">A fresh jar would suit ${o.name} better.</span>` : ""}`;
   }
@@ -289,7 +296,8 @@ function verdict(s, o, plan) {
       t.hour < 0.5
         ? `Start it ${day === "today" ? "now" : `${day} morning`} instead.`
         : `Start it ${day} around ${clockAt(t.hour)} instead.`;
-    if (t.day === s.clock.day && Math.abs(t.hour - s.clock.hour) < 0.5) tip = "";
+    const st = fromStart(s).clock;
+    if (t.day === st.day && Math.abs(t.hour - st.hour) < 0.5) tip = "";
   } else if (plan.f < o.lo) tip = "A little chili would hurry it along.";
   else tip = "A pinch of salt would hold it back.";
   return `<b class="bad">${now}</b> <span class="tip">${tip}</span>`;
@@ -324,7 +332,7 @@ const bandWord = (f) => word(f).replace(/<[^>]+>/g, "");
 /** How a jar will be at pickup, in a word or two. */
 function fitWord(o, f) {
   if (f >= 1) return `<small class="fit bad">Lid popped</small>`;
-  if (f < o.lo) return `<small class="fit bad">Still ${bandWord(f)}</small>`;
+  if (f < o.lo) return `<small class="fit bad">Not ready</small>`;
   if (f > o.hi) return `<small class="fit bad">Gone ${bandWord(f)}</small>`;
   return `<small class="fit good">Just right</small>`;
 }
@@ -350,7 +358,7 @@ function renderPlan(ui) {
   }
   el.hidden = false;
   if (p.slot >= 0 && s.shelf.slots[p.slot]) p.slot = firstEmpty(s);
-  const fresh = planFor(s, o, p.adds);
+  const fresh = planFor(fromStart(s), o, p.adds);
   if (!fresh) {
     p.adds = [];
     return;
@@ -364,11 +372,12 @@ function renderPlan(ui) {
   if (p.src !== "new" && !options.some((c) => c.i === p.src)) p.src = offer ? "new" : pickSrc(s, o);
   const chosen = options.find((c) => c.i === p.src);
   // What the strip, timeline and verdict show: the chosen shelf jar, a new jar,
-  // or once the order is covered, the jar kept for it that suits best.
+  // or once the order is covered, a kept jar that won't suit (to swap it) or else one that will.
   const keptPlans = jars
-    .map((x) => shelfPlan(s, o, x.jar))
-    .sort((a, b) => Number(b.fits) - Number(a.fits));
-  const plan = left <= 0 && keptPlans.length ? keptPlans[0] : (chosen?.plan ?? fresh);
+    .map((x) => ({ slot: s.shelf.slots.indexOf(x.jar), plan: shelfPlan(s, o, x.jar) }))
+    .sort((a, b) => Number(a.plan.fits) - Number(b.plan.fits));
+  const swap = left <= 0 && keptPlans[0] && !keptPlans[0].plan.fits ? keptPlans[0] : null;
+  const plan = left <= 0 && keptPlans.length ? keptPlans[0].plan : (chosen?.plan ?? fresh);
   const portion = o.kind === "bulk" ? "it" : "a portion";
 
   const kept = jars.length
@@ -387,7 +396,7 @@ function renderPlan(ui) {
         )
         .join(
           "",
-        )}<button class="opt${p.src === "new" ? " sel" : ""}" data-act="board-src" data-src="new"><span class="ojar">${emptyJarSvg}</span><span class="otext">A new jar, started now${stripMarks(o, [fresh.f], fresh.fits)}</span>${fresh.right ? fitWord(o, fresh.f) : ""}</button></div>`
+        )}<button class="opt${p.src === "new" ? " sel" : ""}" data-act="board-src" data-src="new"><span class="ojar">${emptyJarSvg}</span><span class="otext">A new jar, started ${evening ? "in the morning" : "now"}${stripMarks(o, [fresh.f], fresh.fits)}</span>${fresh.right ? fitWord(o, fresh.f) : ""}</button></div>`
     : "";
 
   const adds = timingAdds(s, o)
@@ -409,6 +418,8 @@ function renderPlan(ui) {
   let go;
   if (offer)
     go = `<button class="main" data-act="board-take" data-order="${o.id}">Take it</button>`;
+  else if (swap)
+    go = `<button class="main" data-act="board-unhold" data-slot="${swap.slot}">Pick another jar</button>`;
   else if (left <= 0) go = `<button class="main" data-act="board-close">All set</button>`;
   else if (chosen)
     go = `<button class="main" data-act="board-hold" data-slot="${chosen.i}">Keep ${portion} for ${o.name}</button>`;

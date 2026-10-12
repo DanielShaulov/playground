@@ -7,7 +7,7 @@
 
 import { RECIPES } from "../content/recipes.js";
 import { PATIENCE, PREORDER_PATIENCE } from "../content/tuning.js";
-import { flavour, isOver, dueFor } from "../core/index.js";
+import { flavour, isOver, dueFor, onMenu } from "../core/index.js";
 import { jarSvg, emptyJarSvg } from "./art/jar.js";
 import { faceSvg } from "./art/customer.js";
 import { strip, stripLabels } from "./strip.js";
@@ -212,8 +212,9 @@ function actionsHtml(s, cust, sel) {
       main = `<button class="main" disabled>${have ? `Tap a ${lower(cust.recipe)} jar` : `No ${lower(cust.recipe)} on the shelf`}</button>`;
     }
   }
-  const pre = cust.orderId
-    ? ""
-    : `<button data-act="preorder">Pre-order<small>due day ${dueFor(s, cust).due}</small></button>`;
+  const pre =
+    cust.orderId || !onMenu(s, cust.recipe)
+      ? ""
+      : `<button data-act="preorder">Pre-order<small>due day ${dueFor(s, cust).due}</small></button>`;
   return `${pre}${main}<button data-act="away">Send away<small>♥ −${cust.orderId ? 2 : 1}</small></button>`;
 }
