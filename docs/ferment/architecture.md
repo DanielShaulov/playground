@@ -55,9 +55,11 @@ games/ferment/
                     planFor, kept portions (hold/release)
     jars.js         flavour, ageing, add-in maths
     bench.js        pantry, experiments, discovery, recipe card, previewCurve
+    progress.js     upgrades, reputation tiers, goals ladder (state.progress)
     rng.js          named random streams
     types.js        JSDoc types for the state, actions and events
-  content/          data: recipes, flavour bands, names, tuning numbers
+  content/          data: recipes, flavour bands, names, tuning numbers,
+                    upgrades, tiers and goals
   ui/               main.js (state, input, loop, saving), shop.js (screen),
                     bench.js + recipe-card.js + bench.css (brewing bench),
                     board.js + board.css (order board and planner),

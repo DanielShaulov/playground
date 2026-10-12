@@ -11,7 +11,8 @@
  * Module map: state.js (slices) · step.js (action list) · clock.js (day cycle,
  * fixed steps) · shop.js (coins, rep, shelf actions) · customers.js (walk-ins)
  * · orders.js (orders, regulars, planFor) · jars.js (flavour, add-in maths)
- * · bench.js (pantry, experiments, discovery, recipe card) · rng.js (named random streams).
+ * · bench.js (pantry, experiments, discovery, recipe card) · progress.js (upgrades,
+ * tiers, goals) · rng.js (named random streams).
  */
 
 export { newGame, loadSave, SLICES } from "./state.js";
@@ -21,3 +22,14 @@ export { flavour, isOver, bandOf, forecast, ageAt, lifeOf, mixOf } from "./jars.
 export { previewCurve, recipeCard, resolveMix, menu } from "./bench.js";
 export { judge, demand, demandAt } from "./customers.js";
 export { dueFor, planFor, holdsOn, freePortions } from "./orders.js";
+export {
+  tierOf,
+  slotCount,
+  jarSize,
+  crockAt,
+  upgradeOffers,
+  goalAt,
+  goalText,
+  goalNow,
+  measure,
+} from "./progress.js";

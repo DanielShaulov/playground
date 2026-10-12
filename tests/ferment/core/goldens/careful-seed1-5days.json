@@ -360,6 +360,19 @@
           "missed": 0
         }
       }
+    },
+    "progress": {
+      "upgrades": {},
+      "crocks": {},
+      "tier": 0,
+      "goal": 0,
+      "stats": {
+        "served": 0,
+        "earned": 0,
+        "delight": 0,
+        "bestDay": 0,
+        "orders": 0
+      }
     }
   }
 }
