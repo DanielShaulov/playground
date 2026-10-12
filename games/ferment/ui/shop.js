@@ -15,6 +15,7 @@ import { word, lower, requestLine, clockText } from "./text.js";
 import { sheetHtml } from "./sheets.js";
 import { renderBoard, freeFor, portionsHtml, keptFor, whoNote } from "./board.js";
 import { patch, setClass, bump } from "./dom.js";
+import { bigJar } from "./upgrades.js";
 
 /** Build the screen's fixed skeleton; returns the elements render() fills in. */
 export function mountShop(parent) {
@@ -48,20 +49,26 @@ export function mountShop(parent) {
     toasts: $("toasts"),
     slots: [],
   };
-  for (let r = 0; r < 3; r++) {
-    const row = document.createElement("div");
-    row.className = "row";
-    for (let c = 0; c < 3; c++) {
-      const el = document.createElement("div");
-      el.className = "slot";
-      el.dataset.act = "slot";
-      el.dataset.slot = String(els.slots.length);
-      els.slots.push(el);
-      row.appendChild(el);
-    }
-    els.shelf.appendChild(row);
-  }
   return els;
+}
+
+/** Give the shelf one spot per slot, three to a row; it grows with shelf upgrades. */
+function growShelf(els, n) {
+  while (els.slots.length < n) {
+    let row = els.shelf.lastElementChild;
+    if (!row || row.childElementCount === 3) {
+      row = document.createElement("div");
+      row.className = "row";
+      els.shelf.appendChild(row);
+    }
+    const el = document.createElement("div");
+    el.className = "slot";
+    el.dataset.act = "slot";
+    el.dataset.slot = String(els.slots.length);
+    els.slots.push(el);
+    row.appendChild(el);
+  }
+  setClass(els.shelf, n > 9 ? "shelf many" : "shelf");
 }
 
 let lastCoins = null;
@@ -138,10 +145,12 @@ export function renderShop(els, ui) {
   }
 
   // shelf
+  growShelf(els, s.shelf.slots.length);
   s.shelf.slots.forEach((jar, i) => {
     const el = els.slots[i];
+    const crock = s.progress.crocks[i] ? ` crock-${s.progress.crocks[i]}` : "";
     if (!jar) {
-      setClass(el, "slot empty" + (cust ? " dim" : ""));
+      setClass(el, "slot empty" + crock + (cust ? " dim" : ""));
       patch(
         el,
         `${emptyJarSvg}<div class="lbl">Empty<small>${s.clock.phase === "evening" ? "&nbsp;" : "tap to brew"}</small></div>`,
@@ -153,7 +162,7 @@ export function renderShop(els, ui) {
     const kept = keptFor(s, jar);
     const relevant = cust && jar.recipe === cust.recipe && !over && freeFor(s, jar, cust);
     const fits = relevant && f >= cust.lo && f <= cust.hi;
-    let cls = "slot";
+    let cls = "slot" + crock + (bigJar(jar) ? " big" : "");
     if (cust && !relevant) cls += " dim";
     if (fits) cls += " fits";
     if (i === ui.selected) cls += " sel";
@@ -191,7 +200,7 @@ function actionsHtml(s, cust, sel) {
     return `<button data-act="restart">Start over</button>${tip || `<button class="main" data-act="open">Open shop ▶</button>`}`;
   }
   if (s.clock.phase === "evening") {
-    return `<button class="main" data-act="summary">Today's takings</button>`;
+    return `<button class="main" data-act="evening">🌙 Back to the evening</button>`;
   }
   if (!cust) {
     return `<button data-act="close">Close early</button>${tip}`;

@@ -239,7 +239,7 @@ export function renderBench(view, ui) {
   patch(r.lapse, timelapseHtml(b.recipe, b.adds, curve, secret));
   patch(
     r.pantry,
-    `<h3>Pantry${evening ? "" : ` <span class="dim">· restock in the evening</span>`}</h3><div class="items">${pantry}</div>`,
+    `<h3>Pantry${evening ? `<button class="right tomarket" data-act="evening" data-tab="market">🧺 Restock at the market ›</button>` : ` <span class="dim">· restock at the market in the evening</span>`}</h3><div class="items">${pantry}</div>`,
   );
   patch(r.card, recipeCardHtml(card));
   patch(r.note, note);
