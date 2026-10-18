@@ -28,10 +28,12 @@
  *   id: number, name: string, look: number, recipe: string,
  *   lo: number, hi: number, patience: number, orderId?: number,
  *   kind?: OrderKind, due?: number, arriveAt?: number, arrived?: boolean,
- *   regular?: string, qty?: number, got?: number, jars?: number[], offMenu?: boolean
+ *   regular?: string, qty?: number, got?: number, jars?: number[], offMenu?: boolean,
+ *   script?: string
  * }} Customer
  *   lo..hi is the flavour window they want. orderId marks someone collecting an order
  *   (the order's fields come along). offMenu: a walk-in asking for a recipe not on the menu.
+ *   script: one of day 1's scripted customers (core/tutorial.js), by the case they show.
  *
  * @typedef {"preorder" | "standing" | "bulk"} OrderKind
  *   preorder: a walk-in booked a later day. standing: a regular's next visit.
@@ -68,7 +70,8 @@
  * @typedef {{
  *   meta: MetaSlice, clock: ClockSlice, shop: ShopSlice, shelf: ShelfSlice,
  *   customers: CustomersSlice, orders: OrdersSlice, bench: BenchSlice, pantry: PantrySlice,
- *   regulars: RegularsSlice, progress: ProgressSlice, market: MarketSlice
+ *   regulars: RegularsSlice, progress: ProgressSlice, market: MarketSlice,
+ *   tutorial: TutorialSlice
  * }} State
  *
  * @typedef {{ type: string, [key: string]: any }} Action
@@ -173,6 +176,19 @@
  *   marketToday(): one stall. have: in the pantry now; room: how many more the pantry takes.
  * @typedef {{ ok: true, state: State, why?: undefined } | { ok: false, why: "empty" | "notACode" | "damaged" | "unplayable", state?: undefined }} SaveCodeResult
  *   readCode(): a backup code turned back into a state, or why it couldn't be (core/save.js).
+ */
+
+/**
+ * @typedef {{
+ *   on: boolean, intro: boolean,
+ *   now: { id: string, beat: number, who?: number, name?: string, slot?: number, order?: number } | null,
+ *   done: string[], tries: Record<string, number>, script: number
+ * }} TutorialSlice
+ *   core/tutorial.js. on: the first days' notes are running. intro: the intro scene
+ *   is still to be seen. now: the moment showing (content/tutorial.js), on which beat;
+ *   who/name: the customer it is about; slot: the spot a jar was just started in or kept
+ *   from; order: the pre-order they booked. done: moments finished. tries: moment id →
+ *   times it passed unfinished. script: day 1's scripted customers used so far.
  */
 
 export {};

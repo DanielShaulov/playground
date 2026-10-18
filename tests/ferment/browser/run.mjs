@@ -22,8 +22,9 @@ import * as audio from "./audio.mjs";
 import * as fx from "./fx.mjs";
 import * as settings from "./settings.mjs";
 import * as orders from "./orders.mjs";
+import * as intro from "./intro.mjs";
 
-const FLOWS = [day, gallery, bench, board, evening, orders, audio, fx, settings];
+const FLOWS = [day, gallery, bench, board, evening, orders, audio, fx, settings, intro];
 const PHONES = { small: devices["iPhone SE"], large: devices["iPhone 15 Pro Max"] };
 const SHOTS = fileURLToPath(new URL("./shots/", import.meta.url));
 
@@ -70,7 +71,8 @@ async function play(flow, phone) {
     if (over.length) throw new Error(`overflows the screen at "${name}": ${over.join(", ")}`);
   };
   try {
-    await page.goto(`${server.url}games/ferment/`);
+    // Flows start a plain shop (no intro or notes) unless they ask for a page of their own.
+    await page.goto(`${server.url}games/ferment/${flow.page ?? "?tips=off"}`);
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     const note = await flow.run(page, snap);

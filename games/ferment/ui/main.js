@@ -24,21 +24,27 @@ import { mountEvening, renderEvening, openEvening, eveningAct, eveningReact } fr
 import { audioReact } from "./audio.js";
 import { toast } from "./dom.js";
 import { fxReact } from "./fx.js";
-import { mountSettings, renderSettings, settingsAct } from "./settings.js";
+import { mountSettings, renderSettings, settingsAct, onReplayIntro } from "./settings.js";
 import { lower, LINES } from "./text.js";
+import { mountTutorial, renderTutorial, tutorialAct, tipsPaused } from "./tutorial.js";
+import { mountIntro, renderIntro, introAct } from "./intro.js";
 
 const store = createStore("ferment");
 const freshSeed = () => (Date.now() % 1e9) | 0;
+/** A new shop starts with the intro and the keeper's notes, unless the page says ?tips=off (the phone flows). */
+const tips = new URLSearchParams(location.search).get("tips") !== "off";
+const freshGame = () => C.newGame(freshSeed(), { tutorial: tips });
 
 /** Game state plus screen-only state. */
 const ui = {
-  s: C.loadSave(store.get("save")) ?? C.newGame(freshSeed()),
+  s: C.loadSave(store.get("save")) ?? freshGame(),
   selected: null, // shelf slot index
   departing: null, // { customer, mood, line, pay, f, until }
   sheet: null, // { kind: "brew", slot }
   evening: null, // the evening screen when open (ui/evening.js)
   bench: null, // the brewing bench when open (ui/bench.js)
   settings: null, // the settings sheet when open (ui/settings.js)
+  intro: null, // the intro scene's picture while it shows (ui/intro.js)
 };
 
 function save() {
@@ -50,11 +56,16 @@ document.title = "The Brine Nook · Playground";
 const bench = mountBench(els.root);
 const evening = mountEvening(els.root);
 const settings = mountSettings(els.root);
+const tutorialView = mountTutorial(els.root);
+const intro = mountIntro(els.root);
+onReplayIntro(() => dispatch({ type: "tutorial", do: "replay" }));
 const render = () => (
   renderShop(els, ui),
   renderEvening(evening, ui),
   renderBench(bench, ui),
-  renderSettings(settings, ui)
+  renderSettings(settings, ui),
+  renderIntro(intro, ui),
+  renderTutorial(tutorialView, ui, dispatch)
 );
 
 function depart(customer, mood, line, extra = {}) {
@@ -80,6 +91,9 @@ function react(e) {
       break;
     case "arrived":
       if (e.customer.orderId) toast(els.toasts, `${e.customer.name} is here to collect`);
+      break;
+    case "tutorialReplayed":
+      ui.intro = null;
       break;
     case "left":
       if (e.why === "impatient") {
@@ -130,7 +144,7 @@ function replace(s) {
   save();
   render();
 }
-const restart = () => replace(C.newGame(freshSeed()));
+const restart = () => replace(freshGame());
 
 // ---------- input ----------
 
@@ -148,6 +162,8 @@ els.root.addEventListener("click", (e) => {
   const s = ui.s;
   if (settingsAct(act, t, ui, (text) => toast(els.toasts, text), { replace, restart })) {
     // handled by the settings sheet
+  } else if (introAct(act, ui, dispatch) || tutorialAct(act, ui, dispatch)) {
+    // handled by the intro scene or the keeper's notes
   } else if (benchAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
     // handled by the bench
   } else if (boardAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
@@ -194,8 +210,8 @@ let saveT = 0;
 function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
-  // Settings and the planner pause the shop, so nothing moves under the thumb.
-  if (ui.s.clock.phase === "open" && !ui.settings && !ui.plan) {
+  // Settings, the planner and the keeper's notes pause the shop, so nothing moves under the thumb.
+  if (ui.s.clock.phase === "open" && !ui.settings && !ui.plan && !tipsPaused(ui)) {
     pending += dt / HOUR_SECONDS;
     const n = Math.floor(pending * C.STEPS_PER_HOUR);
     if (n > 0) {
@@ -233,7 +249,7 @@ requestAnimationFrame(frame);
     return ui.s;
   },
   set state(v) {
-    replace(C.loadSave(v) ?? C.newGame(freshSeed()));
+    replace(C.loadSave(v) ?? freshGame());
   },
   dispatch(action) {
     const events = dispatch(action);

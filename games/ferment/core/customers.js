@@ -23,6 +23,7 @@ import { isOver } from "./jars.js";
 import { addRep } from "./shop.js";
 import { settle, dropIn } from "./orders.js";
 import { menu, unlocked } from "./bench.js";
+import { scriptedWalkIn } from "./tutorial.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Customer} Customer */
@@ -155,8 +156,9 @@ export function walkIns(/** @type {State} */ s, events) {
   while (s.clock.hour >= cs.nextArrival && cs.nextArrival < OPEN_HOURS - 0.5) {
     if (cs.queue.length < MAX_QUEUE) {
       const regular = dropIn(s);
-      const c = regular ?? makeWalkIn(s);
-      if (!regular) askOffMenu(s, c, events);
+      const scripted = regular ? null : scriptedWalkIn(s);
+      const c = regular ?? scripted ?? makeWalkIn(s);
+      if (!regular && !scripted) askOffMenu(s, c, events);
       cs.queue.push(c);
       events.push({ type: "arrived", customer: c });
     }

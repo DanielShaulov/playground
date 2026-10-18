@@ -41,7 +41,8 @@ export async function run(page, snap) {
   const hour = (await state()).clock.hour;
   await page.waitForTimeout(1500);
   assert.equal((await state()).clock.hour, hour, "the shop waits while settings are open");
-  assert.equal(await page.locator('.settings [data-act="set-intro"]').count(), 0);
+  // The onboarding registers its intro, so the sheet offers it.
+  assert.equal(await page.locator('.settings [data-act="set-intro"]').count(), 1);
   await snap("1-sheet");
 
   // Sound: the same mute ui/audio.js keeps.
@@ -174,7 +175,7 @@ export async function run(page, snap) {
   await page.mouse.click(5, 40);
   assert.equal(await sheet.isHidden(), true);
 
-  // The intro button appears once the onboarding screens hand one over.
+  // The intro button calls whatever the onboarding screens handed over.
   await page.evaluate(async () => {
     const m = await import("/games/ferment/ui/settings.js");
     m.onReplayIntro(() => (window.__introPlayed = (window.__introPlayed ?? 0) + 1));

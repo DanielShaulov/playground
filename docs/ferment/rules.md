@@ -389,6 +389,36 @@ coins taken, delighted customers, best day's takings, orders handed over); the
 other goals read the shop as it is (menu size, regulars won, reputation,
 upgrades bought).
 
+## Onboarding
+
+A new shop opens with a short intro scene (three pictures, skippable): the
+old keeper, Agnes Pell, has retired and left the shop to the player. Day 1
+starts with an empty shelf except her two parting jars, a dill and a kimchi
+already in their sweet spots (`START_GIFT` in content/tuning.js), so the
+first serve can be taught while the player's own jars ripen. Tests, bots and
+goldens start from `newGame(seed)`, which keeps the older `START_SHELF` and
+no tutorial; the player's start is `newGame(seed, { tutorial: true })`.
+
+Day 1's first three walk-ins are scripted (`SCRIPT` in content/tutorial.js),
+each set up from the shelf as it stands to show one basic case (Hadash,
+2026-10-20): Marta wants a jar that fits right now; Oskar wants it riper
+than anything on the shelf, so he pre-orders and the jar started that
+morning is kept for him; Bea wants something no shelf jar will reach in
+time, so she pre-orders and a new jar is started for her. A case the shelf
+can't show is passed over for a random walk-in. Only games with the notes on
+get them; with the notes skipped, the game plays as one without.
+
+The first days teach one moment at a time, each a short note from the keeper
+pinned beside the thing it is about (content/tutorial.js, core/tutorial.js):
+the parting jars and starting a jar (day 1 morning), the first serve, a
+kept portion and a new jar for an order (the scripted customers), a regular's first drop-in (day 2), the
+market (first evening), the bench (second evening) and the first tier.
+A note opens on a game event, moves on when the player does what it says
+(or taps "Got it"), and goes if its moment passes; a moment that passes
+unfinished three times stops coming back. The shop clock waits while a note
+is up. "No more notes" turns them off; "Watch the intro again" in settings
+(the `tutorial` action with `do: "replay"`) starts again from the intro.
+
 ## Not in the game yet
 
 The screens for upgrades and the goals ladder.

@@ -28,3 +28,12 @@ export const START_SHELF = [
   [1, "kimchi", 0.4],
   [2, "dill", 0.1],
 ];
+/**
+ * The player's start (newGame with the tutorial): the old keeper's two parting
+ * jars, ripe for the first morning; the rest of the shelf is empty.
+ * @type {[number, string, number][]}
+ */
+export const START_GIFT = [
+  [0, "dill", 0.22],
+  [1, "kimchi", 0.38],
+];
