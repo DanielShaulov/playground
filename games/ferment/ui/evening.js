@@ -20,6 +20,7 @@
 import { RECIPES } from "../content/recipes.js";
 import { UPGRADES } from "../content/upgrades.js";
 import { INGREDIENTS } from "../content/ingredients.js";
+import { ingredientSvg } from "./art/ingredients.js";
 import { TIERS } from "../content/goals.js";
 import { goalNow, goalAt, goalText, tierOf, upgradeOffers } from "../core/index.js";
 import { marketHtml, marketAct, rareToday } from "./market.js";
@@ -189,7 +190,7 @@ function opensAt(k) {
 
 function rewardHtml(reward) {
   const stock = Object.entries(reward.stock ?? {})
-    .map(([id, n]) => `<i>${INGREDIENTS[id]?.icon ?? ""} ×${n}</i>`)
+    .map(([id, n]) => `<i>${ingredientSvg(id)} ×${n}</i>`)
     .join("");
   return `<span class="reward"><i>🪙 ${reward.coins}</i>${stock}</span>`;
 }

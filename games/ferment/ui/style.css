@@ -16,6 +16,12 @@
   --tangy: #f2b84b;
   --sour: #e2683f;
   --funky: #8e5bb0;
+  /* the shop's fittings: back wall, shelf back, planks */
+  --wall: #f6ead8;
+  --panel: #ecd8ba;
+  --plank: #b9875a;
+  --plank-hi: #cf9d6e;
+  --plank-lo: #a5764b;
 }
 
 body {
@@ -25,6 +31,37 @@ body {
 
 .app {
   gap: 8px;
+  background: var(--wall);
+  transition: background-color 2s;
+}
+
+/* --- the shop scene (ui/art/scene.js sets --window, --light, --wall) --- */
+/* The light through the window, laid over the whole shop. Above the shop,
+   under the toasts (15), sheets (20), evening (25) and bench (30). */
+.app::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none;
+  background: var(--light, none);
+  mix-blend-mode: var(--light-blend, normal);
+  transition: opacity 1s;
+}
+
+/* Drawn ingredient icons (ui/art/ingredients.js) sit in text like the emoji did. */
+svg.ing {
+  display: inline-block;
+  width: 1.25em;
+  height: 1.25em;
+  vertical-align: -0.3em;
+  flex: none;
+}
+.ico svg.ing {
+  display: block;
+  width: 1.15em;
+  height: 1.15em;
+  margin: 0 auto;
 }
 
 /* --- top bar --- */
@@ -183,22 +220,61 @@ body {
 }
 
 /* --- counter --- */
+/* The counter: the shop window behind the customer, a wooden countertop in
+   front of them, and the order ticket beside. */
 .counter {
   margin: 0 12px;
-  background: var(--card);
+  background: linear-gradient(#f4e6cf, #ecd9bb);
   border: 2px solid var(--line);
   border-radius: 18px;
-  padding: 10px 12px 10px 6px;
+  padding: 10px 12px 18px 6px;
   display: flex;
   gap: 8px;
   align-items: stretch;
   min-height: 132px;
+  position: relative;
+  overflow: hidden;
+}
+.counter::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  bottom: 14px;
+  width: 84px;
+  background: var(--window, none) left bottom / contain no-repeat;
+}
+.counter::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 14px;
+  background:
+    linear-gradient(
+      176deg,
+      transparent 35%,
+      rgba(110, 70, 38, 0.14) 36% 39%,
+      transparent 40% 70%,
+      rgba(255, 230, 190, 0.18) 71% 73%,
+      transparent 74%
+    ),
+    linear-gradient(var(--plank-hi), var(--plank) 45%, var(--plank-lo));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 230, 190, 0.45),
+    inset 0 -4px 0 var(--wood-dark);
+}
+.counter .face,
+.counter .talk,
+.counter.idle > div {
   position: relative;
 }
 .counter .face {
   flex: 0 0 74px;
   display: flex;
   align-items: flex-end;
+  margin-bottom: -8px;
 }
 .counter .face svg {
   width: 74px;
@@ -230,8 +306,9 @@ body {
 }
 .counter .queue {
   position: absolute;
+  z-index: 1;
   right: 12px;
-  bottom: -9px;
+  bottom: 3px;
   display: flex;
   gap: 3px;
 }
@@ -261,10 +338,15 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 14px 18px;
+  padding: 12px 12px 22px 96px;
   color: var(--fg-dim);
   font-weight: 600;
   line-height: 1.4;
+}
+.counter.idle > div {
+  background: rgba(255, 252, 245, 0.88);
+  border-radius: 12px;
+  padding: 10px 12px;
 }
 .counter.idle b {
   color: var(--fg);
@@ -290,12 +372,25 @@ body {
 }
 
 /* --- shelf --- */
+/* A wooden shelf unit: a pale board back between two uprights, a plank under
+   each row that casts a shadow on the boards below it. */
 .shelf {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 12px;
+  margin: 0 6px;
+  padding: 6px 10px 0;
+  border-radius: 8px 8px 0 0;
+  background-color: var(--panel);
+  background-image: linear-gradient(rgba(255, 250, 240, 0.25), rgba(120, 80, 40, 0.06));
+  background-attachment: local;
+  box-shadow:
+    inset 6px 0 0 var(--plank),
+    inset -6px 0 0 var(--plank),
+    inset 8px 0 0 var(--plank-lo),
+    inset -8px 0 0 var(--plank-lo),
+    inset 0 6px 0 var(--wood-dark);
 }
 .row {
   flex: 1 1 0;
@@ -303,10 +398,44 @@ body {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  border-bottom: 9px solid var(--wood);
-  box-shadow: 0 5px 0 var(--wood-dark);
-  margin-bottom: 9px;
-  border-radius: 0 0 3px 3px;
+  position: relative;
+  margin-bottom: 15px;
+  /* the plank above's shadow, and a board seam down the middle of each gap
+     between spots, so the boards line up with the jars */
+  background:
+    linear-gradient(rgba(90, 60, 30, 0.14), transparent 18px),
+    linear-gradient(
+      90deg,
+      transparent calc(33.333% - 2.33px),
+      rgba(143, 100, 64, 0.16) calc(33.333% - 2.33px) calc(33.333% - 0.33px),
+      transparent calc(33.333% - 0.33px) calc(66.667% + 0.33px),
+      rgba(143, 100, 64, 0.16) calc(66.667% + 0.33px) calc(66.667% + 2.33px),
+      transparent calc(66.667% + 2.33px)
+    );
+}
+.row::after {
+  content: "";
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  bottom: -15px;
+  height: 10px;
+  border-radius: 2px;
+  background:
+    linear-gradient(
+      172deg,
+      transparent 30%,
+      rgba(110, 70, 38, 0.14) 31% 33%,
+      transparent 34% 62%,
+      rgba(255, 230, 190, 0.2) 63% 65%,
+      transparent 66%
+    ),
+    linear-gradient(178deg, transparent 45%, rgba(110, 70, 38, 0.12) 46% 49%, transparent 50%),
+    linear-gradient(var(--plank-hi), var(--plank) 50%, var(--plank-lo));
+  box-shadow:
+    0 4px 0 var(--wood-dark),
+    0 7px 6px rgba(60, 40, 20, 0.22);
+  pointer-events: none;
 }
 .slot {
   min-height: 0;
@@ -346,15 +475,82 @@ body {
   font-size: 10px;
   color: var(--fg-dim);
 }
-.slot.dim {
+/* Jars the customer can't take fade back, but the faces on portions kept
+   for someone stay at full strength. */
+.slot.dim > svg,
+.slot.dim > .strip,
+.slot.dim .lbl small,
+.slot.dim .portions i:not(.held) {
   opacity: 0.38;
 }
+.slot.dim .lbl {
+  color: rgba(74, 53, 36, 0.45);
+}
+.slot .portions i.held {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
 .slot.sel {
-  background: #fff3c4;
+  background-color: #fff3c4;
   box-shadow: 0 0 0 3px var(--tangy) inset;
 }
 .slot.fits:not(.sel) {
-  background: #e4f1dc;
+  background-color: #e4f1dc;
+}
+
+/* --- shelf marks for upgrades (ui/shop.js) --- */
+/* A spot with a crock: the crock itself in the top corner (steam for warm,
+   a frost star for cool), a stoneware plinth under the jar in its glaze and
+   a wash of its colour, so the spot reads at a glance, jar or no jar. */
+.slot.crock-cool::before,
+.slot.crock-warm::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 0;
+  height: 8px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(#a9bcc4, #8ea4ae 60%, #6c818b);
+}
+.slot.crock-warm::before {
+  background: linear-gradient(#e09468, #cf7f4f 60%, #a65c34);
+}
+.slot.crock-cool,
+.slot.crock-warm {
+  padding-bottom: 12px;
+  background-repeat: no-repeat;
+  background-position:
+    2px 2px,
+    0 0;
+  background-size:
+    34px 37px,
+    100% 100%;
+}
+.slot.crock-cool {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%22-32 -44 64 70%22%3E%3Cpath d=%22M-22 -18 Q-27 0 -21 18 Q-19 24 -12 24 H12 Q19 24 21 18 Q27 0 22 -18 Z%22 fill=%22%238ea4ae%22 stroke=%22%236c818b%22 stroke-width=%222%22/%3E%3Cpath d=%22M-25 -2 H25%22 stroke=%22%236c818b%22 stroke-width=%223%22 opacity=%22.7%22/%3E%3Crect x=%22-25%22 y=%22-25%22 width=%2250%22 height=%228%22 rx=%223%22 fill=%22%236c818b%22/%3E%3Cpath d=%22M-15 -11 Q-17 4 -13 16%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22 opacity=%22.35%22 stroke-linecap=%22round%22/%3E%3Cg stroke=%22%235f8fa6%22 stroke-width=%222.6%22 stroke-linecap=%22round%22%3E%3Cpath d=%22M0 -42 V-28 M-6 -38 L6 -32 M6 -38 L-6 -32%22/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(0deg, rgba(142, 164, 174, 0.26), rgba(142, 164, 174, 0) 75%);
+}
+.slot.crock-warm {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%22-32 -44 64 70%22%3E%3Cpath d=%22M-22 -18 Q-27 0 -21 18 Q-19 24 -12 24 H12 Q19 24 21 18 Q27 0 22 -18 Z%22 fill=%22%23cf7f4f%22 stroke=%22%23a65c34%22 stroke-width=%222%22/%3E%3Cpath d=%22M-25 -2 H25%22 stroke=%22%23a65c34%22 stroke-width=%223%22 opacity=%22.7%22/%3E%3Crect x=%22-25%22 y=%22-25%22 width=%2250%22 height=%228%22 rx=%223%22 fill=%22%23a65c34%22/%3E%3Cpath d=%22M-15 -11 Q-17 4 -13 16%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22 opacity=%22.35%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M-10 -30 q4 -5 0 -10 M0 -29 q4 -5 0 -10 M10 -30 q4 -5 0 -10%22 stroke=%22%23c9692f%22 stroke-width=%223%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3C/svg%3E"),
+    linear-gradient(0deg, rgba(207, 127, 79, 0.24), rgba(207, 127, 79, 0) 75%);
+}
+/* A bigger jar (a wide swing-top in ui/art/jar.js) stands a little taller too. */
+.slot.big svg.jar {
+  max-height: 112px;
+  transform: scale(1.08);
+  transform-origin: 50% 100%;
+}
+/* More than nine spots: the shelf scrolls, three rows in view. */
+.shelf.many {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.shelf.many .row {
+  flex: 0 0 calc((100% - 45px) / 3);
 }
 .slot.empty .lbl {
   color: var(--fg-dim);
@@ -565,10 +761,21 @@ body {
   }
   .counter {
     min-height: 0;
-    padding: 6px 8px 6px 4px;
+    padding: 6px 8px 14px 4px;
+  }
+  .counter::before {
+    width: 62px;
+    bottom: 10px;
+  }
+  .counter::after {
+    height: 11px;
+  }
+  .counter.idle {
+    padding: 8px 10px 16px 72px;
   }
   .counter .face {
     flex-basis: 52px;
+    margin-bottom: -6px;
   }
   .counter .face svg {
     width: 52px;
@@ -587,8 +794,14 @@ body {
     margin-top: 8px;
   }
   .row {
-    border-bottom-width: 7px;
-    margin-bottom: 7px;
+    margin-bottom: 12px;
+  }
+  .row::after {
+    bottom: -12px;
+    height: 8px;
+  }
+  .shelf.many .row {
+    flex-basis: calc((100% - 36px) / 3);
   }
   .actions button {
     min-height: 48px;
