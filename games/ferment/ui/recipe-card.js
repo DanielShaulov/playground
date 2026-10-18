@@ -9,6 +9,7 @@
 
 import { RECIPES } from "../content/recipes.js";
 import { INGREDIENTS } from "../content/ingredients.js";
+import { ingredientSvg } from "./art/ingredients.js";
 import { ageAt, demand } from "../core/index.js";
 
 /** Card line key → when it was first seen known (performance.now()). */
@@ -53,7 +54,7 @@ export function recipeCardHtml(card) {
   for (const e of card.effects) {
     const g = INGREDIENTS[e.ingredient];
     if (!e.known) {
-      untried.push(g.icon);
+      untried.push(ingredientSvg(e.ingredient));
       continue;
     }
     const key = `${card.recipe}:${e.ingredient}`;
@@ -61,8 +62,8 @@ export function recipeCardHtml(card) {
     const pop = ageAt(card.recipe, [], 1) - ageAt(card.recipe, [e.ingredient], 1);
     lines.push(
       Math.abs(best) < 0.5 && Math.abs(pop) < 0.5
-        ? `<li class="ok${fresh(key, true)}" data-line="${key}">${g.icon} ${g.name}: ${flavourLine(card, e.ingredient)}</li>`
-        : `<li class="ok${fresh(key, true)}" data-line="${key}">${g.icon} ${g.name}: most wanted ${when(best)} · pops ${when(pop)}</li>`,
+        ? `<li class="ok${fresh(key, true)}" data-line="${key}">${ingredientSvg(e.ingredient)} ${g.name}: ${flavourLine(card, e.ingredient)}</li>`
+        : `<li class="ok${fresh(key, true)}" data-line="${key}">${ingredientSvg(e.ingredient)} ${g.name}: most wanted ${when(best)} · pops ${when(pop)}</li>`,
     );
   }
   if (untried.length)
@@ -73,9 +74,7 @@ export function recipeCardHtml(card) {
     const key = `${card.recipe}:${f.recipe}`;
     const r = RECIPES[f.recipe];
     if (f.state === "known") {
-      const needs = f.needs.map(
-        (n) => INGREDIENTS[n].icon + " " + INGREDIENTS[n].name.toLowerCase(),
-      );
+      const needs = f.needs.map((n) => ingredientSvg(n) + " " + INGREDIENTS[n].name.toLowerCase());
       lines.push(
         `<li class="ok found${fresh(key, true)}" data-line="${key}">✨ ${r.name} = ${needs.join(" + ")} · 🪙${r.price}</li>`,
       );

@@ -264,10 +264,19 @@ export function jarArt(/** @type {JarLook} */ look, cls = "jar") {
       <path d="M-20 -34.5 H20" stroke="${LID}" stroke-width="1"/>${strain}`;
   }
 
-  return `<svg class="${cls}" viewBox="-32 -62 64 100" preserveAspectRatio="xMidYMax meet">
+  // A bigger jar (more portions than the usual) is a wider swing-top jar with
+  // a wire bail over the lid, so it reads as bigger even at shelf size.
+  const big = size > SERVINGS;
+  const bail =
+    big && !over
+      ? `<g fill="none" stroke="#8d8a82" stroke-width="1.5" stroke-linecap="round"><path d="M-22 -33 Q-24 ${n1(-42 - dome)} 0 ${n1(-42 - dome * 1.2)} Q24 ${n1(-42 - dome)} 22 -33"/>
+          <path d="M-23.5 -30 h4 M19.5 -30 h4"/></g><circle cx="-21.5" cy="-30" r="1.6" fill="#8d8a82"/><circle cx="21.5" cy="-30" r="1.6" fill="#8d8a82"/>`
+      : "";
+
+  return `<svg class="${cls}" viewBox="-32 -62 64 100" preserveAspectRatio="xMidYMax meet"${big ? ` data-big="1"` : ""}>
     <defs><clipPath id="${uid}"><path d="${INSIDE}"/></clipPath>
       <linearGradient id="${uid}g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".0"/><stop offset=".55" stop-color="#fff" stop-opacity=".18"/><stop offset="1" stop-color="#6b5a43" stop-opacity=".1"/></linearGradient></defs>
-    <ellipse cx="0" cy="36.5" rx="24" ry="1.8" fill="#5a4330" opacity=".14"/>
+    <ellipse cx="0" cy="36.5" rx="${big ? 28 : 24}" ry="1.8" fill="#5a4330" opacity=".14"/><g${big ? ` transform="scale(1.12 1.04)"` : ""}>
     <path d="${BODY}" fill="#fcfbf6"/>
     <g clip-path="url(#${uid})">
       <rect x="-26" y="${n1(level)}" width="52" height="${n1(40 - level)}" fill="${r.brine}" opacity=".62"/>
@@ -283,7 +292,7 @@ export function jarArt(/** @type {JarLook} */ look, cls = "jar") {
     ${notches}
     <rect x="-19" y="-20" width="4.5" height="46" rx="2.25" fill="#fff" opacity=".6"/>
     <rect x="16" y="-21" width="2" height="9" rx="1" fill="#fff" opacity=".55"/>
-    ${lid}
+    ${lid}${bail}</g>
   </svg>`;
 }
 

@@ -734,46 +734,6 @@
   font-weight: 600;
 }
 
-/* --- shelf marks for upgrades (ui/shop.js) --- */
-/* A spot with a crock stands on a stoneware plinth in the crock's colour. */
-.slot {
-  position: relative;
-}
-.slot.crock-cool::before,
-.slot.crock-warm::before {
-  content: "";
-  position: absolute;
-  left: 10%;
-  right: 10%;
-  bottom: 0;
-  height: 6px;
-  border-radius: 4px 4px 0 0;
-  background: #8ea4ae;
-}
-.slot.crock-warm::before {
-  background: #cf7f4f;
-}
-.slot.crock-cool {
-  background: linear-gradient(0deg, rgba(142, 164, 174, 0.14), transparent 40%);
-}
-.slot.crock-warm {
-  background: linear-gradient(0deg, rgba(207, 127, 79, 0.13), transparent 40%);
-}
-/* A bigger jar stands taller than the rest. */
-.slot.big svg.jar {
-  max-height: 112px;
-  transform: scale(1.12);
-  transform-origin: 50% 100%;
-}
-/* More than nine spots: the shelf scrolls, three rows in view. */
-.shelf.many {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.shelf.many .row {
-  flex: 0 0 calc((100% - 27px) / 3);
-}
-
 /* the bench's way to the market */
 .bench .tomarket {
   border: 0;

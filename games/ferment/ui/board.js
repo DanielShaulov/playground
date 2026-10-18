@@ -31,6 +31,7 @@ import { REGULARS } from "../content/regulars.js";
 import { planFor, forecast, isOver, ageAt, holdsOn, freePortions } from "../core/index.js";
 import { faceSvg } from "./art/customer.js";
 import { jarSvg, emptyJarSvg } from "./art/jar.js";
+import { ingredientSvg } from "./art/ingredients.js";
 import { openBench } from "./bench.js";
 import { strip, stripLabels } from "./strip.js";
 import { word } from "./text.js";
@@ -422,7 +423,7 @@ function renderPlan(ui) {
   const adds = timingAdds(s, o)
     .map(
       (a) =>
-        `<button class="add${p.adds.includes(a.id) ? " on" : ""}" data-act="board-add" data-ingredient="${a.id}" ${!a.ok || (a.stock < 1 && !p.adds.includes(a.id)) ? "disabled" : ""}>${INGREDIENTS[a.id].icon} ${INGREDIENTS[a.id].name}<small>${a.ok || !a.makes ? `${INGREDIENTS[a.id].tag} · ${a.stock} left` : s.bench.known.includes(a.makes) ? `makes ${RECIPES[a.makes].name.toLowerCase()}` : "makes something new"}</small></button>`,
+        `<button class="add${p.adds.includes(a.id) ? " on" : ""}" data-act="board-add" data-ingredient="${a.id}" ${!a.ok || (a.stock < 1 && !p.adds.includes(a.id)) ? "disabled" : ""}>${ingredientSvg(a.id)} ${INGREDIENTS[a.id].name}<small>${a.ok || !a.makes ? `${INGREDIENTS[a.id].tag} · ${a.stock} left` : s.bench.known.includes(a.makes) ? `makes ${RECIPES[a.makes].name.toLowerCase()}` : "makes something new"}</small></button>`,
     )
     .join("");
   const spots = s.shelf.slots
@@ -448,7 +449,7 @@ function renderPlan(ui) {
   else if (evening) go = `<button class="main" disabled>Start it in the morning</button>`;
   else if (firstEmpty(s) < 0) go = `<button class="main" disabled>No room on the shelf</button>`;
   else if (missing.length)
-    go = `<button class="main" disabled>Needs ${missing.map((a) => INGREDIENTS[a].icon + " " + INGREDIENTS[a].name.toLowerCase()).join(", ")}</button>`;
+    go = `<button class="main" disabled>Needs ${missing.map((a) => ingredientSvg(a) + " " + INGREDIENTS[a].name.toLowerCase()).join(", ")}</button>`;
   else
     go = `<button class="main" data-act="board-start" ${s.shop.coins < r.cost ? "disabled" : ""}>Start a jar<small>🪙 ${r.cost}</small></button>`;
 

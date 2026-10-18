@@ -31,6 +31,7 @@ import {
   menu,
 } from "../core/index.js";
 import { jarSvg } from "./art/jar.js";
+import { ingredientSvg } from "./art/ingredients.js";
 import { recipeCardHtml } from "./recipe-card.js";
 import { patch } from "./dom.js";
 
@@ -183,7 +184,7 @@ export function renderBench(view, ui) {
     const a = b.adds[i];
     if (a) {
       const g = INGREDIENTS[a];
-      slots += `<button class="add" data-act="bench-drop" data-ingredient="${a}" aria-label="Take out ${g.name}"><span class="ico">${g.icon}</span><b>${g.name}</b>${tagHtml(g.tag)}</button>`;
+      slots += `<button class="add" data-act="bench-drop" data-ingredient="${a}" aria-label="Take out ${g.name}"><span class="ico">${ingredientSvg(a)}</span><b>${g.name}</b>${tagHtml(g.tag)}</button>`;
     } else {
       slots += `<div class="add empty">+<small>${i === b.adds.length ? "from the pantry" : ""}</small></div>`;
     }
@@ -203,7 +204,7 @@ export function renderBench(view, ui) {
         ? `<button class="buy" disabled>Not today</button>`
         : `<button class="buy" data-act="bench-buy" data-ingredient="${id}" ${stall.room < 1 || stall.left < 1 || s.shop.coins < stall.price ? "disabled" : ""}>+1 · 🪙${stall.price}</button>`;
     return `<div class="pi${inMix ? " in" : ""}${have ? "" : " out"}"><button class="pick" data-act="bench-add" data-ingredient="${id}" ${canAdd ? "" : "disabled"}>
-      <span class="ico">${g.icon}</span><b>${g.name}</b><i class="n">×${have}</i>${tagHtml(g.tag)}</button>${buy}</div>`;
+      <span class="ico">${ingredientSvg(id)}</span><b>${g.name}</b><i class="n">×${have}</i>${tagHtml(g.tag)}</button>${buy}</div>`;
   }).join("");
 
   const card = recipeCard(s, b.recipe);

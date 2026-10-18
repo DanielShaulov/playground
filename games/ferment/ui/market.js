@@ -10,6 +10,7 @@
  */
 
 import { INGREDIENTS, INGREDIENT_IDS, MAX_STOCK } from "../content/ingredients.js";
+import { ingredientSvg } from "./art/ingredients.js";
 import { marketToday } from "../core/index.js";
 
 /** True for an ingredient the market only has now and then (its `stall`, content/ingredients.js). */
@@ -31,7 +32,7 @@ export function marketHtml(s) {
     const have = s.pantry.stock[id] ?? 0;
     const rare = isRare(id);
     const pantry = `<span class="have${have >= MAX_STOCK ? " full" : ""}">${have} in pantry</span>`;
-    const head = `<span class="ico">${g.icon}</span><b class="nm">${g.name}</b><span class="tag t-${g.tag}">${TAG_ICON[g.tag] ?? ""} ${g.tag}</span>`;
+    const head = `<span class="ico">${ingredientSvg(id)}</span><b class="nm">${g.name}</b><span class="tag t-${g.tag}">${TAG_ICON[g.tag] ?? ""} ${g.tag}</span>`;
     if (!m)
       return `<div class="crate none" data-ingredient="${id}">${head}<div class="empty">Not out today</div>${pantry}</div>`;
     const diff = m.price - g.cost;

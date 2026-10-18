@@ -65,6 +65,9 @@ games/ferment/
                     bench.js + recipe-card.js + bench.css (brewing bench),
                     board.js + board.css (order board and planner),
                     sheets.js, strip.js, text.js, dom.js, art/, style.css
+    art/            jar.js (jars), customer.js (faces), ingredients.js
+                    (pantry icons), scene.js (window + light by time of day);
+                    every state is on art-gallery.html, all drawn in-house
 ```
 
 ## The core API

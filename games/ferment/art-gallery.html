@@ -7,6 +7,7 @@
     <link rel="icon" href="../../icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../../shared/style.css" />
     <link rel="stylesheet" href="./ui/style.css" />
+    <link rel="stylesheet" href="./ui/board.css" />
     <title>Brine Nook art gallery</title>
     <style>
       /* A scrolling page of every jar state, for screenshots and for judging the art. */
@@ -82,6 +83,44 @@
       .grid.counter-size figure svg.portrait {
         width: 52px;
       }
+      .grid.ings svg.ing {
+        width: 44px;
+        height: 44px;
+      }
+      .grid.ings .inline {
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .grid.ings .inline svg.ing {
+        width: 1.25em;
+        height: 1.25em;
+      }
+      .grid.windows img {
+        width: 64px;
+        height: 90px;
+      }
+      .grid.windows .light {
+        width: 64px;
+        height: 40px;
+        border-radius: 6px;
+        background-color: #f6ead8;
+        position: relative;
+        overflow: hidden;
+      }
+      .grid.windows .light::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--light);
+        mix-blend-mode: var(--light-blend);
+      }
+      section .shelf {
+        height: 330px;
+        margin: 0;
+      }
+      section .counter {
+        margin: 0 0 10px;
+      }
       .sizes svg.icon {
         width: 44px;
         height: 60px;
@@ -101,6 +140,8 @@
       import { SERVINGS } from "./content/tuning.js";
       import { jarArt, emptyJarSvg } from "./ui/art/jar.js";
       import { strip } from "./ui/strip.js";
+      import { ingredientSvg } from "./ui/art/ingredients.js";
+      import { windowArt, lightAt } from "./ui/art/scene.js";
       import {
         faceSvg,
         MOODS,
@@ -197,6 +238,47 @@
       html += `<section data-section="sizes"><h2>Other uses</h2><p>The empty shelf spot, and the small jar on the start-a-jar sheet.</p>
         <div class="grid sizes"><figure>${emptyJarSvg}<figcaption>empty</figcaption></figure>
         ${BASES.map((r) => `<figure>${jarArt(look(r, 0), "icon")}<figcaption>${RECIPES[r].name}</figcaption></figure>`).join("")}</div></section>`;
+
+      html += `<section data-section="ingredients"><h2>Ingredients</h2><p>Drawn pantry icons (ui/art/ingredients.js), big and at text size. An unknown id gets a burlap sack.</p>
+        <div class="grid ings">${[...INGREDIENT_IDS, "mystery"]
+          .map(
+            (i) =>
+              `<figure>${ingredientSvg(i)}<figcaption>${i}<small class="inline">${ingredientSvg(i)} ×3</small></figcaption></figure>`,
+          )
+          .join("")}</div></section>`;
+
+      const HOURS = [
+        [7, "morning"],
+        [8.5, "opening"],
+        [12, "noon"],
+        [16, "afternoon"],
+        [18.8, "golden"],
+        [20, "closing"],
+        [21.5, "night"],
+      ];
+      const dataUri = (svg) => `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      html += `<section data-section="window"><h2>The window through the day</h2><p>The window behind the counter and, under it, the light it throws on the shop (ui/art/scene.js).</p>
+        <div class="grid windows">${HOURS.map(([h, name]) => {
+          const l = lightAt(h);
+          return `<figure><img src="${dataUri(windowArt(h))}" alt=""><div class="light" style="--light:${l.light};--light-blend:${l.blend};background-color:${l.wall}"></div><figcaption>${name}<small>${Math.floor(h)}:${String(Math.round((h % 1) * 60)).padStart(2, "0")}</small></figcaption></figure>`;
+        }).join("")}</div></section>`;
+
+      // A shelf as the shop draws it: spots with crocks, a bigger jar, and a
+      // jar with a portion kept back that stays readable when the jar is dimmed.
+      const chips = (held) =>
+        `<span class="portions">${held ? `<i class="held">${faceSvg(118, "wait")}</i>` : ""}<i></i></span>`;
+      const spot = (cls, l, name, note, held = false) =>
+        `<div class="slot ${cls}">${l ? jarArt(l) + strip({ f: l.f }) : emptyJarSvg}<div class="lbl"><span>${name}${l ? chips(held) : ""}</span><small>${note}</small></div></div>`;
+      html += `<section data-section="shelf"><h2>On the shelf</h2><p>Crock spots (warm steams, cellar frosts) with and without a jar, a bigger swing-top jar, and a jar kept for someone, dimmed while another customer waits.</p>
+        <div class="shelf"><div class="row">
+          ${spot("crock-warm", look("kimchi", 0.5), "Kimchi", "warm crock")}
+          ${spot("crock-cool", look("dill", 0.2), "Dill pickles", "cellar crock")}
+          ${spot("crock-warm empty", null, "Empty", "warm crock")}
+        </div><div class="row">
+          ${spot("big", look("dill", 0.3, { servings: SERVINGS + 1, size: SERVINGS + 1 }), "Dill pickles", "bigger jar")}
+          ${spot("dim held", look("kimchi", 0.3), "Kimchi", "for Sam", true)}
+          ${spot("crock-cool empty", null, "Empty", "cellar crock")}
+        </div></div></section>`;
 
       const person = (look, mood, name, note = "") =>
         `<figure>${faceSvg(look, mood)}<figcaption>${name}<small>${note}</small></figcaption></figure>`;

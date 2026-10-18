@@ -10,6 +10,7 @@ import { PATIENCE, PREORDER_PATIENCE } from "../content/tuning.js";
 import { flavour, isOver, dueFor } from "../core/index.js";
 import { jarSvg, emptyJarSvg } from "./art/jar.js";
 import { faceSvg } from "./art/customer.js";
+import { paintScene } from "./art/scene.js";
 import { strip, stripLabels } from "./strip.js";
 import { word, lower, requestLine, clockText } from "./text.js";
 import { sheetHtml } from "./sheets.js";
@@ -84,6 +85,7 @@ export function renderShop(els, ui) {
   const sel = ui.selected !== null ? s.shelf.slots[ui.selected] : null;
   if (ui.selected !== null && !sel) ui.selected = null;
 
+  paintScene(els.root, s);
   // top bar
   patch(els.title, `🫙 Day ${s.clock.day} · ${clockText(s)}`);
   patch(els.rep, `♥ ${s.shop.rep}`);
