@@ -171,6 +171,8 @@
  *   drift: ingredient id → price multiplier on its cost (missing = 1), stepped each morning.
  * @typedef {{ ingredient: string, price: number, left: number, have: number, room: number }} MarketItem
  *   marketToday(): one stall. have: in the pantry now; room: how many more the pantry takes.
+ * @typedef {{ ok: true, state: State, why?: undefined } | { ok: false, why: "empty" | "notACode" | "damaged" | "unplayable", state?: undefined }} SaveCodeResult
+ *   readCode(): a backup code turned back into a state, or why it couldn't be (core/save.js).
  */
 
 export {};

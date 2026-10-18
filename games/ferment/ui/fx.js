@@ -10,12 +10,14 @@
  * nodes it moves (the face at the counter, a jar on the shelf) are animated
  * with the Web Animations API, which leaves their class names alone.
  *
- * With prefers-reduced-motion nothing here runs at all (the browser tests
+ * With reduced motion (the phone setting, or Calm in ui/settings.js, which
+ * overrides it) nothing here runs at all (the browser tests
  * play that way, so their screenshots stay still and repeatable).
  */
 
 import { RECIPES } from "../content/recipes.js";
 import { bump } from "./dom.js";
+import { calmMotion } from "./settings.js";
 
 /** Every duration (ms) and count the motion uses. */
 export const FX = {
@@ -41,7 +43,7 @@ export const FX = {
   dawn: 1200,
 };
 
-const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const calm = calmMotion;
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 /** @type {HTMLElement | null} */

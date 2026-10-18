@@ -1,10 +1,10 @@
 // Phone flow: sound and haptics. No AudioContext exists until the first tap;
 // a day with sound on plays sounds (and buzzes where navigator.vibrate exists);
-// the top-bar toggle mutes both, the choice survives a reload, and a muted
+// the Sound switch in the settings sheet mutes both, the choice survives a reload, and a muted
 // page never opens audio at all. Every sound in content/sounds.js builds
 // cleanly (finite samples, no clipping, short). Runs without vibrate too, as
 // on iOS Safari. Depends on window.__ferment, window.__fermentAudio and the
-// data-act="sound" button.
+// the settings sheet's data-act="set-sound" switch.
 import assert from "node:assert/strict";
 
 export const name = "audio";
@@ -37,7 +37,17 @@ export async function run(page, snap) {
       list: undefined,
       played: window.__fermentAudio.played,
     }));
-  const button = page.locator('.top [data-act="sound"]');
+  // The Sound switch lives in the settings sheet (gear in the top bar).
+  const sound = async (v) => {
+    await page.locator('.top [data-act="settings"]').tap();
+    await page.locator(`[data-act="set-sound"][data-v="${v}"]`).tap();
+    const on = await page
+      .locator('[data-act="set-sound"][aria-pressed="true"]')
+      .getAttribute("data-v");
+    await page.locator('[data-act="set-close"]').tap();
+    return on;
+  };
+  const muted = () => page.evaluate(() => window.__fermentAudio.muted);
   const dayPasses = () =>
     page.evaluate(() => {
       const f = window.__ferment;
@@ -49,7 +59,7 @@ export async function run(page, snap) {
   await page.waitForTimeout(400);
   let a = await ac();
   assert.equal(a.made, 0, "no AudioContext before the first tap");
-  assert.equal(await button.getAttribute("aria-pressed"), "false");
+  assert.equal(await muted(), false);
 
   // Every sound builds cleanly.
   const bad = await page.evaluate(async () => {
@@ -101,9 +111,8 @@ export async function run(page, snap) {
 
   // Mute: the button says so, nothing more plays or buzzes, the day goes on.
   await page.locator('[data-act="sleep"]').tap();
-  await button.tap();
-  assert.equal(await button.getAttribute("aria-pressed"), "true");
-  assert.equal(await button.getAttribute("aria-label"), "Sound off");
+  assert.equal(await sound("off"), "off");
+  assert.equal(await muted(), true);
   await snap("2-muted");
   const quiet = await ac();
   await page.locator('[data-act="open"]').tap();
@@ -119,13 +128,13 @@ export async function run(page, snap) {
   await page.evaluate(() => sessionStorage.setItem("noVibrate", "1"));
   await page.reload();
   await page.locator('[data-act="sleep"]').tap();
-  assert.equal(await button.getAttribute("aria-pressed"), "true");
+  assert.equal(await muted(), true);
   assert.equal((await ac()).made, 0, "muted: no AudioContext");
 
   // Unmuting is a tap, so it opens audio; with no vibrate (iOS) nothing breaks.
   assert.equal(await page.evaluate(() => typeof navigator.vibrate), "undefined");
-  await button.tap();
-  assert.equal(await button.getAttribute("aria-pressed"), "false");
+  assert.equal(await sound("on"), "on");
+  assert.equal(await muted(), false);
   await page.locator('[data-act="open"]').tap();
   await page.evaluate(async () => (await import("/games/ferment/ui/audio.js")).play("tierUp"));
   a = await ac();

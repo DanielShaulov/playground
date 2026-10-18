@@ -2,8 +2,8 @@
 /**
  * Sound and haptics. Game events from step() become short synthesised sounds
  * (content/sounds.js, built by vendor/zzfx.js) and, on phones that support it,
- * a light buzz. main.js calls audioReact(e) for every event; shop.js puts
- * soundButton() in the top bar.
+ * a light buzz. main.js calls audioReact(e) for every event; the Sound switch
+ * in the settings sheet (ui/settings.js) calls setMuted.
  *
  * Browsers (iOS above all) only let a page make sound after a tap, so the
  * AudioContext is created on the first tap while sound is on, never before.
@@ -40,29 +40,11 @@ const hook = {
 };
 /** @type {any} */ (window).__fermentAudio = hook;
 
-/** The top-bar toggle: a small speaker, struck through when muted. */
-export function soundButton() {
-  return `<button class="sound" data-act="sound" style="${BUTTON}" ${label()}>${icon()}</button>`;
-}
-// Inline so the button needs no stylesheet of its own; padding makes the tap area bigger than the icon.
-const BUTTON =
-  "border:0;background:none;color:var(--fg-dim);padding:12px 6px;margin:-8px -9px;line-height:0;-webkit-tap-highlight-color:transparent";
-const label = () => `aria-pressed="${muted}" aria-label="${muted ? "Sound off" : "Sound on"}"`;
-const icon = () =>
-  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3l5-4v13l-5-4H4z" fill="currentColor"/>${
-    muted
-      ? '<path d="M16 9.5l5 5M21 9.5l-5 5"/>'
-      : '<path d="M16 9a4.2 4.2 0 0 1 0 6"/><path d="M18.6 6.5a7.8 7.8 0 0 1 0 11"/>'
-  }</svg>`;
-
-function setMuted(m) {
+/** Sound on or off, for the settings sheet. */
+export const isMuted = () => muted;
+export function setMuted(m) {
   muted = m;
   store.set("audio", { muted });
-  for (const b of document.querySelectorAll('[data-act="sound"]')) {
-    b.setAttribute("aria-pressed", String(muted));
-    b.setAttribute("aria-label", muted ? "Sound off" : "Sound on");
-    b.innerHTML = icon();
-  }
   if (muted) ctx?.suspend();
   else unlock();
 }
@@ -89,10 +71,6 @@ function unlock() {
 // Any tap may be the first; iOS counts touchend and click, not touchstart.
 for (const type of ["pointerup", "touchend", "click"])
   document.addEventListener(type, unlock, { capture: true, passive: true });
-document.addEventListener("click", (e) => {
-  const t = /** @type {HTMLElement} */ (e.target).closest?.('[data-act="sound"]');
-  if (t) setMuted(!muted);
-});
 document.addEventListener("visibilitychange", () => {
   if (!ctx || muted) return;
   if (document.hidden) ctx.suspend();
