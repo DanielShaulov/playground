@@ -19,8 +19,9 @@ import * as bench from "./bench.mjs";
 import * as board from "./board.mjs";
 import * as evening from "./evening.mjs";
 import * as audio from "./audio.mjs";
+import * as fx from "./fx.mjs";
 
-const FLOWS = [day, gallery, bench, board, evening, audio];
+const FLOWS = [day, gallery, bench, board, evening, audio, fx];
 const PHONES = { small: devices["iPhone SE"], large: devices["iPhone 15 Pro Max"] };
 const SHOTS = fileURLToPath(new URL("./shots/", import.meta.url));
 
@@ -34,7 +35,11 @@ const server = await serve();
 const browser = await chromium.launch({ executablePath });
 
 async function play(flow, phone) {
-  const ctx = await browser.newContext({ ...PHONES[phone], hasTouch: true });
+  const ctx = await browser.newContext({
+    ...PHONES[phone],
+    hasTouch: true,
+    reducedMotion: "reduce",
+  });
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));

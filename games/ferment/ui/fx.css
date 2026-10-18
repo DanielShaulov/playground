@@ -1,0 +1,132 @@
+/* Motion overlay (ui/fx.js): everything here is throwaway and never takes a tap. */
+
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict;
+}
+.fx-layer * {
+  pointer-events: none;
+}
+.fx {
+  position: absolute;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-layer {
+    display: none;
+  }
+}
+
+.fx-coin {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3c4 0 18%, var(--coin) 42%, #e0a92f 100%);
+  border: 1.5px solid #c48a1a;
+  box-shadow: 0 1px 2px rgba(90, 60, 10, 0.3);
+}
+.fx-tip {
+  white-space: nowrap;
+  background: var(--good);
+  color: #fff;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(40, 70, 30, 0.25);
+}
+
+.fx-jar svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.fx-lid {
+  border-radius: 40% 40% 3px 3px / 70% 70% 3px 3px;
+  background: linear-gradient(180deg, #c99a6a 0 45%, #8f6440 45% 100%);
+}
+.fx-drop {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(120, 90, 50, 0.25);
+}
+
+.fx-ring {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid var(--wood-dark);
+}
+
+.fx-glow {
+  width: min(300px, 80vw);
+  height: min(300px, 80vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 220, 120, 0.85), rgba(255, 211, 107, 0) 68%);
+}
+.fx-confetti {
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  box-shadow: 0 1px 1px rgba(60, 40, 20, 0.15);
+}
+
+.fx-wash {
+  position: absolute;
+  inset: 0;
+}
+.fx-wash.warm {
+  background: radial-gradient(
+    ellipse at 50% 20%,
+    rgba(255, 214, 140, 0.9),
+    rgba(255, 214, 140, 0) 70%
+  );
+}
+.fx-wash.night {
+  background: linear-gradient(180deg, #1f2740, #3a3557 60%, #5a4560);
+}
+.fx-wash.sunrise {
+  background: linear-gradient(
+    0deg,
+    rgba(255, 190, 120, 0.85),
+    rgba(255, 226, 170, 0.3) 55%,
+    rgba(255, 240, 210, 0)
+  );
+}
+
+.fx-sign {
+  transform-origin: 50% -22px;
+}
+.fx-sign::before {
+  /* the string it hangs from */
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -22px;
+  width: 34px;
+  height: 22px;
+  transform: translateX(-50%);
+  border: 2px solid var(--wood-dark);
+  border-bottom: 0;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+.fx-sign b {
+  display: block;
+  background: var(--card);
+  color: var(--good);
+  border: 3px solid var(--wood);
+  border-radius: 10px;
+  padding: 6px 22px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow:
+    0 4px 0 var(--wood-dark),
+    0 8px 18px rgba(60, 40, 20, 0.2);
+}
