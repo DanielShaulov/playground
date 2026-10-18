@@ -16,6 +16,7 @@ import { sheetHtml } from "./sheets.js";
 import { renderBoard, freeFor, portionsHtml, keptFor, whoNote } from "./board.js";
 import { patch, setClass, bump } from "./dom.js";
 import { bigJar } from "./upgrades.js";
+import { soundButton } from "./audio.js";
 
 /** Build the screen's fixed skeleton; returns the elements render() fills in. */
 export function mountShop(parent) {
@@ -25,6 +26,7 @@ export function mountShop(parent) {
   <header class="top">
     <a class="back" href="../../index.html" aria-label="Back to games">‹</a>
     <div class="title" id="title"></div>
+    ${soundButton()}
     <div class="pill rep" id="rep"></div>
     <div class="pill coins" id="coins"></div>
   </header>

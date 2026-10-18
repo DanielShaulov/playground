@@ -18,8 +18,9 @@ import * as gallery from "./gallery.mjs";
 import * as bench from "./bench.mjs";
 import * as board from "./board.mjs";
 import * as evening from "./evening.mjs";
+import * as audio from "./audio.mjs";
 
-const FLOWS = [day, gallery, bench, board, evening];
+const FLOWS = [day, gallery, bench, board, evening, audio];
 const PHONES = { small: devices["iPhone SE"], large: devices["iPhone 15 Pro Max"] };
 const SHOTS = fileURLToPath(new URL("./shots/", import.meta.url));
 

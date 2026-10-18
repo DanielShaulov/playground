@@ -21,6 +21,7 @@ import { mountShop, renderShop } from "./shop.js";
 import { mountBench, renderBench, benchAct } from "./bench.js";
 import { boardAct, boardReact } from "./board.js";
 import { mountEvening, renderEvening, openEvening, eveningAct, eveningReact } from "./evening.js";
+import { audioReact } from "./audio.js";
 import { toast } from "./dom.js";
 import { lower, LINES } from "./text.js";
 
@@ -62,6 +63,7 @@ function dispatch(action) {
 function react(e) {
   boardReact(e, (text) => toast(els.toasts, text));
   eveningReact(e, (text) => toast(els.toasts, text));
+  audioReact(e);
   switch (e.type) {
     case "popped":
       toast(els.toasts, `A ${lower(e.jar.recipe)} jar popped its lid!`);
