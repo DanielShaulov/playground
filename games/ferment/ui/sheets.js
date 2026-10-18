@@ -1,5 +1,5 @@
 // @ts-check
-/** Bottom sheets: starting a jar, and the evening takings. */
+/** Bottom sheet for starting a jar. (The evening has its own screen: ui/evening.js.) */
 
 import { RECIPES } from "../content/recipes.js";
 import { crockAt, forecast, jarSize, menu } from "../core/index.js";
@@ -32,16 +32,5 @@ export function sheetHtml(s, sheet) {
       <p>Dots show where the jar will be after each day. A green box is a pre-order you could time it for.</p>
       ${rows}<div class="btns"><button data-act="cancel">Cancel</button><button data-act="bench" data-slot="${sheet.slot}">🧪 Add-ins…</button></div></div>`;
   }
-  const t = sheet.summary;
-  const dr = s.shop.rep - t.repStart;
-  return `<div class="panel"><h2>Day ${s.clock.day} closed</h2><p>Jars on the shelf will age overnight.</p>
-    <div class="stats">
-      <div><b>${t.served}</b>customers served</div>
-      <div><b>🪙 ${t.earned}</b>earned, ${t.tips} in tips</div>
-      <div><b>${dr >= 0 ? "+" : "−"}${Math.abs(dr)} ♥</b>reputation</div>
-      <div><b>${t.preorders}</b>pre-orders taken</div>
-      ${t.missed ? `<div><b>${t.missed}</b>pre-orders missed</div>` : ""}
-      ${t.left ? `<div><b>${t.left}</b>walked out waiting</div>` : ""}
-    </div>
-    <div class="btns"><button data-act="bench">🧪 Bench</button><button class="main" data-act="sleep">Sleep → Day ${s.clock.day + 1}</button></div></div>`;
+  return "";
 }

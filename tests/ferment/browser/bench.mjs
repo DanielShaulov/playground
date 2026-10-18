@@ -17,7 +17,7 @@ export async function run(page, snap) {
     window.__ferment.dispatch({ type: "open" });
     window.__ferment.dispatch({ type: "close" });
   });
-  await page.locator('.sheet [data-act="bench"]').tap();
+  await page.locator('.evening [data-act="bench"]').tap();
   await page.locator(".bench").waitFor();
   await snap("1-evening");
 
