@@ -23,6 +23,7 @@ import { boardAct, boardReact } from "./board.js";
 import { mountEvening, renderEvening, openEvening, eveningAct, eveningReact } from "./evening.js";
 import { audioReact } from "./audio.js";
 import { toast } from "./dom.js";
+import { fxReact } from "./fx.js";
 import { lower, LINES } from "./text.js";
 
 const store = createStore("ferment");
@@ -61,6 +62,7 @@ function dispatch(action) {
 }
 
 function react(e) {
+  fxReact(e, ui);
   boardReact(e, (text) => toast(els.toasts, text));
   eveningReact(e, (text) => toast(els.toasts, text));
   audioReact(e);
