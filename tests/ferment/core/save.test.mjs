@@ -1,6 +1,6 @@
 // Saves: a state survives JSON, a save missing a slice gets its defaults, and
 // anything else (including the demo's pre-split saves) starts a fresh game.
-// Playtest saves are disposable until release, so there is no migration.
+// Saves made since the release must keep loading: release-saves.test.mjs.
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as C from "../../../games/ferment/core/index.js";

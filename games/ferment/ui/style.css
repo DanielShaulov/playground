@@ -64,6 +64,12 @@ svg.ing {
   margin: 0 auto;
 }
 
+/* While the evening or the bench covers the screen, the shop under it isn't
+   drawn at all (a slow phone spent ~100 ms painting it unseen on closing). */
+.app.covered > :is(.top, .board, .counter, .shelf, .actions) {
+  visibility: hidden;
+}
+
 /* --- top bar --- */
 .top {
   display: flex;
@@ -462,13 +468,17 @@ svg.ing {
   flex: none;
 }
 .slot .lbl {
+  max-width: 100%;
   margin-top: 5px;
   font-size: 12px;
   font-weight: 700;
   text-align: center;
-  white-space: nowrap;
   line-height: 1.15;
   flex: none;
+}
+/* A long name wraps between words, its portion chips kept whole after it. */
+.slot .lbl .portions {
+  white-space: nowrap;
 }
 .slot .lbl small {
   display: block;
@@ -772,6 +782,15 @@ svg.ing {
   }
   .counter.idle {
     padding: 8px 10px 16px 72px;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .counter.idle > div {
+    padding: 6px 10px;
+  }
+  .counter.idle b {
+    font-size: 16px;
+    margin-bottom: 2px;
   }
   .counter .face {
     flex-basis: 52px;
@@ -803,7 +822,38 @@ svg.ing {
   .shelf.many .row {
     flex-basis: calc((100% - 36px) / 3);
   }
+  /* Spots are short here: a smaller jar keeps it, its strip and its name inside the spot. */
+  .slot svg.jar {
+    min-height: 22px;
+  }
   .actions button {
     min-height: 48px;
+  }
+}
+
+/* Narrow phones (iPhone SE): a late game's coins and the clock both fit, the
+   title taking a second line rather than cutting the day and time off. */
+@media (max-width: 374px) {
+  .top {
+    gap: 4px;
+    padding: 8px 8px 0;
+  }
+  .top .title {
+    font-size: 14px;
+    line-height: 1.1;
+    white-space: normal;
+  }
+  .pill {
+    padding: 5px 8px;
+    font-size: 14px;
+  }
+  /* A name and its chips stay on one line when they can, using the gap beside the spot. */
+  .slot {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .slot .lbl {
+    max-width: calc(100% + 8px);
+    font-size: 11px;
   }
 }

@@ -28,7 +28,7 @@ let muted = !!store.get("audio", {})?.muted;
 let ctx = null;
 /** @type {GainNode | null} */
 let master = null;
-/** @type {Record<string, AudioBuffer[]>} built once per sound, on first play */
+/** @type {Record<string, AudioBuffer[]>} built once per sound, ahead of time (warm) or on first play */
 const buffers = {};
 /** @type {Record<string, number>} last start time per sound, for `gap` */
 const lastAt = {};
@@ -64,6 +64,7 @@ function unlock() {
     blip.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
     blip.connect(master);
     blip.start();
+    warm();
   }
   if (ctx.state !== "running") ctx.resume().catch(() => {});
 }
@@ -86,19 +87,41 @@ export function play(id, after = 0) {
   const now = ctx.currentTime + after;
   if (now - (lastAt[id] ?? -9) < (sound.gap ?? 0.05)) return;
   lastAt[id] = now;
-  buffers[id] ??= sound.notes.map(([, zz]) => {
-    const samples = ZZFX.buildSamples(...zz);
-    const b = ctx.createBuffer(1, Math.max(1, samples.length), ZZFX.sampleRate);
-    b.getChannelData(0).set(samples);
-    return b;
-  });
+  const built = build(id);
   sound.notes.forEach(([at], i) => {
     const src = ctx.createBufferSource();
-    src.buffer = buffers[id][i];
+    src.buffer = built[i];
     src.connect(master);
     src.start(now + at);
   });
   hook.played++;
+}
+
+/** A sound's notes as audio buffers, synthesised the first time they're needed. */
+function build(/** @type {string} */ id) {
+  const c = /** @type {AudioContext} */ (ctx);
+  return (buffers[id] ??= SOUNDS[id].notes.map(([, zz]) => {
+    const samples = ZZFX.buildSamples(...zz);
+    const b = c.createBuffer(1, Math.max(1, samples.length), ZZFX.sampleRate);
+    b.getChannelData(0).set(samples);
+    return b;
+  }));
+}
+
+/**
+ * Synthesise every sound in the background, one per pause, once sound is
+ * unlocked. Built on first play instead, the closing bell alone cost a slow
+ * phone ~60 ms inside the tap that closes the shop (release check).
+ */
+function warm() {
+  const ids = Object.keys(SOUNDS);
+  const next = () => {
+    const id = ids.shift();
+    if (!id || !ctx) return;
+    build(id);
+    setTimeout(next, 30);
+  };
+  setTimeout(next, 30);
 }
 
 function buzz(pattern) {

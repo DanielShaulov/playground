@@ -23,8 +23,28 @@ import * as fx from "./fx.mjs";
 import * as settings from "./settings.mjs";
 import * as orders from "./orders.mjs";
 import * as intro from "./intro.mjs";
+import * as saves from "./saves.mjs";
+import * as offline from "./offline.mjs";
+import * as perf from "./perf.mjs";
 
-const FLOWS = [day, gallery, bench, board, evening, orders, audio, fx, settings, intro];
+const ALL = [
+  day,
+  gallery,
+  bench,
+  board,
+  evening,
+  orders,
+  audio,
+  fx,
+  settings,
+  intro,
+  saves,
+  offline,
+  perf,
+];
+// FLOWS=fx,day runs just those (handy while working on one screen).
+const only = process.env.FLOWS?.split(",");
+const FLOWS = only ? ALL.filter((f) => only.includes(f.name)) : ALL;
 const PHONES = { small: devices["iPhone SE"], large: devices["iPhone 15 Pro Max"] };
 const SHOTS = fileURLToPath(new URL("./shots/", import.meta.url));
 
@@ -86,9 +106,15 @@ async function play(flow, phone) {
   }
 }
 
+// Flows that time things (export alone = true) run after the rest, one at a time,
+// so the other flows aren't taking the CPU while they measure.
 const results = await Promise.all(
-  FLOWS.flatMap((flow) => Object.keys(PHONES).map((phone) => play(flow, phone))),
+  FLOWS.filter((f) => !f.alone).flatMap((flow) =>
+    Object.keys(PHONES).map((phone) => play(flow, phone)),
+  ),
 );
+for (const flow of FLOWS.filter((f) => f.alone))
+  for (const phone of Object.keys(PHONES)) results.push(await play(flow, phone));
 await browser.close();
 server.close();
 

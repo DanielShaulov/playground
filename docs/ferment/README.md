@@ -15,7 +15,8 @@ next.
 The build plan (milestones, tasks, who owns which files) is the
 "Ferment build plan" doc in the Ferment project. Decisions already made there:
 evolve the demo rather than rebuild; an endless shop with a goals ladder, not
-a season; playtest saves are disposable until release; a PR with no visible
+a season; saves are kept from the release on (the fixtures in
+`tests/ferment/core/fixtures/` must always load); a PR with no visible
 change may merge on green CI, anything a player would notice waits for
 Hadash's playtest of its preview.
 
@@ -59,6 +60,14 @@ the screen, and any console error fails it too. The shots land in
 `tests/ferment/browser/shots/index.html` (git-ignored). On CI they are the
 `ferment-shots` artifact of the Test run. Look at them before opening a PR
 that changes a screen.
+
+`FLOWS=saves,perf npm run test:ferment:browser` runs just those flows.
+Three flows guard the release: `saves` opens every release save on the
+phone, `offline` installs the game from the launcher, switches the server
+off and plays a day, and `perf` times taps on the biggest save with the CPU
+slowed 4× (its budget is at the top of `perf.mjs`; going over is a warning
+on the PR, like the balance sim, and only twice over fails). A flow that
+exports `alone = true` runs after the others, by itself.
 
 To add a flow, copy `tests/ferment/browser/day.mjs` (export `name` and
 `async run(page, snap)`) and add it to `FLOWS` in `run.mjs`. Flows tap real

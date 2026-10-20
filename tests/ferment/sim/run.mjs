@@ -22,6 +22,12 @@ import { BOTS } from "./bots.mjs";
 const DAYS = 30;
 /** Days the careful bot plays after the idle bot's 30, to show the shop can recover. */
 const RECOVER_DAYS = 10;
+/**
+ * Bots play the player's real start (the old keeper's two parting jars, day 1's
+ * scripted customers), not the fuller test shelf the goldens use.
+ * SIM_START=shelf plays that one instead.
+ */
+const START = { tutorial: process.env.SIM_START !== "shelf" };
 const SEEDS = Array.from({ length: Number(process.env.SIM_SEEDS ?? 8) }, (_, i) => i + 1);
 
 /**
@@ -119,7 +125,8 @@ const median = (xs) => {
 /** One seed: all three bots, plus the careful bot taking over the idle shop. */
 function runSeed(seed) {
   const out = {};
-  for (const bot of ["careful", "careless", "idle"]) out[bot] = play(bot, C.newGame(seed), DAYS);
+  for (const bot of ["careful", "careless", "idle"])
+    out[bot] = play(bot, C.newGame(seed, START), DAYS);
   out.recover = play("careful", out.idle.state, RECOVER_DAYS);
   return out;
 }

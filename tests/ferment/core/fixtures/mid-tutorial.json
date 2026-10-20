@@ -1,0 +1,88 @@
+{
+  "meta": { "seed": 3, "nextId": 8, "rng": { "market": -1354670937, "customers": -192143945 } },
+  "clock": { "day": 1, "phase": "open", "hour": 0.5000000000000007 },
+  "shop": {
+    "coins": 0,
+    "rep": 5,
+    "today": {
+      "served": 0,
+      "earned": 0,
+      "tips": 0,
+      "repStart": 5,
+      "missed": 0,
+      "preorders": 0,
+      "left": 0
+    }
+  },
+  "shelf": {
+    "slots": [
+      { "id": 1, "recipe": "dill", "age": 11.059999999999972, "servings": 2, "size": 2 },
+      { "id": 2, "recipe": "kimchi", "age": 27.85999999999997, "servings": 2, "size": 2 },
+      { "id": 3, "recipe": "kimchi", "age": 0.5000000000000007, "servings": 2, "size": 2 },
+      { "id": 4, "recipe": "dill", "age": 0.5000000000000007, "servings": 2, "size": 2 },
+      { "id": 5, "recipe": "kimchi", "age": 0.5000000000000007, "servings": 2, "size": 2 },
+      { "id": 6, "recipe": "kimchi", "age": 0.5000000000000007, "servings": 2, "size": 2 },
+      null,
+      null,
+      null
+    ]
+  },
+  "customers": {
+    "queue": [
+      {
+        "id": 7,
+        "name": "Marta",
+        "look": 412,
+        "recipe": "kimchi",
+        "lo": 0.3171296296296292,
+        "hi": 0.47712962962962924,
+        "patience": 2.191666666666667,
+        "script": "serve"
+      }
+    ],
+    "nextArrival": 1.8039476843411104
+  },
+  "orders": { "list": [], "offers": [], "asked": [] },
+  "bench": {
+    "known": [],
+    "hints": ["garlicdill", "honeyhot", "pearkimchi", "firekraut"],
+    "tried": {}
+  },
+  "pantry": { "stock": { "salt": 2, "chili": 2 } },
+  "regulars": { "met": {} },
+  "progress": {
+    "upgrades": {},
+    "crocks": {},
+    "tier": 0,
+    "goal": 0,
+    "stats": { "served": 0, "earned": 0, "delight": 0, "bestDay": 0, "orders": 0 }
+  },
+  "market": {
+    "day": 1,
+    "items": {
+      "salt": { "price": 2, "left": 6 },
+      "chili": { "price": 3, "left": 6 },
+      "honey": { "price": 4, "left": 4 },
+      "pear": { "price": 3, "left": 5 },
+      "garlic": { "price": 2, "left": 8 },
+      "oak": { "price": 2, "left": 4 }
+    },
+    "drift": {
+      "salt": 0.886,
+      "chili": 1.045,
+      "honey": 1.016,
+      "pear": 0.963,
+      "garlic": 1.092,
+      "oak": 1.075,
+      "whey": 1.027
+    }
+  },
+  "tutorial": {
+    "on": true,
+    "intro": false,
+    "now": { "id": "serve", "beat": 0, "who": 7, "name": "Marta" },
+    "done": ["gift"],
+    "tries": { "brew": 1 },
+    "script": 1
+  }
+}

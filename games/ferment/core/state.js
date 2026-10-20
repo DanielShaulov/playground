@@ -5,8 +5,9 @@
  *
  * Saves carry no version number. loadSave() fills any slice (or field) a save
  * is missing from its defaults, so parallel PRs never fight over a version.
- * Playtest saves are disposable until release: anything that doesn't look
- * like a sliced save starts a fresh game instead.
+ * From the release on, saves are kept: tests/ferment/core/fixtures/ holds
+ * real saves every build must load as they are. Only something that was never
+ * a sliced save (the first demo's, or junk) starts a fresh game instead.
  */
 
 import { RECIPES, VARIANT_IDS } from "../content/recipes.js";

@@ -21,6 +21,9 @@ export async function serve() {
   const server = createServer(async (req, res) => {
     let path = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname));
     if (path.endsWith("/")) path += "index.html";
+    // The launcher asks the Pages site which PR previews are up; here there are none.
+    if (path === "/pr/index.json")
+      return void res.writeHead(200, { "content-type": TYPES[".json"] }).end("[]");
     try {
       const body = await readFile(join(ROOT, path));
       res.writeHead(200, { "content-type": TYPES[extname(path)] ?? "application/octet-stream" });
@@ -30,5 +33,8 @@ export async function serve() {
     }
   });
   await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
-  return { url: `http://127.0.0.1:${server.address().port}/`, close: () => server.close() };
+  return {
+    url: `http://127.0.0.1:${server.address().port}/`,
+    close: () => (server.close(), server.closeAllConnections()),
+  };
 }

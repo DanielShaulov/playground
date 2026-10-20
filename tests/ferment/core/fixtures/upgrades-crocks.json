@@ -1,0 +1,200 @@
+{
+  "meta": {
+    "seed": 3,
+    "nextId": 132,
+    "rng": { "market": 1732989916, "customers": 82104240, "requests": -1019809426 }
+  },
+  "clock": { "day": 5, "phase": "evening", "hour": 12 },
+  "shop": {
+    "coins": 439,
+    "rep": 8,
+    "today": {
+      "served": 7,
+      "earned": 165,
+      "tips": 18,
+      "repStart": 8,
+      "missed": 0,
+      "preorders": 3,
+      "left": 0
+    }
+  },
+  "shelf": {
+    "slots": [
+      {
+        "id": 88,
+        "recipe": "garlicdill",
+        "age": 34.44999999999945,
+        "servings": 1,
+        "size": 2,
+        "adds": ["garlic", "chili"],
+        "pace": 0.75
+      },
+      {
+        "id": 77,
+        "recipe": "funkykimchi",
+        "age": 35.99999999999936,
+        "servings": 2,
+        "size": 2,
+        "adds": ["garlic", "chili"]
+      },
+      { "id": 122, "recipe": "kraut", "age": 5.600000000000109, "servings": 2, "size": 2 },
+      { "id": 107, "recipe": "pearkimchi", "age": 12, "servings": 2, "size": 2, "adds": ["pear"] },
+      {
+        "id": 119,
+        "recipe": "dill",
+        "age": 6.800000000000169,
+        "servings": 2,
+        "size": 2,
+        "adds": ["salt"]
+      },
+      {
+        "id": 92,
+        "recipe": "honeyhot",
+        "age": 32.599999999999554,
+        "servings": 1,
+        "size": 2,
+        "adds": ["honey", "salt"]
+      },
+      {
+        "id": 129,
+        "recipe": "pearkimchi",
+        "age": 2.5000000000000346,
+        "servings": 2,
+        "size": 2,
+        "adds": ["pear"]
+      },
+      {
+        "id": 99,
+        "recipe": "honeyhot",
+        "age": 29.549999999999464,
+        "servings": 1,
+        "size": 2,
+        "adds": ["honey", "salt"]
+      },
+      {
+        "id": 113,
+        "recipe": "kimchi",
+        "age": 10.2500000000001,
+        "servings": 2,
+        "size": 2,
+        "adds": ["honey"]
+      },
+      null,
+      null,
+      null
+    ]
+  },
+  "customers": { "queue": [], "nextArrival": 12.149239214500412 },
+  "orders": {
+    "list": [
+      {
+        "id": 85,
+        "kind": "standing",
+        "name": "Mrs. Okafor",
+        "look": 212,
+        "recipe": "dill",
+        "lo": 0.16999999999999998,
+        "hi": 0.33,
+        "due": 6,
+        "arriveAt": 1.5,
+        "arrived": false,
+        "regular": "okafor",
+        "jars": [119]
+      },
+      {
+        "id": 112,
+        "kind": "preorder",
+        "name": "Rosa",
+        "look": 345,
+        "recipe": "kimchi",
+        "lo": 0.40968633331588894,
+        "hi": 0.5696863333158889,
+        "due": 6,
+        "arriveAt": 9,
+        "arrived": false,
+        "jars": [113]
+      },
+      {
+        "id": 121,
+        "kind": "preorder",
+        "name": "Dmitri",
+        "look": 314,
+        "recipe": "kraut",
+        "lo": 0.47627820641714774,
+        "hi": 0.6362782064171477,
+        "due": 8,
+        "arriveAt": 1.1533847700578432,
+        "arrived": false,
+        "jars": [122]
+      },
+      {
+        "id": 128,
+        "kind": "preorder",
+        "name": "Dmitri",
+        "look": 213,
+        "recipe": "pearkimchi",
+        "lo": 0.4158496383069387,
+        "hi": 0.5758496383069387,
+        "due": 7,
+        "arriveAt": 0.5,
+        "arrived": false,
+        "jars": [129]
+      }
+    ],
+    "offers": [],
+    "asked": []
+  },
+  "bench": {
+    "known": ["garlicdill", "honeyhot", "pearkimchi", "funkykimchi"],
+    "hints": ["firekraut"],
+    "tried": {
+      "dill": ["salt", "garlic", "honey", "chili"],
+      "hotsauce": ["honey", "salt"],
+      "kimchi": ["pear", "garlic", "chili", "honey"]
+    }
+  },
+  "pantry": { "stock": { "salt": 2, "chili": 3, "garlic": 3, "pear": 1, "honey": 0 } },
+  "regulars": {
+    "met": {
+      "okafor": { "since": 3, "visits": 1, "happy": 1, "missed": 0 },
+      "noodlebar": { "since": 4, "visits": 0, "happy": 0, "missed": 0 },
+      "kenji": { "since": 5, "visits": 0, "happy": 0, "missed": 0, "pending": true, "seen": 5 }
+    }
+  },
+  "progress": {
+    "upgrades": { "shelf": 1 },
+    "crocks": { "0": "cool" },
+    "tier": 2,
+    "goal": 8,
+    "stats": { "served": 33, "earned": 701, "delight": 29, "bestDay": 194, "orders": 20 }
+  },
+  "market": {
+    "day": 5,
+    "items": {
+      "salt": { "price": 1, "left": 5 },
+      "chili": { "price": 3, "left": 5 },
+      "honey": { "price": 3, "left": 2 },
+      "pear": { "price": 3, "left": 3 },
+      "garlic": { "price": 2, "left": 7 },
+      "oak": { "price": 2, "left": 5 },
+      "whey": { "price": 6, "left": 3 }
+    },
+    "drift": {
+      "salt": 0.7,
+      "chili": 1.146,
+      "honey": 0.836,
+      "pear": 0.937,
+      "garlic": 0.962,
+      "oak": 1.038,
+      "whey": 0.985
+    }
+  },
+  "tutorial": {
+    "on": true,
+    "intro": false,
+    "now": { "id": "bench", "beat": 0 },
+    "done": ["gift", "serve", "keep", "tier", "regular", "market", "brew"],
+    "tries": { "brew": 3, "market": 3, "regular": 1, "bench": 1 },
+    "script": 3
+  }
+}

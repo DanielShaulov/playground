@@ -1,0 +1,67 @@
+{
+  "meta": { "seed": 3, "nextId": 3, "rng": { "market": -1354670937 } },
+  "clock": { "day": 1, "phase": "morning", "hour": 0 },
+  "shop": {
+    "coins": 40,
+    "rep": 5,
+    "today": {
+      "served": 0,
+      "earned": 0,
+      "tips": 0,
+      "repStart": 5,
+      "missed": 0,
+      "preorders": 0,
+      "left": 0
+    }
+  },
+  "shelf": {
+    "slots": [
+      { "id": 1, "recipe": "dill", "age": 10.56, "servings": 2, "size": 2 },
+      { "id": 2, "recipe": "kimchi", "age": 27.36, "servings": 2, "size": 2 },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "customers": { "queue": [], "nextArrival": 0 },
+  "orders": { "list": [], "offers": [], "asked": [] },
+  "bench": {
+    "known": [],
+    "hints": ["garlicdill", "honeyhot", "pearkimchi", "firekraut"],
+    "tried": {}
+  },
+  "pantry": { "stock": { "salt": 2, "chili": 2 } },
+  "regulars": { "met": {} },
+  "progress": {
+    "upgrades": {},
+    "crocks": {},
+    "tier": 0,
+    "goal": 0,
+    "stats": { "served": 0, "earned": 0, "delight": 0, "bestDay": 0, "orders": 0 }
+  },
+  "market": {
+    "day": 1,
+    "items": {
+      "salt": { "price": 2, "left": 6 },
+      "chili": { "price": 3, "left": 6 },
+      "honey": { "price": 4, "left": 4 },
+      "pear": { "price": 3, "left": 5 },
+      "garlic": { "price": 2, "left": 8 },
+      "oak": { "price": 2, "left": 4 }
+    },
+    "drift": {
+      "salt": 0.886,
+      "chili": 1.045,
+      "honey": 1.016,
+      "pear": 0.963,
+      "garlic": 1.092,
+      "oak": 1.075,
+      "whey": 1.027
+    }
+  },
+  "tutorial": { "on": true, "intro": true, "now": null, "done": [], "tries": {}, "script": 0 }
+}

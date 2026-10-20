@@ -59,7 +59,9 @@ const settings = mountSettings(els.root);
 const tutorialView = mountTutorial(els.root);
 const intro = mountIntro(els.root);
 onReplayIntro(() => dispatch({ type: "tutorial", do: "replay" }));
+// The evening and the bench cover the whole screen: the shop under them goes unpainted.
 const render = () => (
+  els.root.classList.toggle("covered", !!(ui.evening || ui.bench)),
   renderShop(els, ui),
   renderEvening(evening, ui),
   renderBench(bench, ui),
