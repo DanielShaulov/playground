@@ -97,13 +97,10 @@ function ticketHtml(s, o) {
   let pips = "";
   if (o.qty) {
     for (let i = 0; i < need; i++)
-      pips += `<i class="${i < got ? "got" : i < got + jars.length + (o.morning?.length ?? 0) ? "brewing" : ""}"></i>`;
+      pips += `<i class="${i < got ? "got" : i < got + jars.length ? "brewing" : ""}"></i>`;
     pips = `<span class="pips">${pips}</span>`;
   }
-  const marks = [
-    ...jars.map((x) => x.at),
-    ...(o.morning ?? []).map((m) => planFor(fromStart(s), o, m.adds, m.slot)?.f ?? 0),
-  ];
+  const marks = jars.map((x) => x.at);
   const fits = marks.some((f) => f >= o.lo && f <= o.hi && f < 1);
   return `<button class="${cls.join(" ")}" data-act="order" data-order="${o.id}">
     <div class="who"><span class="face">${faceSvg(o.look, "wait")}</span><span class="name">${o.name}</span></div>
@@ -177,10 +174,7 @@ function planSheet() {
   return planEl;
 }
 
-const firstEmpty = (s) => s.shelf.slots.findIndex((j, i) => !j && !bookedFor(s, i));
-
-/** The order a shelf spot is booked for, to start next morning (after closing). */
-const bookedFor = (s, i) => s.orders.list.find((o) => o.morning?.some((m) => m.slot === i));
+const firstEmpty = (s) => s.shelf.slots.findIndex((j) => !j);
 
 /** Open the planner for an order: on the best shelf jar for it if one suits, else a new jar. */
 export function openPlan(ui, orderId) {
@@ -242,8 +236,7 @@ function pickSrc(s, o) {
 }
 
 /** How many more jars (or portions) an order still needs kept or started. */
-const stillNeeds = (s, o) =>
-  (o.qty ?? 1) - (o.got ?? 0) - jarsFor(s, o).length - (o.morning?.length ?? 0);
+const stillNeeds = (s, o) => (o.qty ?? 1) - (o.got ?? 0) - jarsFor(s, o).length;
 
 /**
  * Where an order stands, for the evening's order list:
@@ -267,16 +260,12 @@ export function orderStatus(s, o) {
   return { kind: suits ? "set" : "swap", left: 0, jars, shelf: false };
 }
 
-/** The shop as it will be when a new jar can go on: now, or tomorrow morning after closing. */
-const fromStart = (s) =>
-  s.clock.phase === "evening" ? { ...s, clock: { ...s.clock, day: s.clock.day + 1, hour: 0 } } : s;
-
 /** Timing add-ins the pantry has that keep the jar the order's recipe. */
 function timingAdds(s, o) {
   const needs = RECIPES[o.recipe].needs ?? [];
   return INGREDIENT_IDS.filter((id) => INGREDIENTS[id].speed !== 1 && !needs.includes(id)).map(
     (id) => {
-      const p = planFor(fromStart(s), o, [id]);
+      const p = planFor(s, o, [id]);
       return { id, ok: !!p && p.right, makes: p?.recipe, stock: s.pantry.stock[id] ?? 0 };
     },
   );
@@ -317,7 +306,7 @@ function verdict(s, o, plan) {
         ? `Not ready yet when ${o.name} comes in.`
         : `Gone ${bandWord(plan.f)} by the time ${o.name} comes in.`;
   if (plan.shelf) {
-    const fresh = planFor(fromStart(s), o, [], firstEmpty(s));
+    const fresh = planFor(s, o, [], firstEmpty(s));
     const better = fresh && (fresh.fits || bestStart(s, o, fresh));
     return `<b class="bad">${now}</b>${better ? ` <span class="tip">A fresh jar would suit ${o.name} better.</span>` : ""}`;
   }
@@ -329,9 +318,10 @@ function verdict(s, o, plan) {
     tip =
       t.hour < 0.5
         ? `Start it ${day === "today" ? "now" : `${day} morning`} instead.`
-        : `Start it ${day} around ${clockAt(t.hour)} instead.`;
-    const st = fromStart(s).clock;
-    if (t.day === st.day && Math.abs(t.hour - st.hour) < 0.5) tip = "";
+        : t.hour > OPEN_HOURS - 0.5
+          ? `Start it ${day === "today" ? "tonight" : `${day} evening`} after closing instead.`
+          : `Start it ${day} around ${clockAt(t.hour)} instead.`;
+    if (t.day === s.clock.day && Math.abs(t.hour - s.clock.hour) < 0.5) tip = "";
   } else {
     // Only suggest an add-in the pantry has that keeps it the same recipe.
     const fast = plan.f < o.lo;
@@ -350,9 +340,9 @@ function verdict(s, o, plan) {
 }
 
 /**
- * When a jar like `plan` could be started (shop hours only, from now on) to sit
- * in the middle of the order's window at pickup, as close as possible.
- * Null when no start time while the shop is open lands it in the window.
+ * When a jar like `plan` could be started (while open, or that evening once
+ * closed, from now on) to sit in the middle of the order's window at pickup,
+ * as close as possible. Null when no such start lands it in the window.
  * @returns {{ day: number, hour: number } | null}
  */
 export function bestStart(s, o, plan) {
@@ -360,15 +350,18 @@ export function bestStart(s, o, plan) {
   const from = pick - ageAt(plan.recipe, plan.adds, o.hi, plan.pace);
   const to = pick - ageAt(plan.recipe, plan.adds, o.lo, plan.pace);
   const aim = (from + to) / 2;
-  // After closing (even early) the first chance is the next morning.
-  const start = fromStart(s).clock;
+  const now = s.clock.day * 24 + s.clock.hour;
   let best = null;
-  for (let d = start.day; d * 24 <= to; d++) {
-    const lo = Math.max(from, d * 24 + (d === start.day ? start.hour : 0));
-    const hi = Math.min(to, d * 24 + OPEN_HOURS - 0.5); // before closing
+  for (let d = s.clock.day; d * 24 <= to; d++) {
+    const lo = Math.max(from, d === s.clock.day ? now : d * 24);
+    // Up to closing time; after closing (even early) only tonight, then the morning.
+    const hi = Math.min(
+      to,
+      d === s.clock.day && s.clock.phase === "evening" ? now : d * 24 + OPEN_HOURS,
+    );
     if (lo > hi) continue;
     const t = Math.min(hi, Math.max(lo, aim));
-    if (!best || Math.abs(t - aim) < Math.abs(best - aim)) best = t;
+    if (best === null || Math.abs(t - aim) < Math.abs(best - aim)) best = t;
   }
   if (best === null) return null;
   const day = Math.floor(best / 24);
@@ -405,8 +398,8 @@ function renderPlan(ui) {
     return;
   }
   el.hidden = false;
-  if (p.slot >= 0 && (s.shelf.slots[p.slot] || bookedFor(s, p.slot))) p.slot = firstEmpty(s);
-  const fresh = planFor(fromStart(s), o, p.adds, p.slot);
+  if (p.slot >= 0 && s.shelf.slots[p.slot]) p.slot = firstEmpty(s);
+  const fresh = planFor(s, o, p.adds, p.slot);
   if (!fresh) {
     p.adds = [];
     return;
@@ -427,37 +420,17 @@ function renderPlan(ui) {
     .map((x) => ({ slot: s.shelf.slots.indexOf(x.jar), plan: shelfPlan(s, o, x.jar) }))
     .sort((a, b) => Number(a.plan.fits) - Number(b.plan.fits));
   const swap = left <= 0 && keptPlans[0] && !keptPlans[0].plan.fits ? keptPlans[0] : null;
-  // A jar booked for the morning shows as planned, with its own add-ins.
-  const bookedPlan = o.morning?.length
-    ? planFor(fromStart(s), o, o.morning[0].adds, o.morning[0].slot)
-    : null;
-  const plan =
-    left <= 0 && keptPlans.length
-      ? keptPlans[0].plan
-      : left <= 0 && bookedPlan
-        ? bookedPlan
-        : (chosen?.plan ?? fresh);
+  const plan = left <= 0 && keptPlans.length ? keptPlans[0].plan : (chosen?.plan ?? fresh);
   const portion = o.kind === "bulk" ? "it" : "a portion";
 
-  const booked = o.morning ?? [];
-  const kept =
-    jars.length || booked.length
-      ? `<div class="have">${jars
-          .map(
-            (x) =>
-              `<button class="kept" data-act="board-unhold" data-slot="${s.shelf.slots.indexOf(x.jar)}">${jarSvg(x.jar, "mini")}<small>Let go</small></button>`,
-          )
-          .join("")}${booked
-          .map(
-            () =>
-              `<button class="kept" data-act="board-unmorning">${emptyJarSvg}<small>Let go</small></button>`,
-          )
-          .join("")}<small>${
-          booked.length && !jars.length
-            ? `Starts in the morning for ${o.name}`
-            : `${jars.length + booked.length} of ${need} kept for ${o.name}${booked.length ? ` (${booked.length} in the morning)` : ""}`
-        }</small></div>`
-      : "";
+  const kept = jars.length
+    ? `<div class="have">${jars
+        .map(
+          (x) =>
+            `<button class="kept" data-act="board-unhold" data-slot="${s.shelf.slots.indexOf(x.jar)}">${jarSvg(x.jar, "mini")}<small>Let go</small></button>`,
+        )
+        .join("")}<small>${jars.length} of ${need} kept for ${o.name}</small></div>`
+    : "";
   const optHtml = options.length
     ? `<div class="opts">${options
         .map(
@@ -466,7 +439,7 @@ function renderPlan(ui) {
         )
         .join(
           "",
-        )}<button class="opt${p.src === "new" ? " sel" : ""}" data-act="board-src" data-src="new"><span class="ojar">${emptyJarSvg}</span><span class="otext">A new jar, started ${evening ? "in the morning" : "now"}${stripMarks(o, [fresh.f], fresh.fits)}</span>${fresh.right ? fitWord(o, fresh.f) : ""}</button></div>`
+        )}<button class="opt${p.src === "new" ? " sel" : ""}" data-act="board-src" data-src="new"><span class="ojar">${emptyJarSvg}</span><span class="otext">A new jar, started ${evening ? "tonight" : "now"}${stripMarks(o, [fresh.f], fresh.fits)}</span>${fresh.right ? fitWord(o, fresh.f) : ""}</button></div>`
     : "";
 
   const adds = timingAdds(s, o)
@@ -479,9 +452,7 @@ function renderPlan(ui) {
     .map((j, i) =>
       j
         ? `<span class="spot full">${portionsHtml(s, j)}${jarSvg(j, "mini")}</span>`
-        : bookedFor(s, i)
-          ? `<span class="spot full"><span class="portions"><i class="held" title="For ${bookedFor(s, i).name} in the morning">${faceSvg(bookedFor(s, i).look, "wait")}</i></span>${emptyJarSvg}</span>`
-          : `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`,
+        : `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`,
     )
     .join("");
   const newJar = !offer && !unknown && left > 0 && p.src === "new";
@@ -500,8 +471,6 @@ function renderPlan(ui) {
   else if (firstEmpty(s) < 0) go = `<button class="main" disabled>No room on the shelf</button>`;
   else if (missing.length)
     go = `<button class="main" disabled>Needs ${missing.map((a) => ingredientSvg(a) + " " + INGREDIENTS[a].name.toLowerCase()).join(", ")}</button>`;
-  else if (evening)
-    go = `<button class="main" data-act="board-morning" ${s.shop.coins < r.cost ? "disabled" : ""}>Start it in the morning<small>🪙 ${r.cost}</small></button>`;
   else
     go = `<button class="main" data-act="board-start" ${s.shop.coins < r.cost ? "disabled" : ""}>Start a jar<small>🪙 ${r.cost}</small></button>`;
 
@@ -605,16 +574,6 @@ export function boardAct(act, t, ui, dispatch, toast) {
         adds: p.adds,
       });
       if (events.some((e) => e.type === "startedForOrder")) next("Started!");
-    } else if (act === "board-morning") {
-      const events = dispatch({
-        type: "planMorning",
-        orderId: p.orderId,
-        slot: p.slot,
-        adds: p.adds,
-      });
-      if (events.some((e) => e.type === "plannedMorning")) next("It goes on first thing!");
-    } else if (act === "board-unmorning") {
-      dispatch({ type: "planMorning", orderId: p.orderId, slot: null });
     }
   }
   return true;
@@ -626,8 +585,6 @@ export function boardReact(e, toast) {
   else if (e.type === "hinted") toast(`${e.customer.name} asked for something new`);
   else if (e.type === "regularJoined" && REGULARS[e.regular].kind === "standing")
     toast(`${REGULARS[e.regular].name} will keep coming back. Look for the ticket on the board.`);
-  else if (e.type === "morningFailed")
-    toast(`Couldn't start ${e.order.name}'s jar this morning: ${e.why}`);
   else if (e.type === "delivered" && !e.done)
     toast(`${e.customer.got} of ${e.customer.qty} jars handed over`);
 }

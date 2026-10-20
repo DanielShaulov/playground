@@ -83,7 +83,7 @@ export function mountBench(parent) {
   return { el, r };
 }
 
-/** Open the bench; `slot` is the empty shelf spot a brew goes into (none in the evening). */
+/** Open the bench; `slot` is the empty shelf spot a brew goes into (none just to try mixes). */
 export function openBench(ui, slot = null) {
   ui.bench = { recipe: lastRecipe, adds: [], slot, note: null };
 }
@@ -141,7 +141,7 @@ export function benchAct(act, t, ui, dispatch, toast) {
 
 /** What the bench can do right now: brew into a spot, try a mix, or only look. */
 function modeOf(s, b) {
-  if (b.slot !== null && s.clock.phase !== "evening" && !s.shelf.slots[b.slot]) return "brew";
+  if (b.slot !== null && !s.shelf.slots[b.slot]) return "brew";
   if (s.clock.phase === "evening") return "try";
   return "look";
 }

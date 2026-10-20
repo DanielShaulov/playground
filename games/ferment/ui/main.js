@@ -157,7 +157,7 @@ els.root.addEventListener("click", (e) => {
   } else if (act === "slot") {
     const i = Number(t.dataset.slot);
     if (!s.shelf.slots[i]) {
-      if (s.clock.phase !== "evening") ui.sheet = { kind: "brew", slot: i };
+      ui.sheet = { kind: "brew", slot: i };
     } else {
       ui.selected = ui.selected === i ? null : i;
     }

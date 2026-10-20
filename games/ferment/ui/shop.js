@@ -141,7 +141,7 @@ export function renderShop(els, ui) {
       const due = s.orders.list.filter((o) => o.due === s.clock.day).length;
       html = `<div><b>Morning, day ${s.clock.day}</b>Tap an empty shelf spot to start a jar, then open the shop.${due ? ` ${due} order${due > 1 ? "s" : ""} to collect today.` : ""}</div>`;
     } else if (s.clock.phase === "evening") {
-      html = `<div><b>Closed for the night</b>The jars keep working while you sleep.</div>`;
+      html = `<div><b>Closed for the night</b>A jar started now gets the night's head start.</div>`;
     } else {
       html = `<div><b>The shop is quiet</b>Someone will be in soon.</div>`;
     }
@@ -155,10 +155,7 @@ export function renderShop(els, ui) {
     const crock = s.progress.crocks[i] ? ` crock-${s.progress.crocks[i]}` : "";
     if (!jar) {
       setClass(el, "slot empty" + crock + (cust ? " dim" : ""));
-      patch(
-        el,
-        `${emptyJarSvg}<div class="lbl">Empty<small>${s.clock.phase === "evening" ? "&nbsp;" : "tap to brew"}</small></div>`,
-      );
+      patch(el, `${emptyJarSvg}<div class="lbl">Empty<small>tap to brew</small></div>`);
       return;
     }
     const f = Math.round(flavour(jar) * 200) / 200;

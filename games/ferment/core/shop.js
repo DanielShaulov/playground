@@ -40,7 +40,6 @@ export function brew(s, { slot, recipe, adds }, events) {
   if (typeof recipe !== "string" || !Object.hasOwn(RECIPES, recipe)) return "no such recipe";
   const r = RECIPES[recipe];
   if (badSlot(s, slot)) return "no such slot";
-  if (s.clock.phase === "evening") return "shop is closed";
   if (s.shelf.slots[slot]) return "slot is full";
   if (s.shop.coins < r.cost) return "not enough coins";
   const mix = checkMix(s, recipe, adds);

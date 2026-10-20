@@ -8,10 +8,10 @@
  *   workshop   upgrades, each drawn on the thing it changes (ui/upgrades.js)
  *   goals      the reputation track with its tiers, and the goals ladder
  *
- * The evening only plans: buying, building, claiming. Jars are started in
- * the morning. The orders corner (ui/orders.js) lists every order still to
- * collect, split into what needs a jar and what is reserved; a card opens the
- * planner over the evening. The ‹ back shows the shop; the shop's own button
+ * The evening plans: buying, building, claiming, and jars can still go on
+ * tonight to ripen overnight. The orders corner (ui/orders.js) lists every
+ * order still to collect, split into what needs a jar and what is reserved; a
+ * card opens the planner over the evening. The ‹ back shows the shop; the shop's own button
  * comes back here.
  *
  * Tabs: till, orders, market, workshop, goals.

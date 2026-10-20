@@ -22,7 +22,10 @@ Everything is in in-game hours. A day has three phases:
 
 - The shelf starts with 9 slots (`SLOTS`) and grows with upgrades (see
   Progression). Starting a jar costs coins and fills an empty slot; you can
-  start jars in the morning or while open.
+  start jars in the morning, while open, or in the evening after closing
+  **(Hadash)**: a jar started in the evening is paid for then and ages
+  through the night, so it wakes with a head start of the rest of the 24
+  hours (12 hours after a full day).
 - A jar's flavour is its age divided by its recipe's ripening time, from 0 to 1.
   The strip is split into four bands: crisp (below 0.3), tangy (to 0.55), sour
   (to 0.8) and funky (to 1).
@@ -55,7 +58,8 @@ The menu starts with two recipes and grows tier by tier **(Hadash)**, so a
 new shop isn't handed everything at once. The two are the easy ones to time
 from a morning start: dill is at its best late the same day, kimchi all
 through the next. Hot sauce comes next because its best stretch falls
-overnight from a morning start, so it needs a crock or an add-in to time.
+overnight from a morning start, so it needs an evening start, a crock or an
+add-in to time.
 
 - Portions can be kept for orders (see Kept portions below); walk-ins can only
   buy portions nobody has kept.
@@ -260,16 +264,11 @@ decisions **(Hadash)**, not just layout:
   recipe is locked and labelled with what it makes ("makes fire kraut", or
   "makes something new" if undiscovered). The verdict's tips only suggest
   add-ins that are in the pantry and keep the recipe.
-- **After closing** (including closing early) a new jar is previewed as
-  started at the next morning's opening, since that's the earliest it can go
-  on, and "start it at …" tips never suggest a time the shop is closed.
-- **Booking for the morning (Hadash):** after closing, the main button is
-  "Start it in the morning". It books the jar (spot and add-ins) on the order
-  (`planMorning`, `order.morning`); nothing is paid and nothing goes on the
-  shelf until you wake, when the jar starts first thing (`startMorning`, run
-  by sleep). The booked spot shows the customer's face and can't be booked
-  twice; the planner shows the booking with Let go. A booking that can't
-  start (say, coins spent at the market) is dropped with a toast.
+- **After closing** (including closing early) a new jar is "started
+  tonight": the main button is still "Start a jar", and the jar goes on at
+  once with the night ahead of it **(Hadash)**. "Start it …" tips suggest a
+  time while open or that evening after closing ("tonight after closing"),
+  never a later hour of a night that has already started.
 - **Undiscovered recipes:** the order can exist (pre-order is fine), but the
   planner offers no new jar for it. It says we don't know how to make it yet
   and the main button goes to the bench. Once discovered it plans like any
