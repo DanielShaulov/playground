@@ -9,8 +9,12 @@
  *   goals      the reputation track with its tiers, and the goals ladder
  *
  * The evening only plans: buying, building, claiming. Jars are started in
- * the morning. The ‹ back (or Orders) shows the shop and its order board;
- * the shop's own button comes back here.
+ * the morning. The orders corner (ui/orders.js) lists every order still to
+ * collect, split into what needs a jar and what is reserved; a card opens the
+ * planner over the evening. The ‹ back shows the shop; the shop's own button
+ * comes back here.
+ *
+ * Tabs: till, orders, market, workshop, goals.
  *
  * Screen-only state: ui.evening = { tab, spot } (null while the shop shows).
  * Buttons carry data-act="eve-…", "mk-…", "up-…" or "sleep"; main.js hands
@@ -25,10 +29,12 @@ import { TIERS } from "../content/goals.js";
 import { goalNow, goalAt, goalText, tierOf, upgradeOffers } from "../core/index.js";
 import { marketHtml, marketAct, rareToday } from "./market.js";
 import { upgradesHtml, upgradesAct } from "./upgrades.js";
+import { ordersHtml, ordersNow } from "./orders.js";
 import { patch } from "./dom.js";
 
 const TABS = [
   ["till", "🧾", "Takings"],
+  ["orders", "📋", "Orders"],
   ["market", "🧺", "Market"],
   ["workshop", "🔨", "Workshop"],
   ["goals", "🏆", "Goals"],
@@ -164,12 +170,16 @@ function tillHtml(s) {
   );
   if (can.length) notes.push(["workshop", `🔨 You can afford ${can[0].name.toLowerCase()}`]);
   const due = s.orders.list.filter((o) => o.due === s.clock.day + 1).length;
-  if (due) notes.push(["orders", `📋 ${due} order${due > 1 ? "s" : ""} to collect tomorrow`]);
+  const todo = ordersNow(s).filter((x) => x.todo).length;
+  if (due || todo)
+    notes.push([
+      "orders",
+      `📋 ${due ? `${due} order${due > 1 ? "s" : ""} to collect tomorrow` : "Orders to plan"}${todo ? `, ${todo} still need${todo > 1 ? "" : "s"} a jar` : ", all reserved"}`,
+    ]);
   const tonight = notes
-    .map(([tab, text]) =>
-      tab === "orders"
-        ? `<button class="go" data-act="eve-close">${text}<span>›</span></button>`
-        : `<button class="go" data-act="eve-tab" data-tab="${tab}">${text}<span>›</span></button>`,
+    .map(
+      ([tab, text]) =>
+        `<button class="go" data-act="eve-tab" data-tab="${tab}">${text}<span>›</span></button>`,
     )
     .join("");
   return `${receipt}${tonight ? `<div class="tonight"><h3>Tonight</h3>${tonight}</div>` : ""}
@@ -260,6 +270,7 @@ export function renderEvening(view, ui) {
   const dot = {
     market: rareToday(s).length > 0,
     goals: goalNow(s).ready,
+    orders: ordersNow(s).some((x) => x.todo),
   };
   patch(
     r.tabs,
@@ -269,13 +280,15 @@ export function renderEvening(view, ui) {
     ).join(""),
   );
   const body =
-    ev.tab === "market"
-      ? marketHtml(s)
-      : ev.tab === "workshop"
-        ? upgradesHtml(s, ui)
-        : ev.tab === "goals"
-          ? goalsHtml(s)
-          : tillHtml(s);
+    ev.tab === "orders"
+      ? ordersHtml(s)
+      : ev.tab === "market"
+        ? marketHtml(s)
+        : ev.tab === "workshop"
+          ? upgradesHtml(s, ui)
+          : ev.tab === "goals"
+            ? goalsHtml(s)
+            : tillHtml(s);
   const was = r.body.dataset.tab;
   patch(r.body, `<div class="corner c-${ev.tab}">${body}</div>`);
   if (was !== ev.tab) {
@@ -284,6 +297,6 @@ export function renderEvening(view, ui) {
   }
   patch(
     r.actions,
-    `<button data-act="bench">🧪 Bench</button><button data-act="eve-close">📋 Orders</button><button class="main" data-act="sleep">Sleep<small>→ Day ${s.clock.day + 1}</small></button>`,
+    `<button data-act="bench">🧪 Bench</button><button class="main" data-act="sleep">Sleep<small>→ Day ${s.clock.day + 1}</small></button>`,
   );
 }

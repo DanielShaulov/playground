@@ -110,7 +110,7 @@ function ticketHtml(s, o) {
 }
 
 /** A strip with the order's window and the started jars' marks at pickup. */
-function stripMarks(win, marks, fits, big = false) {
+export function stripMarks(win, marks, fits, big = false) {
   const html = strip({ win, big });
   if (!marks.length) return html;
   const m = marks
@@ -237,6 +237,28 @@ function pickSrc(s, o) {
 
 /** How many more jars (or portions) an order still needs kept or started. */
 const stillNeeds = (s, o) => (o.qty ?? 1) - (o.got ?? 0) - jarsFor(s, o).length;
+
+/**
+ * Where an order stands, for the evening's order list:
+ *   set    every jar it needs is kept, and each will suit at pickup
+ *   swap   covered, but a kept jar won't suit by then
+ *   need   still needs a jar kept or started (`left` of them)
+ *   bench  needs a jar of a recipe not worked out at the bench yet
+ * `jars` are the kept jars with where each will be at pickup.
+ * @returns {{ kind: "set" | "swap" | "need" | "bench", left: number, jars: { jar: any, at: number }[], shelf: boolean }}
+ */
+export function orderStatus(s, o) {
+  const jars = jarsFor(s, o);
+  const left = stillNeeds(s, o);
+  const r = RECIPES[o.recipe];
+  const shelf = left > 0 && candidates(s, o).some((c) => c.plan.fits);
+  if (left > 0) {
+    const unknown = !!r.base && !s.bench.known.includes(o.recipe);
+    return { kind: unknown && !shelf ? "bench" : "need", left, jars, shelf };
+  }
+  const suits = jars.every(({ at }) => at < 1 && at >= o.lo && at <= o.hi);
+  return { kind: suits ? "set" : "swap", left: 0, jars, shelf: false };
+}
 
 /** The shop as it will be when a new jar can go on: now, or tomorrow morning after closing. */
 const fromStart = (s) =>

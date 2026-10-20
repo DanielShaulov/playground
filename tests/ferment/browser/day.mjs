@@ -53,6 +53,8 @@ export async function run(page, snap) {
     } else {
       await page.locator('[data-act="preorder"]').tap();
       assert.ok((await state()).orders.list.length > 0);
+      // Pre-ordering goes straight to the planner; leave it for now.
+      await page.locator('.plan .btns [data-act="board-close"]').tap();
       preorders++;
     }
   }
