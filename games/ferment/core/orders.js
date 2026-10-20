@@ -323,6 +323,47 @@ export function startForOrder(s, { orderId, slot, adds }, events) {
 }
 
 /**
+ * { type: "planMorning", orderId, slot, adds? } — after closing, book a jar
+ * for a taken order to start in `slot` with `adds` first thing next morning
+ * (jars can't go on while the shop is closed). Coins and add-ins are only
+ * spent when it starts; { slot: null } drops the booking.
+ */
+export function planMorning(s, { orderId, slot, adds }, events) {
+  const order = findIn(s.orders.list, orderId);
+  if (!order) return "no such order";
+  if (s.clock.phase !== "evening") return "shop is not closed";
+  if (slot === null) {
+    if (!order.morning?.length) return "nothing booked";
+    delete order.morning;
+    events.push({ type: "unplannedMorning", order });
+    return;
+  }
+  const mix = resolveMix(order.recipe, adds ?? []);
+  if (!mix) return "bad add-ins";
+  if (mix.recipe !== order.recipe) return "mix makes something else";
+  if (!Number.isInteger(slot) || slot < 0 || slot >= s.shelf.slots.length) return "no such slot";
+  if (s.shelf.slots[slot]) return "slot is full";
+  if (s.orders.list.some((o) => o.morning?.some((m) => m.slot === slot))) return "slot is booked";
+  const need = (order.qty ?? 1) - (order.got ?? 0) - (order.jars?.length ?? 0);
+  if ((order.morning?.length ?? 0) >= need) return "order is covered";
+  (order.morning ??= []).push({ slot, adds: adds ?? [] });
+  events.push({ type: "plannedMorning", order, slot });
+}
+
+/** At the start of a new day: start every jar booked the night before (see planMorning). */
+export function startMorning(/** @type {State} */ s, events) {
+  for (const order of s.orders.list) {
+    if (!order.morning) continue;
+    const booked = order.morning;
+    delete order.morning;
+    for (const m of booked) {
+      const why = startForOrder(s, { orderId: order.id, slot: m.slot, adds: m.adds }, events);
+      if (why) events.push({ type: "morningFailed", order, slot: m.slot, why });
+    }
+  }
+}
+
+/**
  * Portions of `jar` set aside for an order: a bulk buyer takes whole jars,
  * anyone else one portion. A jar can hold portions for several orders.
  */

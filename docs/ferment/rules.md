@@ -263,6 +263,13 @@ decisions **(Hadash)**, not just layout:
 - **After closing** (including closing early) a new jar is previewed as
   started at the next morning's opening, since that's the earliest it can go
   on, and "start it at …" tips never suggest a time the shop is closed.
+- **Booking for the morning (Hadash):** after closing, the main button is
+  "Start it in the morning". It books the jar (spot and add-ins) on the order
+  (`planMorning`, `order.morning`); nothing is paid and nothing goes on the
+  shelf until you wake, when the jar starts first thing (`startMorning`, run
+  by sleep). The booked spot shows the customer's face and can't be booked
+  twice; the planner shows the booking with Let go. A booking that can't
+  start (say, coins spent at the market) is dropped with a toast.
 - **Undiscovered recipes:** the order can exist (pre-order is fine), but the
   planner offers no new jar for it. It says we don't know how to make it yet
   and the main button goes to the bench. Once discovered it plans like any

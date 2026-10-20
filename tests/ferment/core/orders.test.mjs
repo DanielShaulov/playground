@@ -452,3 +452,44 @@ test("startForOrder: the new jar is set aside for that order", () => {
     [900],
   );
 });
+
+test("planMorning: after closing, a jar booked for an order starts when you wake", () => {
+  let s = structuredClone(C.newGame(1));
+  s.orders.list.push(order({ due: 4 }));
+  assert.equal(rejected(s, { type: "planMorning", orderId: 900, slot: 5 }), "shop is not closed");
+  s.clock.phase = "evening";
+  assert.equal(rejected(s, { type: "planMorning", orderId: 900, slot: 0 }), "slot is full");
+  assert.equal(
+    rejected(s, { type: "planMorning", orderId: 900, slot: 5, adds: ["garlic"] }),
+    "mix makes something else",
+  );
+  const coins = s.shop.coins;
+  s = ok(s, { type: "planMorning", orderId: 900, slot: 5, adds: ["salt"] }).state;
+  assert.equal(s.shelf.slots[5], null, "nothing goes on while closed");
+  assert.equal(s.shop.coins, coins, "nothing is paid until it starts");
+  assert.equal(rejected(s, { type: "planMorning", orderId: 900, slot: 6 }), "order is covered");
+  s.orders.list.push(order({ id: 901, due: 4 }));
+  assert.equal(rejected(s, { type: "planMorning", orderId: 901, slot: 5 }), "slot is booked");
+  const r = ok(s, { type: "sleep" });
+  const jar = r.state.shelf.slots[5];
+  assert.equal(jar.recipe, "dill");
+  assert.deepEqual(jar.adds, ["salt"]);
+  assert.equal(jar.age, 0, "it starts at the morning, not overnight");
+  assert.deepEqual(r.state.orders.list[0].jars, [jar.id]);
+  assert.equal(r.state.orders.list[0].morning, undefined);
+  assert.equal(r.state.shop.coins, coins - RECIPES.dill.cost);
+});
+
+test("planMorning: a booking can be dropped, and one that can't start says why", () => {
+  let s = structuredClone(C.newGame(1));
+  s.clock.phase = "evening";
+  s.orders.list.push(order({ due: 4 }));
+  s = ok(s, { type: "planMorning", orderId: 900, slot: 5 }).state;
+  const dropped = ok(s, { type: "planMorning", orderId: 900, slot: null }).state;
+  assert.equal(dropped.orders.list[0].morning, undefined);
+  assert.equal(ok(dropped, { type: "sleep" }).state.shelf.slots[5], null);
+  s.shop.coins = 0;
+  const r = ok(s, { type: "sleep" });
+  assert.equal(r.state.shelf.slots[5], null);
+  assert.ok(r.events.some((e) => e.type === "morningFailed" && e.why === "not enough coins"));
+});

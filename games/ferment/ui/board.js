@@ -97,10 +97,13 @@ function ticketHtml(s, o) {
   let pips = "";
   if (o.qty) {
     for (let i = 0; i < need; i++)
-      pips += `<i class="${i < got ? "got" : i < got + jars.length ? "brewing" : ""}"></i>`;
+      pips += `<i class="${i < got ? "got" : i < got + jars.length + (o.morning?.length ?? 0) ? "brewing" : ""}"></i>`;
     pips = `<span class="pips">${pips}</span>`;
   }
-  const marks = jars.map((x) => x.at);
+  const marks = [
+    ...jars.map((x) => x.at),
+    ...(o.morning ?? []).map((m) => planFor(fromStart(s), o, m.adds, m.slot)?.f ?? 0),
+  ];
   const fits = marks.some((f) => f >= o.lo && f <= o.hi && f < 1);
   return `<button class="${cls.join(" ")}" data-act="order" data-order="${o.id}">
     <div class="who"><span class="face">${faceSvg(o.look, "wait")}</span><span class="name">${o.name}</span></div>
@@ -174,7 +177,10 @@ function planSheet() {
   return planEl;
 }
 
-const firstEmpty = (s) => s.shelf.slots.findIndex((j) => !j);
+const firstEmpty = (s) => s.shelf.slots.findIndex((j, i) => !j && !bookedFor(s, i));
+
+/** The order a shelf spot is booked for, to start next morning (after closing). */
+const bookedFor = (s, i) => s.orders.list.find((o) => o.morning?.some((m) => m.slot === i));
 
 /** Open the planner for an order: on the best shelf jar for it if one suits, else a new jar. */
 export function openPlan(ui, orderId) {
@@ -236,7 +242,8 @@ function pickSrc(s, o) {
 }
 
 /** How many more jars (or portions) an order still needs kept or started. */
-const stillNeeds = (s, o) => (o.qty ?? 1) - (o.got ?? 0) - jarsFor(s, o).length;
+const stillNeeds = (s, o) =>
+  (o.qty ?? 1) - (o.got ?? 0) - jarsFor(s, o).length - (o.morning?.length ?? 0);
 
 /**
  * Where an order stands, for the evening's order list:
@@ -398,7 +405,7 @@ function renderPlan(ui) {
     return;
   }
   el.hidden = false;
-  if (p.slot >= 0 && s.shelf.slots[p.slot]) p.slot = firstEmpty(s);
+  if (p.slot >= 0 && (s.shelf.slots[p.slot] || bookedFor(s, p.slot))) p.slot = firstEmpty(s);
   const fresh = planFor(fromStart(s), o, p.adds, p.slot);
   if (!fresh) {
     p.adds = [];
@@ -420,17 +427,37 @@ function renderPlan(ui) {
     .map((x) => ({ slot: s.shelf.slots.indexOf(x.jar), plan: shelfPlan(s, o, x.jar) }))
     .sort((a, b) => Number(a.plan.fits) - Number(b.plan.fits));
   const swap = left <= 0 && keptPlans[0] && !keptPlans[0].plan.fits ? keptPlans[0] : null;
-  const plan = left <= 0 && keptPlans.length ? keptPlans[0].plan : (chosen?.plan ?? fresh);
+  // A jar booked for the morning shows as planned, with its own add-ins.
+  const bookedPlan = o.morning?.length
+    ? planFor(fromStart(s), o, o.morning[0].adds, o.morning[0].slot)
+    : null;
+  const plan =
+    left <= 0 && keptPlans.length
+      ? keptPlans[0].plan
+      : left <= 0 && bookedPlan
+        ? bookedPlan
+        : (chosen?.plan ?? fresh);
   const portion = o.kind === "bulk" ? "it" : "a portion";
 
-  const kept = jars.length
-    ? `<div class="have">${jars
-        .map(
-          (x) =>
-            `<button class="kept" data-act="board-unhold" data-slot="${s.shelf.slots.indexOf(x.jar)}">${jarSvg(x.jar, "mini")}<small>Let go</small></button>`,
-        )
-        .join("")}<small>${jars.length} of ${need} kept for ${o.name}</small></div>`
-    : "";
+  const booked = o.morning ?? [];
+  const kept =
+    jars.length || booked.length
+      ? `<div class="have">${jars
+          .map(
+            (x) =>
+              `<button class="kept" data-act="board-unhold" data-slot="${s.shelf.slots.indexOf(x.jar)}">${jarSvg(x.jar, "mini")}<small>Let go</small></button>`,
+          )
+          .join("")}${booked
+          .map(
+            () =>
+              `<button class="kept" data-act="board-unmorning">${emptyJarSvg}<small>Let go</small></button>`,
+          )
+          .join("")}<small>${
+          booked.length && !jars.length
+            ? `Starts in the morning for ${o.name}`
+            : `${jars.length + booked.length} of ${need} kept for ${o.name}${booked.length ? ` (${booked.length} in the morning)` : ""}`
+        }</small></div>`
+      : "";
   const optHtml = options.length
     ? `<div class="opts">${options
         .map(
@@ -452,7 +479,9 @@ function renderPlan(ui) {
     .map((j, i) =>
       j
         ? `<span class="spot full">${portionsHtml(s, j)}${jarSvg(j, "mini")}</span>`
-        : `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`,
+        : bookedFor(s, i)
+          ? `<span class="spot full"><span class="portions"><i class="held" title="For ${bookedFor(s, i).name} in the morning">${faceSvg(bookedFor(s, i).look, "wait")}</i></span>${emptyJarSvg}</span>`
+          : `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`,
     )
     .join("");
   const newJar = !offer && !unknown && left > 0 && p.src === "new";
@@ -468,10 +497,11 @@ function renderPlan(ui) {
     go = `<button class="main" data-act="board-hold" data-slot="${chosen.i}">Keep ${portion} for ${o.name}</button>`;
   else if (unknown)
     go = `<button class="main" data-act="board-hint" data-recipe="${o.recipe}">🧪 To the bench</button>`;
-  else if (evening) go = `<button class="main" disabled>Start it in the morning</button>`;
   else if (firstEmpty(s) < 0) go = `<button class="main" disabled>No room on the shelf</button>`;
   else if (missing.length)
     go = `<button class="main" disabled>Needs ${missing.map((a) => ingredientSvg(a) + " " + INGREDIENTS[a].name.toLowerCase()).join(", ")}</button>`;
+  else if (evening)
+    go = `<button class="main" data-act="board-morning" ${s.shop.coins < r.cost ? "disabled" : ""}>Start it in the morning<small>🪙 ${r.cost}</small></button>`;
   else
     go = `<button class="main" data-act="board-start" ${s.shop.coins < r.cost ? "disabled" : ""}>Start a jar<small>🪙 ${r.cost}</small></button>`;
 
@@ -575,6 +605,16 @@ export function boardAct(act, t, ui, dispatch, toast) {
         adds: p.adds,
       });
       if (events.some((e) => e.type === "startedForOrder")) next("Started!");
+    } else if (act === "board-morning") {
+      const events = dispatch({
+        type: "planMorning",
+        orderId: p.orderId,
+        slot: p.slot,
+        adds: p.adds,
+      });
+      if (events.some((e) => e.type === "plannedMorning")) next("It goes on first thing!");
+    } else if (act === "board-unmorning") {
+      dispatch({ type: "planMorning", orderId: p.orderId, slot: null });
     }
   }
   return true;
@@ -586,6 +626,8 @@ export function boardReact(e, toast) {
   else if (e.type === "hinted") toast(`${e.customer.name} asked for something new`);
   else if (e.type === "regularJoined" && REGULARS[e.regular].kind === "standing")
     toast(`${REGULARS[e.regular].name} will keep coming back. Look for the ticket on the board.`);
+  else if (e.type === "morningFailed")
+    toast(`Couldn't start ${e.order.name}'s jar this morning: ${e.why}`);
   else if (e.type === "delivered" && !e.done)
     toast(`${e.customer.got} of ${e.customer.qty} jars handed over`);
 }
