@@ -52,7 +52,7 @@ function statusHtml(o, st) {
       return `<b class="st bad">Needs ${jarWord}</b><small>🧪 Work it out at the bench</small>`;
     default:
       return `<b class="st bad">Needs ${jarWord}</b><small>${
-        st.shelf ? "A shelf jar would suit" : "Start one in the morning"
+        st.shelf ? "A shelf jar would suit" : "Start one tonight"
       }</small>`;
   }
 }

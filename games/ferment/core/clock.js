@@ -14,7 +14,7 @@
 import { OPEN_HOURS } from "../content/tuning.js";
 import { ageJars } from "./jars.js";
 import { firstArrival, leave, walkIns, wearPatience } from "./customers.js";
-import { missOverdue, newDay, orderArrivals, startMorning } from "./orders.js";
+import { missOverdue, newDay, orderArrivals } from "./orders.js";
 import { freshToday } from "./shop.js";
 import { openMarket } from "./market.js";
 
@@ -75,6 +75,5 @@ export function sleep(s, _action, events) {
   s.clock.phase = "morning";
   events.push({ type: "slept", day: s.clock.day, popped });
   newDay(s, events);
-  startMorning(s, events);
   openMarket(s, events);
 }
