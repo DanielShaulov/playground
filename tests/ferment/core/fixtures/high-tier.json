@@ -1,0 +1,304 @@
+{
+  "meta": {
+    "seed": 3,
+    "nextId": 602,
+    "rng": { "market": 1006907849, "customers": -957022218, "requests": -346761459 }
+  },
+  "clock": { "day": 22, "phase": "open", "hour": 9.00000000000013 },
+  "shop": {
+    "coins": 2125,
+    "rep": 10,
+    "today": {
+      "served": 14,
+      "earned": 320,
+      "tips": 38,
+      "repStart": 7,
+      "missed": 0,
+      "preorders": 1,
+      "left": 0
+    }
+  },
+  "shelf": {
+    "slots": [
+      {
+        "id": 591,
+        "recipe": "kimchi",
+        "age": 3.9999999999999885,
+        "servings": 3,
+        "size": 3,
+        "adds": ["salt"],
+        "pace": 0.75
+      },
+      {
+        "id": 564,
+        "recipe": "dill",
+        "age": 28.599999999999696,
+        "servings": 2,
+        "size": 3,
+        "adds": ["salt"]
+      },
+      {
+        "id": 574,
+        "recipe": "beets",
+        "age": 20.99999999999953,
+        "servings": 3,
+        "size": 3,
+        "adds": ["salt"]
+      },
+      {
+        "id": 522,
+        "recipe": "lemons",
+        "age": 56.99999999999885,
+        "servings": 3,
+        "size": 3,
+        "adds": ["salt"]
+      },
+      { "id": 534, "recipe": "lemons", "age": 53.59999999999904, "servings": 2, "size": 3 },
+      {
+        "id": 549,
+        "recipe": "hotsauce",
+        "age": 32.99999999999949,
+        "servings": 1,
+        "size": 3,
+        "adds": ["salt"]
+      },
+      { "id": 569, "recipe": "kimchi", "age": 26.399999999999586, "servings": 2, "size": 3 },
+      { "id": 575, "recipe": "beets", "age": 9.00000000000013, "servings": 3, "size": 3 },
+      null,
+      { "id": 550, "recipe": "dill", "age": 32.99999999999949, "servings": 3, "size": 3 },
+      {
+        "id": 491,
+        "recipe": "firekraut",
+        "age": 81.00000000000588,
+        "servings": 2,
+        "size": 3,
+        "adds": ["chili"]
+      },
+      {
+        "id": 576,
+        "recipe": "funkykimchi",
+        "age": 9.00000000000013,
+        "servings": 3,
+        "size": 3,
+        "adds": ["garlic", "chili"]
+      },
+      {
+        "id": 579,
+        "recipe": "pearkimchi",
+        "age": 8.750000000000144,
+        "servings": 3,
+        "size": 3,
+        "adds": ["pear"]
+      },
+      null,
+      {
+        "id": 562,
+        "recipe": "garlicdill",
+        "age": 30.249999999999645,
+        "servings": 1,
+        "size": 3,
+        "adds": ["garlic"]
+      }
+    ]
+  },
+  "customers": { "queue": [], "nextArrival": 10.081812390744455 },
+  "orders": {
+    "list": [
+      {
+        "id": 495,
+        "kind": "standing",
+        "name": "Lena",
+        "look": 818,
+        "recipe": "lemons",
+        "lo": 0.54,
+        "hi": 0.7,
+        "due": 23,
+        "arriveAt": 6.5,
+        "arrived": false,
+        "regular": "lena",
+        "jars": [522]
+      },
+      {
+        "id": 533,
+        "kind": "preorder",
+        "name": "Theo",
+        "look": 70,
+        "recipe": "lemons",
+        "lo": 0.7297700926846631,
+        "hi": 0.889770092684663,
+        "due": 23,
+        "arriveAt": 9,
+        "arrived": false,
+        "jars": [534]
+      },
+      {
+        "id": 536,
+        "kind": "standing",
+        "name": "Dr. Ames",
+        "look": 463,
+        "recipe": "beets",
+        "lo": 0.33999999999999997,
+        "hi": 0.5,
+        "due": 23,
+        "arriveAt": 4,
+        "arrived": false,
+        "regular": "ames",
+        "jars": [575]
+      },
+      {
+        "id": 555,
+        "kind": "preorder",
+        "name": "Mr. Lindqvist",
+        "look": 184,
+        "recipe": "lemons",
+        "lo": 0.4903737067433466,
+        "hi": 0.6503737067433466,
+        "due": 23,
+        "arriveAt": 7.80587584736128,
+        "arrived": false,
+        "jars": [522]
+      },
+      {
+        "id": 568,
+        "kind": "preorder",
+        "name": "Ezra",
+        "look": 857,
+        "recipe": "kimchi",
+        "lo": 0.4625210128910056,
+        "hi": 0.6225210128910056,
+        "due": 23,
+        "arriveAt": 0.5,
+        "arrived": false,
+        "jars": [569]
+      },
+      {
+        "id": 578,
+        "kind": "preorder",
+        "name": "Ama",
+        "look": 399,
+        "recipe": "pearkimchi",
+        "lo": 0.5391988091109204,
+        "hi": 0.6991988091109204,
+        "due": 24,
+        "arriveAt": 0.5,
+        "arrived": false,
+        "jars": [579]
+      },
+      {
+        "id": 584,
+        "kind": "standing",
+        "name": "Mrs. Okafor",
+        "look": 212,
+        "recipe": "dill",
+        "lo": 0.16999999999999998,
+        "hi": 0.33,
+        "due": 24,
+        "arriveAt": 1.5,
+        "arrived": false,
+        "regular": "okafor"
+      },
+      {
+        "id": 590,
+        "kind": "standing",
+        "name": "Kenji",
+        "look": 905,
+        "recipe": "kimchi",
+        "lo": 0.44,
+        "hi": 0.6,
+        "due": 25,
+        "arriveAt": 5,
+        "arrived": false,
+        "regular": "kenji",
+        "jars": [591]
+      },
+      {
+        "id": 597,
+        "kind": "standing",
+        "name": "Noor",
+        "look": 58,
+        "recipe": "hotsauce",
+        "lo": 0.52,
+        "hi": 0.6799999999999999,
+        "due": 25,
+        "arriveAt": 7.5,
+        "arrived": false,
+        "regular": "noor"
+      },
+      {
+        "id": 601,
+        "kind": "standing",
+        "name": "Old Bram",
+        "look": 640,
+        "recipe": "kraut",
+        "lo": 0.6000000000000001,
+        "hi": 0.76,
+        "due": 26,
+        "arriveAt": 9,
+        "arrived": false,
+        "regular": "bram"
+      }
+    ],
+    "offers": [],
+    "asked": []
+  },
+  "bench": {
+    "known": ["garlicdill", "honeyhot", "pearkimchi", "funkykimchi", "firekraut"],
+    "hints": [],
+    "tried": {
+      "dill": ["salt", "garlic", "honey", "chili"],
+      "hotsauce": ["honey", "salt"],
+      "kimchi": ["pear", "garlic", "chili", "honey", "salt"],
+      "kraut": ["chili", "salt"],
+      "lemons": ["salt"],
+      "beets": ["salt"]
+    }
+  },
+  "pantry": { "stock": { "salt": 2, "chili": 2, "garlic": 2, "pear": 2, "honey": 3 } },
+  "regulars": {
+    "met": {
+      "okafor": { "since": 3, "visits": 10, "happy": 6, "missed": 0 },
+      "noodlebar": { "since": 4, "visits": 0, "happy": 0, "missed": 0 },
+      "kenji": { "since": 8, "visits": 5, "happy": 5, "missed": 0 },
+      "bram": { "since": 6, "visits": 4, "happy": 4, "missed": 0 },
+      "noor": { "since": 6, "visits": 6, "happy": 6, "missed": 0 },
+      "tacotruck": { "since": 8, "visits": 0, "happy": 0, "missed": 0 },
+      "ames": { "since": 11, "visits": 4, "happy": 4, "missed": 0 },
+      "lena": { "since": 16, "visits": 1, "happy": 1, "missed": 0 }
+    }
+  },
+  "progress": {
+    "upgrades": { "shelf": 2, "bigjars": 1 },
+    "crocks": { "0": "cool" },
+    "tier": 5,
+    "goal": 10,
+    "stats": { "served": 182, "earned": 4509, "delight": 152, "bestDay": 350, "orders": 103 }
+  },
+  "market": {
+    "day": 22,
+    "items": {
+      "salt": { "price": 2, "left": 7 },
+      "chili": { "price": 3, "left": 5 },
+      "pear": { "price": 2, "left": 3 },
+      "garlic": { "price": 2, "left": 9 },
+      "oak": { "price": 2, "left": 3 },
+      "whey": { "price": 5, "left": 1 }
+    },
+    "drift": {
+      "salt": 0.94,
+      "chili": 1.113,
+      "honey": 0.88,
+      "pear": 0.7,
+      "garlic": 1.137,
+      "oak": 1.048,
+      "whey": 0.841
+    }
+  },
+  "tutorial": {
+    "on": true,
+    "intro": false,
+    "now": null,
+    "done": ["gift", "serve", "keep", "tier", "regular", "market", "brew", "bench"],
+    "tries": { "brew": 3, "market": 3, "regular": 1, "bench": 3 },
+    "script": 3
+  }
+}

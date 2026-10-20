@@ -1,0 +1,170 @@
+{
+  "meta": {
+    "seed": 3,
+    "nextId": 76,
+    "rng": { "market": 1420860231, "customers": 353021628, "requests": -196150165 }
+  },
+  "clock": { "day": 3, "phase": "evening", "hour": 12 },
+  "shop": {
+    "coins": 304,
+    "rep": 10,
+    "today": {
+      "served": 9,
+      "earned": 194,
+      "tips": 21,
+      "repStart": 8,
+      "missed": 0,
+      "preorders": 4,
+      "left": 0
+    }
+  },
+  "shelf": {
+    "slots": [
+      {
+        "id": 58,
+        "recipe": "dill",
+        "age": 10.60000000000008,
+        "servings": 2,
+        "size": 2,
+        "adds": ["salt"],
+        "pace": 0.75
+      },
+      { "id": 48, "recipe": "hotsauce", "age": 27.899999999999388, "servings": 1, "size": 2 },
+      null,
+      {
+        "id": 62,
+        "recipe": "pearkimchi",
+        "age": 8.700000000000188,
+        "servings": 1,
+        "size": 2,
+        "adds": ["pear"]
+      },
+      { "id": 5, "recipe": "kimchi", "age": 59.99999999999872, "servings": 1, "size": 2 },
+      { "id": 6, "recipe": "kimchi", "age": 59.99999999999872, "servings": 2, "size": 2 },
+      { "id": 35, "recipe": "kimchi", "age": 33.4999999999995, "servings": 1, "size": 2 },
+      null,
+      {
+        "id": 66,
+        "recipe": "garlicdill",
+        "age": 6.450000000000151,
+        "servings": 2,
+        "size": 2,
+        "adds": ["garlic", "honey"]
+      }
+    ]
+  },
+  "customers": { "queue": [], "nextArrival": 11.844632726719139 },
+  "orders": {
+    "list": [
+      {
+        "id": 34,
+        "kind": "preorder",
+        "name": "Felix",
+        "look": 887,
+        "recipe": "kimchi",
+        "lo": 0.5046634851093815,
+        "hi": 0.6646634851093814,
+        "due": 4,
+        "arriveAt": 0.5,
+        "arrived": false,
+        "jars": [35]
+      },
+      {
+        "id": 57,
+        "kind": "standing",
+        "name": "Mrs. Okafor",
+        "look": 212,
+        "recipe": "dill",
+        "lo": 0.16999999999999998,
+        "hi": 0.33,
+        "due": 4,
+        "arriveAt": 0.5,
+        "arrived": false,
+        "regular": "okafor",
+        "jars": [58]
+      },
+      {
+        "id": 61,
+        "kind": "preorder",
+        "name": "Marisol",
+        "look": 788,
+        "recipe": "pearkimchi",
+        "lo": 0.3329398857297414,
+        "hi": 0.49293988572974146,
+        "due": 4,
+        "arriveAt": 9,
+        "arrived": false,
+        "jars": [62]
+      },
+      {
+        "id": 65,
+        "kind": "preorder",
+        "name": "Rosa",
+        "look": 580,
+        "recipe": "garlicdill",
+        "lo": 0.5966444341262142,
+        "hi": 0.7566444341262141,
+        "due": 4,
+        "arriveAt": 9,
+        "arrived": false,
+        "jars": [66]
+      },
+      {
+        "id": 74,
+        "kind": "preorder",
+        "name": "Wren",
+        "look": 283,
+        "recipe": "dill",
+        "lo": 0.2148714480901454,
+        "hi": 0.37487144809014544,
+        "due": 4,
+        "arriveAt": 0.5,
+        "arrived": false,
+        "jars": [58]
+      }
+    ],
+    "offers": [],
+    "asked": [{ "recipe": "funkykimchi", "name": "Mr. Lindqvist", "look": 537, "day": 3 }]
+  },
+  "bench": {
+    "known": ["garlicdill", "honeyhot", "pearkimchi"],
+    "hints": ["firekraut", "funkykimchi"],
+    "tried": { "dill": ["salt", "garlic", "honey"], "hotsauce": ["honey"], "kimchi": ["pear"] }
+  },
+  "pantry": { "stock": { "salt": 2, "chili": 3, "garlic": 2, "pear": 2, "honey": 2 } },
+  "regulars": { "met": { "okafor": { "since": 3, "visits": 0, "happy": 0, "missed": 0 } } },
+  "progress": {
+    "upgrades": {},
+    "crocks": { "0": "cool" },
+    "tier": 1,
+    "goal": 4,
+    "stats": { "served": 20, "earned": 395, "delight": 17, "bestDay": 194, "orders": 10 }
+  },
+  "market": {
+    "day": 3,
+    "items": {
+      "salt": { "price": 1, "left": 5 },
+      "chili": { "price": 3, "left": 7 },
+      "pear": { "price": 3, "left": 6 },
+      "garlic": { "price": 2, "left": 7 },
+      "oak": { "price": 2, "left": 2 }
+    },
+    "drift": {
+      "salt": 0.72,
+      "chili": 1.083,
+      "honey": 0.903,
+      "pear": 0.927,
+      "garlic": 1.037,
+      "oak": 1.016,
+      "whey": 0.995
+    }
+  },
+  "tutorial": {
+    "on": true,
+    "intro": false,
+    "now": { "id": "market", "beat": 0 },
+    "done": ["gift", "serve", "keep", "tier", "regular"],
+    "tries": { "brew": 2, "market": 2, "regular": 1 },
+    "script": 3
+  }
+}

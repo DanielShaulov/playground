@@ -114,7 +114,10 @@ export async function run(page, snap) {
        lo: 0.3, hi: 0.5, due: s.clock.day + 1, arriveAt: 4, arrived: false })`,
   );
   await page.evaluate(() => window.__ferment.dispatch({ type: "hold", orderId: 950, slot: 0 }));
-  await page.waitForTimeout(80);
+  // The stamp waits for the next render, which a busy runner can put off past a fixed wait.
+  await page
+    .waitForFunction(() => window.__seen.includes("i.held"), null, { timeout: 2000 })
+    .catch(() => {});
   assert.ok((await moved()).includes("i.held"), "the kept chip is stamped");
   assert.ok((await seen("fx-ring")) >= 1);
   await snap("3-stamp");

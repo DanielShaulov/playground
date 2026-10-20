@@ -33,7 +33,9 @@ a bug gets reproduced without a person.
 - **State slices.** Each system owns one part of the save (`shelf`, `bench`,
   `orders`, `market`, `progress`) with its own defaults. Loading fills in any
   missing slice, so parallel PRs never fight over a save version number.
-  Until release a save that can't be read simply starts a fresh game.
+  Since the release, saves are kept: the release fixtures must always load,
+  keep every saved field and play on. Renaming an id that a save stores (a
+  recipe, a regular, an upgrade) breaks them; migrate in `loadSave()` instead.
 - **Content as data.** Recipes, ingredients, regulars and upgrades are rows in
   `content/`. Adding a recipe is adding a row, not touching logic.
 - **DOM and inline SVG, not canvas.** The game is jars, panels and buttons:
@@ -140,6 +142,8 @@ The browser test hook is `window.__ferment`: `state` (get or set),
 | Replay goldens        | Anything that changed how a recorded game plays out (`UPDATE_GOLDENS=1` regenerates)  | `tests/ferment/core/`    |
 | Invariant fuzzing     | Impossible states: negative coins, a jar in two slots, a save that doesn't round-trip | `tests/ferment/core/`    |
 | Purity check          | `Math.random`, `Date` or DOM inside the core                                          | `tests/ferment/core/`    |
+| Release saves         | A build that can't load, or changes, a save players already have                      | `tests/ferment/core/`    |
 | Balance sim           | The game got too easy or too hard (Milestone 3)                                       | `tests/ferment/sim/`     |
 | Phone flows + gallery | The real screen breaks or overflows on a small or large phone                         | `tests/ferment/browser/` |
+| Offline + phone speed | The installed game fails offline; a tap is slow on a slowed-down phone                | `tests/ferment/browser/` |
 | Type check            | A wrong field name across modules                                                     | `npm run typecheck`      |
