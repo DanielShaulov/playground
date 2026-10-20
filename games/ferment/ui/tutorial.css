@@ -1,0 +1,210 @@
+/* Onboarding: the intro scene (ui/intro.js) and the keeper's notes (ui/tutorial.js). */
+
+/* --- the keeper's notes: above the motion layer (40), under the intro (60) --- */
+.tips {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+}
+.tip-ring {
+  position: fixed;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 3px rgba(255, 211, 107, 0.95),
+    0 0 0 9999px rgba(40, 26, 14, 0.18);
+  pointer-events: none;
+  transition:
+    left 0.2s,
+    top 0.2s,
+    width 0.2s,
+    height 0.2s;
+  animation: tip-glow 1.8s ease-in-out infinite;
+}
+@keyframes tip-glow {
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(255, 211, 107, 0.6),
+      0 0 0 9999px rgba(40, 26, 14, 0.18);
+  }
+}
+.tip-note {
+  position: fixed;
+  pointer-events: auto;
+  background: #fbf3e2;
+  background-image: repeating-linear-gradient(
+    transparent 0 21px,
+    rgba(160, 120, 80, 0.12) 21px 22px
+  );
+  border: 1px solid #e1cfae;
+  border-radius: 6px 6px 6px 14px;
+  box-shadow: 0 6px 18px rgba(60, 40, 20, 0.28);
+  padding: 10px 12px 8px;
+  color: var(--fg);
+  transform: rotate(-0.6deg);
+}
+.tip-note p {
+  margin: 0 0 6px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.tip-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tip-foot .sign {
+  font-family: Georgia, serif;
+  font-style: italic;
+  color: var(--fg-dim);
+  font-size: 13px;
+  margin-right: auto;
+}
+.tip-foot button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
+  padding: 0 12px;
+}
+.tip-skip {
+  background: none;
+  color: var(--fg-dim);
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+.tip-ok {
+  background: var(--go);
+  color: #fff;
+  box-shadow: 0 2px 0 var(--go-dark);
+}
+.tip-arrow {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  background: #fbf3e2;
+  border: 1px solid #e1cfae;
+  transform: rotate(45deg);
+}
+.tip-note.below .tip-arrow {
+  top: -8px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.tip-note.above .tip-arrow {
+  bottom: -8px;
+  border-left: 0;
+  border-top: 0;
+}
+.tip-note.free .tip-arrow {
+  display: none;
+}
+
+/* --- the intro scene: over everything --- */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  background: radial-gradient(120% 90% at 50% 30%, #3b2c20, #1e1610);
+  color: #f3e6c4;
+}
+.intro[hidden] {
+  display: none;
+}
+.intro-card {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  animation: intro-in 0.5s ease-out;
+}
+@keyframes intro-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.intro-pic {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 6px solid #6d4a2e;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: #6d4a2e;
+}
+.intro-art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.intro-text {
+  margin: 18px 4px 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 19px;
+  line-height: 1.45;
+  min-height: 5.8em;
+}
+.intro-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 6px;
+}
+.intro-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(243, 230, 196, 0.3);
+}
+.intro-dots i.on {
+  background: #f3e6c4;
+}
+.intro-btns {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+.intro-btns button {
+  min-height: 52px;
+  border-radius: 14px;
+  border: 0;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+}
+.intro-btns .main {
+  flex: 1;
+  background: var(--go);
+  color: #fff;
+  box-shadow: 0 3px 0 var(--go-dark);
+}
+.intro-skip {
+  flex: 0 0 auto;
+  padding: 0 18px;
+  background: rgba(243, 230, 196, 0.12);
+  color: #f3e6c4;
+}
+@media (max-height: 600px) {
+  .intro-text {
+    font-size: 16px;
+    margin-top: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-card,
+  .tip-ring {
+    animation: none;
+    transition: none;
+  }
+}

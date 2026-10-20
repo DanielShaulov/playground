@@ -338,6 +338,14 @@
         "oak": 1.124,
         "whey": 0.99
       }
+    },
+    "tutorial": {
+      "on": false,
+      "intro": false,
+      "now": null,
+      "done": [],
+      "tries": {},
+      "script": 0
     }
   }
 }

@@ -11,11 +11,12 @@
 
 import { RECIPES, VARIANT_IDS } from "../content/recipes.js";
 import { START_PANTRY } from "../content/ingredients.js";
-import { SLOTS, START_COINS, START_REP, START_SHELF } from "../content/tuning.js";
+import { SLOTS, START_COINS, START_REP, START_SHELF, START_GIFT } from "../content/tuning.js";
 import { makeJar, validAdds } from "./jars.js";
 import { freshToday } from "./shop.js";
 import { freshProgress, slotCount } from "./progress.js";
 import { openMarket } from "./market.js";
+import { freshTutorial } from "./tutorial.js";
 
 /** @typedef {import("./types.js").State} State */
 
@@ -32,6 +33,7 @@ export const SLICES = {
   regulars: () => ({ met: {} }),
   progress: freshProgress,
   market: () => ({ day: 0, items: {}, drift: {} }),
+  tutorial: () => freshTutorial(),
 };
 
 /** @returns {State} */
@@ -41,11 +43,17 @@ function defaults() {
   return s;
 }
 
-/** A new shop on day 1, with a shelf already in progress so there's something to sell. */
-export function newGame(seed = 1) {
+/**
+ * A new shop on day 1, with a shelf already in progress so there's something to sell.
+ * `tutorial`: the player's start instead (core/tutorial.js): the intro scene and
+ * the first days' notes, and an empty shelf but for the old keeper's parting jars.
+ * Without it (the bots, goldens and tests) the shelf starts as START_SHELF.
+ */
+export function newGame(seed = 1, { tutorial = false } = {}) {
   const s = defaults();
   s.meta.seed = seed | 0;
-  for (const [slot, recipe, f] of START_SHELF) {
+  if (tutorial) s.tutorial = freshTutorial(true);
+  for (const [slot, recipe, f] of tutorial ? START_GIFT : START_SHELF) {
     s.shelf.slots[slot] = makeJar(s, recipe, f * RECIPES[recipe].hours);
   }
   openMarket(s);
