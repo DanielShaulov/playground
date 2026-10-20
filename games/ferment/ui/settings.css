@@ -1,0 +1,179 @@
+/* Settings sheet (ui/settings.js), plus what the motion and strip settings change everywhere. */
+
+/* Above the bench (30), under the motion layer (40). */
+.sheet.settings {
+  z-index: 35;
+}
+.settings h3 {
+  margin: 18px 0 6px;
+  font-size: 17px;
+}
+.settings p b {
+  color: var(--fg);
+}
+.settings p a {
+  color: var(--go-dark);
+  font-weight: 700;
+}
+.set-row {
+  display: flex;
+  flex-wrap: wrap; /* on a narrow phone the choices drop under their label */
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+  min-height: 52px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+  font-weight: 800;
+  font-size: 15px;
+}
+.seg {
+  display: flex;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 2px;
+  flex: none;
+  margin-left: auto;
+}
+.seg button {
+  appearance: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--fg-dim);
+  background: none;
+  border: 0;
+  border-radius: 9px;
+  min-height: 40px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.seg button[aria-pressed="true"] {
+  background: var(--fg);
+  color: var(--bg);
+}
+.set-preview {
+  padding: 18px 6px 4px;
+}
+.set-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+.set-list button {
+  appearance: none;
+  font: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  text-align: left;
+  color: var(--fg);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  min-height: 50px;
+  padding: 0 14px;
+}
+.set-list button.warn,
+.sheet .btns button.warn {
+  color: #9e4936;
+}
+.sheet .btns button.main.warn {
+  background: #c0604a;
+  border-color: #9e4936;
+  color: #fff;
+}
+.settings textarea.code {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  font:
+    600 12px/1.35 ui-monospace,
+    Menlo,
+    monospace;
+  color: var(--fg);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  resize: none;
+  word-break: break-all;
+}
+.settings textarea.paste {
+  font-size: 16px; /* under 16px iOS zooms the page on focus */
+}
+.set-error {
+  color: #b5442e !important;
+  font-weight: 700;
+  margin: 6px 0 0 !important;
+}
+
+/* --- Motion: Calm stops every CSS animation too; Full shows motion even if the phone asks for less. --- */
+html[data-motion="calm"] *,
+html[data-motion="calm"] *::before,
+html[data-motion="calm"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+html[data-motion="calm"] .fx-layer {
+  display: none;
+}
+html[data-motion="full"] .fx-layer {
+  display: block;
+}
+
+/* --- Flavour strip, Patterns style: four textured bands with notches between them. ---
+   Light to dark from crisp to funky, so the bands part even in grey. */
+.strip {
+  isolation: isolate;
+}
+.strip .band {
+  display: none;
+}
+html[data-strip="marked"] .strip {
+  background: none;
+}
+html[data-strip="marked"] .strip .band {
+  display: block;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: -1;
+}
+html[data-strip="marked"] .strip .band.crisp {
+  background: #c4e6ad;
+  border-radius: inherit;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+html[data-strip="marked"] .strip .band.tangy {
+  background:
+    radial-gradient(circle, rgba(90, 55, 0, 0.75) 0 1.1px, transparent 1.5px) 0 0 / 4px 4px,
+    #f2b84b;
+}
+html[data-strip="marked"] .strip .band.sour {
+  background:
+    repeating-linear-gradient(-45deg, rgba(70, 20, 0, 0.45) 0 1.5px, transparent 1.5px 4px), #e2683f;
+}
+html[data-strip="marked"] .strip .band.funky {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px 4px), #4f2a6e;
+  border-radius: inherit;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+/* A notch at each border: a cream gap through the strip with a dark tick above and below. */
+html[data-strip="marked"] .strip .band:not(.crisp) {
+  border-left: 2px solid var(--bg);
+}
+html[data-strip="marked"] .strip .band:not(.crisp)::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: linear-gradient(var(--fg) 0 3px, transparent 3px calc(100% - 3px), var(--fg) 0);
+}

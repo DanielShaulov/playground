@@ -12,7 +12,7 @@
  * fixed steps) · shop.js (coins, rep, shelf actions) · customers.js (walk-ins)
  * · orders.js (orders, regulars, planFor) · jars.js (flavour, add-in maths)
  * · bench.js (pantry, experiments, discovery, recipe card) · market.js (stalls, buy)
- * · progress.js (upgrades, tiers, goals) · rng.js (named random streams).
+ * · progress.js (upgrades, tiers, goals) · rng.js (named random streams) · save.js (backup codes).
  */
 
 export { newGame, loadSave, SLICES } from "./state.js";
@@ -34,3 +34,4 @@ export {
   measure,
 } from "./progress.js";
 export { marketToday, priceAt } from "./market.js";
+export { saveCode, readCode } from "./save.js";

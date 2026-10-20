@@ -24,6 +24,7 @@ import { mountEvening, renderEvening, openEvening, eveningAct, eveningReact } fr
 import { audioReact } from "./audio.js";
 import { toast } from "./dom.js";
 import { fxReact } from "./fx.js";
+import { mountSettings, renderSettings, settingsAct } from "./settings.js";
 import { lower, LINES } from "./text.js";
 
 const store = createStore("ferment");
@@ -37,6 +38,7 @@ const ui = {
   sheet: null, // { kind: "brew", slot }
   evening: null, // the evening screen when open (ui/evening.js)
   bench: null, // the brewing bench when open (ui/bench.js)
+  settings: null, // the settings sheet when open (ui/settings.js)
 };
 
 function save() {
@@ -47,7 +49,13 @@ const els = mountShop(document.body);
 document.title = "The Brine Nook · Playground";
 const bench = mountBench(els.root);
 const evening = mountEvening(els.root);
-const render = () => (renderShop(els, ui), renderEvening(evening, ui), renderBench(bench, ui));
+const settings = mountSettings(els.root);
+const render = () => (
+  renderShop(els, ui),
+  renderEvening(evening, ui),
+  renderBench(bench, ui),
+  renderSettings(settings, ui)
+);
 
 function depart(customer, mood, line, extra = {}) {
   ui.departing = { customer, mood, line, until: performance.now() + 1500, ...extra };
@@ -108,6 +116,20 @@ function react(e) {
   }
 }
 
+/** Swap in a whole other shop (a loaded code, a fresh start), dropping any open screen. */
+function replace(s) {
+  ui.s = s;
+  ui.selected = null;
+  ui.departing = null;
+  ui.bench = null;
+  ui.sheet = null;
+  ui.evening = null;
+  if (ui.s.clock.phase === "evening") openEvening(ui);
+  save();
+  render();
+}
+const restart = () => replace(C.newGame(freshSeed()));
+
 // ---------- input ----------
 
 els.root.addEventListener("click", (e) => {
@@ -116,12 +138,15 @@ els.root.addEventListener("click", (e) => {
   );
   if (!t) {
     if (e.target === els.sheet && ui.sheet?.kind === "brew") ui.sheet = null;
+    if (e.target === settings) ui.settings = null;
     render();
     return;
   }
   const act = t.dataset.act;
   const s = ui.s;
-  if (benchAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
+  if (settingsAct(act, t, ui, (text) => toast(els.toasts, text), { replace, restart })) {
+    // handled by the settings sheet
+  } else if (benchAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
     // handled by the bench
   } else if (boardAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
     // handled by the board
@@ -151,10 +176,7 @@ els.root.addEventListener("click", (e) => {
   } else if (act === "close") {
     dispatch({ type: "close" });
   } else if (act === "restart") {
-    if (confirm("Start a fresh shop? This day and your jars are lost.")) {
-      ui.s = C.newGame(freshSeed());
-      ui.selected = null;
-    }
+    if (confirm("Start a fresh shop? This day and your jars are lost.")) restart();
   }
   save();
   render();
@@ -170,7 +192,7 @@ let saveT = 0;
 function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
-  if (ui.s.clock.phase === "open") {
+  if (ui.s.clock.phase === "open" && !ui.settings) {
     pending += dt / HOUR_SECONDS;
     const n = Math.floor(pending * C.STEPS_PER_HOUR);
     if (n > 0) {
@@ -208,13 +230,7 @@ requestAnimationFrame(frame);
     return ui.s;
   },
   set state(v) {
-    ui.s = C.loadSave(v) ?? C.newGame(freshSeed());
-    ui.selected = null;
-    ui.bench = null;
-    ui.sheet = null;
-    ui.evening = null;
-    if (ui.s.clock.phase === "evening") openEvening(ui);
-    render();
+    replace(C.loadSave(v) ?? C.newGame(freshSeed()));
   },
   dispatch(action) {
     const events = dispatch(action);
