@@ -529,3 +529,8 @@
 .plan .spot .portions i.held svg {
   height: auto;
 }
+
+/* The planner also opens from the evening's orders, so it sits above the evening (25). */
+.sheet.plan {
+  z-index: 27;
+}

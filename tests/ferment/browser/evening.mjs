@@ -23,7 +23,7 @@ export async function run(page, snap) {
   await snap("1-till");
 
   // Back to the shop (its order board), and back again.
-  await page.locator('.evening .actions [data-act="eve-close"]').tap();
+  await page.locator('.evening .top [data-act="eve-close"]').tap();
   assert.ok(await page.locator(".evening").isHidden());
   await page.locator('.actions [data-act="evening"]').tap();
   await page.locator(".evening .receipt").waitFor();
@@ -94,7 +94,7 @@ export async function run(page, snap) {
   await page.locator('.bench [data-act="evening"][data-tab="market"]').tap();
   assert.ok(await page.locator(".bench").isHidden());
   await page.locator(".evening .crates").waitFor();
-  await page.locator('.evening .actions [data-act="eve-close"]').tap();
+  await page.locator('.evening .top [data-act="eve-close"]').tap();
   assert.equal(await page.locator(".shelf .slot").count(), after.shelf.slots.length);
   await page.locator(".slot.crock-cool").waitFor();
   await snap("6-shelf");

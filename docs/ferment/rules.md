@@ -267,6 +267,19 @@ decisions **(Hadash)**, not just layout:
   planner offers no new jar for it. It says we don't know how to make it yet
   and the main button goes to the bench. Once discovered it plans like any
   other order.
+- **Pre-order goes straight to the planner** **(Hadash)**: taking a walk-in's
+  pre-order opens the planner on their new order, so the jar that will serve
+  them is picked right away. "Not now" leaves it on the board. The shop's
+  clock waits while the planner is open.
+- **Orders at night are their own list** **(Hadash)**, not the shop with the
+  board on top: the evening's Orders tab (`ui/orders.js`) shows every order
+  still to collect, under "Needs handling" (no jar kept or started yet, a
+  recipe still to work out at the bench, or a kept jar that won't suit by
+  pickup) and "Reserved" (every jar it needs is kept and will suit). Each card
+  has the face, recipe, pickup time, the window on the strip with kept jars'
+  marks, and what to do next; tapping it opens the planner over the evening.
+  The tab carries a dot while anything needs handling, and the till's
+  "Tonight" note links to it.
 - **Regulars' planner** explains the rhythm ("comes in every other day for
   crisp dill pickles") and shows past visits as dots (delighted, fine,
   missed), because "regular" was otherwise unexplained.

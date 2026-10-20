@@ -19,7 +19,7 @@ import { HOUR_SECONDS } from "../content/tuning.js";
 import { createStore } from "../../../shared/storage.js";
 import { mountShop, renderShop } from "./shop.js";
 import { mountBench, renderBench, benchAct } from "./bench.js";
-import { boardAct, boardReact } from "./board.js";
+import { boardAct, boardReact, openPlan } from "./board.js";
 import { mountEvening, renderEvening, openEvening, eveningAct, eveningReact } from "./evening.js";
 import { audioReact } from "./audio.js";
 import { toast } from "./dom.js";
@@ -95,6 +95,8 @@ function react(e) {
       break;
     case "preordered":
       depart(e.customer, "ok", `“Lovely. I'll be back on day ${e.order.due}.”`);
+      // Straight to picking the jar that will serve them.
+      openPlan(ui, e.order.id);
       break;
     case "brewed":
       ui.sheet = null;
@@ -192,7 +194,8 @@ let saveT = 0;
 function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
-  if (ui.s.clock.phase === "open" && !ui.settings) {
+  // Settings and the planner pause the shop, so nothing moves under the thumb.
+  if (ui.s.clock.phase === "open" && !ui.settings && !ui.plan) {
     pending += dt / HOUR_SECONDS;
     const n = Math.floor(pending * C.STEPS_PER_HOUR);
     if (n > 0) {
