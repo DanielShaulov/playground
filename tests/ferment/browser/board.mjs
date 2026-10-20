@@ -4,7 +4,8 @@
 // where core planFor says, and salt must move it), starts it, and checks the
 // ticket then shows that jar, with Sam's portion kept back from walk-ins; then
 // lets it go and keeps it again from the planner's list of shelf jars. An off-menu request
-// opens the bench. Depends on
+// opens the bench. After closing, a jar is booked for an order and starts on
+// waking. Depends on
 // window.__ferment and the data-act / data-order / data-ingredient attributes
 // of the board's buttons.
 import assert from "node:assert/strict";
@@ -279,6 +280,53 @@ export async function run(page, snap) {
   await page.locator('.ticket.hint[data-recipe="pearkimchi"]').tap();
   await page.locator('.bench .base.on[data-recipe="kimchi"]').waitFor();
   await page.locator('.bench .actions [data-act="bench-close"]').tap();
+
+  // After closing, a new jar for an order is booked for the morning and goes
+  // on when you wake (it used to be a dead "Start it in the morning" button).
+  await page.evaluate(() => {
+    const s = structuredClone(window.__ferment.state);
+    s.clock.phase = "evening";
+    s.shop.coins = 500;
+    s.orders.list.push({
+      id: 906,
+      kind: "preorder",
+      name: "Wren",
+      look: 60,
+      recipe: "kimchi",
+      lo: 0.5,
+      hi: 0.66,
+      due: s.clock.day + 2,
+      arriveAt: 2.67,
+      arrived: false,
+    });
+    window.__ferment.state = s;
+  });
+  // At night the order is opened from the evening's Orders tab.
+  await page.locator('.evening .tab[data-tab="orders"]').tap();
+  await page.locator('.evening .ocard[data-order="906"]').tap();
+  const fresh = page.locator('.plan .opt[data-src="new"]');
+  if (await fresh.count()) await fresh.tap();
+  s = await state();
+  const free = s.shelf.slots.findIndex((j) => !j);
+  await page.locator(`.plan .spot[data-slot="${free}"]`).tap();
+  const morningBtn = page.locator('.plan .btns [data-act="board-morning"]');
+  assert.match(await morningBtn.innerText(), /Start it in the morning/);
+  assert.ok(await morningBtn.isEnabled(), "the morning button does something");
+  await morningBtn.tap();
+  s = await state();
+  assert.deepEqual(s.orders.list.find((o) => o.id === 906).morning, [{ slot: free, adds: [] }]);
+  assert.equal(s.shelf.slots[free], null, "nothing starts while closed");
+  assert.ok(await page.locator(".plan").isHidden(), "booked, the planner closes");
+  await page.locator('.evening .ocard[data-order="906"]').tap();
+  assert.match(await page.locator(".plan .have").innerText(), /Starts in the morning for Wren/);
+  assert.match(await page.locator(".plan .btns .main").innerText(), /All set/);
+  await snap("8-booked-for-morning");
+  await page.locator('.plan .btns .main[data-act="board-close"]').tap();
+  await page.evaluate(() => window.__ferment.dispatch({ type: "sleep" }));
+  s = await state();
+  const woke = s.shelf.slots[free];
+  assert.equal(woke?.recipe, "kimchi", "the booked jar is on the shelf in the morning");
+  assert.deepEqual(s.orders.list.find((o) => o.id === 906).jars, [woke.id]);
 
   return `marker ${plain.f.toFixed(2)} → ${salted.f.toFixed(2)} with salt; bulk tip: ${v.split("\n").pop()}`;
 }

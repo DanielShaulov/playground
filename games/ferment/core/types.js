@@ -40,10 +40,12 @@
  * @typedef {{
  *   id: number, kind: OrderKind, name: string, look: number, recipe: string,
  *   lo: number, hi: number, due: number, arriveAt: number, arrived: boolean,
- *   regular?: string, qty?: number, got?: number, jars?: number[]
+ *   regular?: string, qty?: number, got?: number, jars?: number[],
+ *   morning?: { slot: number, adds: string[] }[]
  * }} Order
  *   due is a day, arriveAt hours since opening that day. regular: id in content/regulars.js.
  *   qty/got: whole jars wanted and handed over (bulk only). jars: ids of jars started for it.
+ *   morning: jars booked after closing to start for it next morning (planMorning).
  *
  * @typedef {{ served: number, earned: number, tips: number, repStart: number, missed: number, preorders: number, left: number }} Today
  *
