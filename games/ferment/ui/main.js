@@ -40,7 +40,7 @@ const ui = {
   s: C.loadSave(store.get("save")) ?? freshGame(),
   selected: null, // shelf slot index
   departing: null, // { customer, mood, line, pay, f, until }
-  sheet: null, // { kind: "brew", slot }
+  sheet: null, // { kind: "brew" | "tip", slot }
   evening: null, // the evening screen when open (ui/evening.js)
   bench: null, // the brewing bench when open (ui/bench.js)
   settings: null, // the settings sheet when open (ui/settings.js)
@@ -118,6 +118,9 @@ function react(e) {
       ui.sheet = null;
       break;
     case "tippedOut":
+      ui.sheet = null;
+      ui.selected = null;
+      break;
     case "opened":
       ui.selected = null;
       break;
@@ -155,7 +158,7 @@ els.root.addEventListener("click", (e) => {
     /** @type {HTMLElement} */ (e.target).closest("[data-act]")
   );
   if (!t) {
-    if (e.target === els.sheet && ui.sheet?.kind === "brew") ui.sheet = null;
+    if (e.target === els.sheet && ui.sheet) ui.sheet = null;
     if (e.target === settings) ui.settings = null;
     render();
     return;
@@ -191,8 +194,10 @@ els.root.addEventListener("click", (e) => {
     dispatch({ type: "preorder" });
   } else if (act === "away") {
     dispatch({ type: "sendAway" });
+  } else if (act === "tip-ask") {
+    ui.sheet = { kind: "tip", slot: ui.selected };
   } else if (act === "tip") {
-    dispatch({ type: "tipOut", slot: ui.selected });
+    dispatch({ type: "tipOut", slot: ui.sheet?.kind === "tip" ? ui.sheet.slot : ui.selected });
   } else if (act === "close") {
     dispatch({ type: "close" });
   } else if (act === "restart") {
@@ -212,8 +217,9 @@ let saveT = 0;
 function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
-  // Settings, the planner and the keeper's notes pause the shop, so nothing moves under the thumb.
-  if (ui.s.clock.phase === "open" && !ui.settings && !ui.plan && !tipsPaused(ui)) {
+  // Settings, the planner, the keeper's notes and the tip-out confirm pause the shop, so nothing moves under the thumb.
+  const paused = ui.settings || ui.plan || ui.sheet?.kind === "tip" || tipsPaused(ui);
+  if (ui.s.clock.phase === "open" && !paused) {
     pending += dt / HOUR_SECONDS;
     const n = Math.floor(pending * C.STEPS_PER_HOUR);
     if (n > 0) {
