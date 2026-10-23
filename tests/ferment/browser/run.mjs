@@ -22,6 +22,7 @@ import * as audio from "./audio.mjs";
 import * as fx from "./fx.mjs";
 import * as settings from "./settings.mjs";
 import * as orders from "./orders.mjs";
+import * as tipout from "./tipout.mjs";
 import * as intro from "./intro.mjs";
 import * as saves from "./saves.mjs";
 import * as offline from "./offline.mjs";
@@ -34,6 +35,7 @@ const ALL = [
   board,
   evening,
   orders,
+  tipout,
   audio,
   fx,
   settings,

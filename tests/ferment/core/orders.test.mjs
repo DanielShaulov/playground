@@ -470,3 +470,25 @@ test("startForOrder: after closing, the jar goes on tonight and ripens overnight
   // The planner said so: tonight's jar is further along at pickup than one started at opening.
   assert.ok(plan.f > C.planFor(s, s.orders.list[0], ["salt"], 5).f);
 });
+
+test("tipOut: an unpopped jar can go any time, and its kept portions go back to needing a jar", () => {
+  let s = C.newGame(1);
+  s.orders.list.push(order());
+  const jar0 = s.shelf.slots[0];
+  assert.equal(C.isOver(jar0), false, "this test tips out a jar that hasn't popped");
+  s = ok(s, { type: "hold", orderId: 900, slot: 0 }).state;
+  assert.deepEqual(s.orders.list.find((o) => o.id === 900).jars, [jar0.id]);
+  const coins = s.shop.coins;
+  const r = ok(s, { type: "tipOut", slot: 0 });
+  assert.equal(r.events[0].type, "tippedOut");
+  assert.equal(r.state.shelf.slots[0], null);
+  assert.equal(r.state.shop.coins, coins, "nothing is refunded");
+  assert.deepEqual(r.state.orders.list.find((o) => o.id === 900).jars, []);
+  // Open and evening too.
+  for (const phase of ["open", "evening"]) {
+    const x = structuredClone(s);
+    x.clock.phase = phase;
+    assert.equal(ok(x, { type: "tipOut", slot: 1 }).state.shelf.slots[1], null);
+  }
+  assert.equal(rejected(r.state, { type: "tipOut", slot: 0 }), "empty slot");
+});

@@ -197,16 +197,21 @@ function actionsHtml(s, cust, sel) {
     sel && isOver(sel)
       ? `<button class="main warn" data-act="tip">Tip out jar<small>it has gone over</small></button>`
       : "";
+  // A jar that hasn't popped can go too, after a confirm (the tip sheet), to free its spot.
+  const early =
+    sel && !tip ? `<button data-act="tip-ask">Tip out<small>free the spot</small></button>` : "";
   if (s.clock.phase === "morning") {
-    return `<button data-act="restart">Start over</button>${tip || `<button class="main" data-act="open">Open shop ▶</button>`}`;
+    return `${early || `<button data-act="restart">Start over</button>`}${tip || `<button class="main" data-act="open">Open shop ▶</button>`}`;
   }
   if (s.clock.phase === "evening") {
-    return `<button class="main" data-act="evening">🌙 Back to the evening</button>`;
+    return `${tip ? "" : early}${tip || `<button class="main" data-act="evening">🌙 Back to the evening</button>`}`;
   }
   if (!cust) {
-    return `<button data-act="close">Close early</button>${tip}`;
+    return `<button data-act="close">Close early</button>${tip || early}`;
   }
   let main = tip;
+  // A jar this customer can't have: tipping it out takes the middle spot.
+  if (!main && sel && sel.recipe !== cust.recipe) main = early;
   if (!main) {
     const name = RECIPES[cust.recipe].name;
     const keptSel =

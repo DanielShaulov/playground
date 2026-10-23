@@ -55,10 +55,15 @@ export function brew(s, { slot, recipe, adds }, events) {
   events.push({ type: "brewed", slot, jar });
 }
 
-/** { type: "tipOut", slot } — throw a jar away. */
+/**
+ * { type: "tipOut", slot } — throw a jar away, popped or not, any time of day.
+ * Nothing is refunded. Orders that had portions kept in it let go of them.
+ */
 export function tipOut(s, { slot }, events) {
   if (badSlot(s, slot) || !s.shelf.slots[slot]) return "empty slot";
   const jar = s.shelf.slots[slot];
+  for (const o of s.orders.list)
+    if (o.jars?.includes(jar.id)) o.jars = o.jars.filter((id) => id !== jar.id);
   s.shelf.slots[slot] = null;
   events.push({ type: "tippedOut", slot, jar });
 }

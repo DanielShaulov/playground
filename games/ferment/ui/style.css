@@ -707,6 +707,10 @@ svg.ing {
   border-color: var(--go-dark);
   color: #fff;
 }
+.sheet .btns button.main.warn {
+  background: #c0604a;
+  border-color: #9e4936;
+}
 .stats {
   display: grid;
   grid-template-columns: 1fr 1fr;

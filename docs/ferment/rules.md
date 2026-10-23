@@ -31,6 +31,15 @@ Everything is in in-game hours. A day has three phases:
   (to 0.8) and funky (to 1).
 - At 1 the lid pops: the jar has gone over, can't be sold and can only be
   tipped out.
+- Any jar can be tipped out early, before it pops, to free its spot
+  **(Hadash)**: a jar past what customers want otherwise sits there taking
+  space. It works in every phase; nothing is refunded. On the shelf, tapping a
+  jar shows "Tip out" in the action bar (in place of Start over in the
+  morning, beside Close early when open, in the middle spot when the customer
+  at the counter wants another recipe). An unpopped jar asks first on a
+  confirm sheet that shows the jar, its flavour, the portions lost and who has
+  portions kept in it; the shop pauses while it is open. A popped jar tips out
+  with one tap, as before.
 - Each jar holds 2 servings, or portions (`SERVINGS`), and empties after the
   last sale. Nothing assumes 2: the count may go to 3 later **(Hadash)**, so
   code reads `jar.servings`, never a literal 2. A jar stores the portions it
@@ -236,7 +245,8 @@ a portion of the new jar for the order.
   `freePortions(state, jar, orderId?)` are the read helpers.
 - The order's own customer can be served from their kept portion; everyone
   else only from free ones. Once an order is settled its holds vanish with
-  it. A kept jar that is tipped out or emptied simply stops counting.
+  it. A kept jar that is emptied simply stops counting; tipping one out also
+  drops it from `order.jars`, so the order shows as needing a jar again.
 
 ## The order board
 
