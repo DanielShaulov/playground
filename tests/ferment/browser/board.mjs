@@ -186,8 +186,8 @@ export async function run(page, snap) {
 
   // Walk-ins want kimchi: the first gets the free portion of Sam's jar; the
   // next finds only Sam's portion left, and has it only if you let it go.
-  const walkIn = (id, name) =>
-    page.evaluate(
+  const walkIn = async (id, name) => {
+    await page.evaluate(
       ([id, name]) => {
         const s = structuredClone(window.__ferment.state);
         s.clock.phase = "open";
@@ -196,6 +196,8 @@ export async function run(page, snap) {
       },
       [id, name],
     );
+    await page.waitForTimeout(400); // the action bar ignores taps just as someone steps up
+  };
   await walkIn(950, "Wren");
   await page.locator(`.slot[data-slot="${slot}"].fits`).tap();
   await page.locator('.actions [data-act="serve"]').tap();

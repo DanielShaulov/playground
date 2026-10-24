@@ -34,12 +34,21 @@ Everything is in in-game hours. A day has three phases:
 - Any jar can be tipped out early, before it pops, to free its spot
   **(Hadash)**: a jar past what customers want otherwise sits there taking
   space. It works in every phase; nothing is refunded. On the shelf, tapping a
-  jar shows "Tip out" in the action bar (in place of Start over in the
-  morning, beside Close early when open, in the middle spot when the customer
-  at the counter wants another recipe). An unpopped jar asks first on a
-  confirm sheet that shows the jar, its flavour, the portions lost and who has
-  portions kept in it; the shop pauses while it is open. A popped jar tips out
-  with one tap, as before.
+  jar shows "Tip out" in the action bar, always as the leftmost button (in
+  place of Start over in the morning, before Close early when open, and before
+  Pre-order / Send away when the customer at the counter wants another
+  recipe; not shown while a jar of the customer's recipe is selected). An
+  unpopped jar asks first on a confirm sheet that shows the jar, its flavour,
+  the portions lost and who has portions kept in it; the shop pauses while it
+  is open. A popped jar tips out with one tap, as before.
+- The order planner (day or night) can tip out too **(Hadash)**: with the
+  shelf full, its row of spots says "No room on the shelf, tap a jar to tip it
+  out"; tapping a full spot asks the same confirm inside the planner, and the
+  freed spot is where the new jar goes.
+- For a moment (350 ms) after a new customer steps up to the counter, taps on
+  the action bar are dropped: the buttons just changed under the thumb, and
+  the tap was meant for what was there before (a playtester's Tip out landed
+  on Send away). Not while a keeper's note is up, since the shop is paused.
 - Each jar holds 2 servings, or portions (`SERVINGS`), and empties after the
   last sale. Nothing assumes 2: the count may go to 3 later **(Hadash)**, so
   code reads `jar.servings`, never a literal 2. A jar stores the portions it

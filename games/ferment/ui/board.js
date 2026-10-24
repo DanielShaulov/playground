@@ -28,7 +28,7 @@ import { RECIPES } from "../content/recipes.js";
 import { INGREDIENTS, INGREDIENT_IDS, MAX_ADDS } from "../content/ingredients.js";
 import { OPEN_AT, OPEN_HOURS } from "../content/tuning.js";
 import { REGULARS } from "../content/regulars.js";
-import { planFor, forecast, isOver, ageAt, holdsOn, freePortions } from "../core/index.js";
+import { planFor, forecast, flavour, isOver, ageAt, holdsOn, freePortions } from "../core/index.js";
 import { faceSvg } from "./art/customer.js";
 import { jarSvg, emptyJarSvg } from "./art/jar.js";
 import { ingredientSvg } from "./art/ingredients.js";
@@ -399,6 +399,8 @@ function renderPlan(ui) {
   }
   el.hidden = false;
   if (p.slot >= 0 && s.shelf.slots[p.slot]) p.slot = firstEmpty(s);
+  const tipJar = p.tip === undefined ? null : s.shelf.slots[p.tip];
+  if (!tipJar) delete p.tip;
   const fresh = planFor(s, o, p.adds, p.slot);
   if (!fresh) {
     p.adds = [];
@@ -451,7 +453,7 @@ function renderPlan(ui) {
   const spots = s.shelf.slots
     .map((j, i) =>
       j
-        ? `<span class="spot full">${portionsHtml(s, j)}${jarSvg(j, "mini")}</span>`
+        ? `<button class="spot full${i === p.tip ? " sel" : ""}" data-act="board-tipask" data-slot="${i}">${portionsHtml(s, j)}${jarSvg(j, "mini")}</button>`
         : `<button class="spot${i === p.slot ? " sel" : ""}" data-act="board-slot" data-slot="${i}">${emptyJarSvg}</button>`,
     )
     .join("");
@@ -468,7 +470,8 @@ function renderPlan(ui) {
     go = `<button class="main" data-act="board-hold" data-slot="${chosen.i}">Keep ${portion} for ${o.name}</button>`;
   else if (unknown)
     go = `<button class="main" data-act="board-hint" data-recipe="${o.recipe}">🧪 To the bench</button>`;
-  else if (firstEmpty(s) < 0) go = `<button class="main" disabled>No room on the shelf</button>`;
+  else if (firstEmpty(s) < 0)
+    go = `<button class="main" disabled>No room on the shelf<small>tap a jar to tip it out</small></button>`;
   else if (missing.length)
     go = `<button class="main" disabled>Needs ${missing.map((a) => ingredientSvg(a) + " " + INGREDIENTS[a].name.toLowerCase()).join(", ")}</button>`;
   else
@@ -492,8 +495,18 @@ function renderPlan(ui) {
         : verdict(s, o, plan)
     }</div>
     ${newJar ? `${adds ? `<div class="adds">${adds}</div>` : ""}<div class="spots">${spots}</div>` : ""}
-    <div class="btns">${offer ? `<button data-act="board-pass" data-order="${o.id}">Pass</button>` : `<button data-act="board-close">Not now</button>`}${go}</div></div>`;
+    ${
+      tipJar
+        ? `<div class="tipask"><h3>Tip out this jar?</h3>${tipAskHtml(s, tipJar)}
+      <div class="btns"><button data-act="board-tipno">Keep it</button><button class="main warn" data-act="board-tip">Tip it out</button></div></div>`
+        : `<div class="btns">${offer ? `<button data-act="board-pass" data-order="${o.id}">Pass</button>` : `<button data-act="board-close">Not now</button>`}${go}</div>`
+    }</div>`;
   patch(el, html);
+  // The confirm sits at the bottom of a tall planner: bring it up once when it opens.
+  if (tipJar && p.tipShown !== p.tip) {
+    el.querySelector(".tipask")?.scrollIntoView({ block: "end" });
+    p.tipShown = p.tip;
+  } else if (!tipJar) delete p.tipShown;
 }
 
 /** The big strip in the planner: the order's window, jars already kept for it, and the jar being planned at pickup. */
@@ -555,6 +568,20 @@ export function boardAct(act, t, ui, dispatch, toast) {
     };
     if (act === "board-slot") {
       p.slot = Number(t.dataset.slot);
+      delete p.tip;
+    } else if (act === "board-tipask") {
+      // A full spot: ask before tipping its jar out to make room.
+      const i = Number(t.dataset.slot);
+      if (p.tip === i) delete p.tip;
+      else p.tip = i;
+    } else if (act === "board-tipno") {
+      delete p.tip;
+    } else if (act === "board-tip") {
+      const slot = p.tip;
+      delete p.tip;
+      const events = dispatch({ type: "tipOut", slot });
+      // The freed spot is where the new jar goes.
+      if (events.some((e) => e.type === "tippedOut")) p.slot = slot;
     } else if (act === "board-src") {
       p.src = t.dataset.src === "new" ? "new" : Number(t.dataset.src);
     } else if (act === "board-hold") {
@@ -609,6 +636,19 @@ export function portionsHtml(s, jar) {
 }
 
 /** Names of who has portions kept back in a jar, as the shop would say them. */
+/**
+ * The body of a tip-out confirm (the shop's sheet and the planner both use
+ * it): the jar on its strip, the portions lost, and who is counting on it.
+ */
+export function tipAskHtml(s, jar) {
+  const f = Math.round(flavour(jar) * 200) / 200;
+  const left = `${jar.servings} portion${jar.servings === 1 ? "" : "s"} left`;
+  const kept = keptFor(s, jar);
+  return `<div class="recipe tip-jar">${jarSvg(jar, "icon")}<div class="info"><div class="name"><span>${RECIPES[jar.recipe].name}</span><span>${word(f)}</span></div>
+      ${strip({ f })}</div></div>
+      <p>${left} go down the drain and the spot is free for a new jar. Nothing comes back.${kept ? ` <b>${kept} ${kept.includes("&") ? "are" : "is"} counting on this jar</b>; their order will need another.` : ""}</p>`;
+}
+
 export const keptFor = (s, jar) => {
   const names = holdsOn(s, jar).map((h) => h.order.name);
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} & ${names.at(-1)}` : (names[0] ?? "");

@@ -2,7 +2,10 @@
 // morning, asks to tip it out, keeps it, then tips it out from the confirm
 // sheet (which names the order counting on it); then, while open, tips out a
 // jar the customer at the counter can't have. A popped jar still goes in one
-// tap. Depends on window.__ferment and the data-slot / data-act attributes.
+// tap. A tap on the action bar just as a customer steps up is dropped (it was
+// meant for the button there before). With the shelf full, the order planner
+// tips a jar out from its row of spots and starts the new jar there.
+// Depends on window.__ferment and the data-slot / data-act attributes.
 import assert from "node:assert/strict";
 
 export const name = "tipout";
@@ -65,6 +68,7 @@ export async function run(page, snap) {
   await page.waitForFunction(() => window.__ferment.state.customers.queue.length > 0, null, {
     timeout: 30000,
   });
+  await page.waitForTimeout(400); // the action bar settles after someone steps up
   s = await state();
   const want = s.customers.queue[0].recipe;
   const other = s.shelf.slots.findIndex((j) => j && j.recipe !== want);
@@ -91,5 +95,78 @@ export async function run(page, snap) {
   await page.locator('.actions [data-act="tip"]').tap();
   assert.equal((await state()).shelf.slots[popped], null);
   assert.ok(await page.locator("#sheet").isHidden());
-  return "tip out early with confirm, kept order released, popped jar in one tap";
+
+  // Someone steps up just as the thumb comes down: that tap doesn't send them away.
+  await page.evaluate(() => {
+    const s = structuredClone(window.__ferment.state);
+    s.customers.queue = [];
+    s.shelf.slots[0] = { id: 8000, recipe: "dill", age: 5, servings: 2, size: 2 };
+    window.__ferment.state = s;
+  });
+  await page.waitForTimeout(400);
+  const jarAt = (await state()).shelf.slots.findIndex((j) => j);
+  await page.locator(`.slot[data-slot="${jarAt}"]`).tap();
+  const early = await page.evaluate(
+    () =>
+      new Promise((done) => {
+        const s = structuredClone(window.__ferment.state);
+        s.customers.queue = [
+          { id: 9001, name: "Ada", look: 5, recipe: "kimchi", lo: 0.3, hi: 0.5, patience: 99 },
+        ];
+        window.__ferment.state = s;
+        const tapWhenUp = () => {
+          const b = /** @type {HTMLElement | null} */ (
+            document.querySelector('#actions [data-act="away"]')
+          );
+          if (!b) return requestAnimationFrame(tapWhenUp);
+          b.click();
+          done(window.__ferment.state.customers.queue.length);
+        };
+        tapWhenUp();
+      }),
+  );
+  assert.equal(early, 1, "a tap as the customer steps up is dropped");
+  await page.waitForTimeout(400);
+  await page.locator('#actions [data-act="away"]').tap();
+  assert.ok(!(await state()).customers.queue.some((c) => c.id === 9001), "a settled tap works");
+  await snap("5-settled");
+
+  // The planner with a full shelf: tap a jar in its spots, confirm, and the new jar goes there.
+  await page.evaluate(() => {
+    const s = structuredClone(window.__ferment.state);
+    const dill = { ...s.shelf.slots.find((j) => j) };
+    s.shelf.slots = s.shelf.slots.map((_, i) => ({ ...dill, id: 7000 + i, recipe: "dill" }));
+    s.customers.queue = [];
+    s.orders.list.push({
+      id: 951,
+      kind: "preorder",
+      name: "Ines",
+      look: 77,
+      recipe: "kimchi",
+      lo: 0.2,
+      hi: 0.4,
+      due: s.clock.day + 3,
+      arriveAt: 4,
+      arrived: false,
+    });
+    window.__ferment.state = s;
+  });
+  await page.locator('.ticket[data-order="951"]').tap();
+  await page.locator(".plan .spots").waitFor();
+  assert.match(await page.locator(".plan .btns .main").textContent(), /No room on the shelf/);
+  await page.locator('.plan .spot.full[data-slot="4"]').tap();
+  await page.locator(".plan .tipask").waitFor();
+  await snap("6-planner-confirm");
+  await page.locator('.plan [data-act="board-tipno"]').tap();
+  await page.locator(".plan .tipask").waitFor({ state: "detached" });
+  assert.ok((await state()).shelf.slots[4], "kept");
+  await page.locator('.plan .spot.full[data-slot="4"]').tap();
+  await page.locator('.plan [data-act="board-tip"]').tap();
+  assert.equal((await state()).shelf.slots[4], null);
+  await page.locator('.plan .spot.sel[data-slot="4"]').waitFor();
+  await page.locator('.plan [data-act="board-start"]').tap();
+  s = await state();
+  assert.equal(s.shelf.slots[4]?.recipe, "kimchi", "the new jar went in the freed spot");
+  assert.deepEqual(s.orders.list.find((o) => o.id === 951).jars, [s.shelf.slots[4].id]);
+  return "tip out early with confirm, kept order released, popped jar in one tap, settle guard, planner tip-out";
 }
