@@ -101,8 +101,14 @@
   resize: none;
   word-break: break-all;
 }
-.settings textarea.paste {
+.settings textarea.paste,
+.settings textarea.report-note {
   font-size: 16px; /* under 16px iOS zooms the page on focus */
+}
+.settings textarea.report-note {
+  font-family: inherit;
+  font-weight: 600;
+  word-break: normal;
 }
 .set-error {
   color: #b5442e !important;

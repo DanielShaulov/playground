@@ -13,6 +13,8 @@ repo=${GITHUB_REPOSITORY:-DanielShaulov/playground}
 rm -rf "$out" && mkdir -p "$out/pr"
 
 git archive HEAD | tar -x -C "$out"
+# build.json tells a bug report which commit the player was on (games read it).
+printf '{ "sha": "%s" }\n' "$(git rev-parse HEAD)" >"$out/build.json"
 
 # Only this repo's own branches: a fork's PR would put a stranger's page on
 # our origin, next to our saves.
@@ -29,6 +31,7 @@ while IFS=$'\t' read -r num sha title; do
   git fetch -q --depth 1 origin "pull/$num/head"
   mkdir -p "$out/pr/$num"
   git archive FETCH_HEAD | tar -x -C "$out/pr/$num"
+  printf '{ "sha": "%s", "pr": %s }\n' "$sha" "$num" >"$out/pr/$num/build.json"
   # A branch cut before previews existed has the old storage.js, which would
   # read and write main's saves. Give it main's.
   st="$out/pr/$num/shared/storage.js"

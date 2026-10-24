@@ -108,3 +108,20 @@ catches a misspelt field in another module before a test runs.
   fetched at runtime.
 - Repo-wide rules (branching, squash merges, terse commits, verifying on a
   phone viewport) are in the root `CLAUDE.md`.
+
+## Bug reports from players
+
+Settings → Report a problem (`ui/report.js`) opens the player's mail app with
+a note they write and a `FERMENT-REPORT1.….END` block, addressed to
+`daniel.shaulov+ferment@gmail.com` with a `[Ferment report]` subject. The
+block holds the shop when the day began plus every action since (ticks
+merged), the shop as it is now, the last taps, uncaught errors, the build
+(`build.json`, written per deploy by `scripts/build-pages.sh`; the repo copy
+says `dev`) and the device. The core is deterministic, so the trail replays
+onto the reported shop exactly.
+
+To work on one: save the email text and run
+`node scripts/ferment-report.mjs email.txt out/`. It prints a summary (and
+whether the replay matches) and writes `start.json` and `now.json`, which a
+Playwright session loads with `window.__ferment.state = <json>`. A fix that
+lives in a save gets a new fixture via `fixtures/make.js`, never an edited one.

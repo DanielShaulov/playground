@@ -28,6 +28,7 @@ import { mountSettings, renderSettings, settingsAct, onReplayIntro } from "./set
 import { lower, LINES } from "./text.js";
 import { mountTutorial, renderTutorial, tutorialAct, tipsPaused } from "./tutorial.js";
 import { mountIntro, renderIntro, introAct } from "./intro.js";
+import { resumeTrail, startTrail, saveTrail, noteAction, noteTap, onFirstError } from "./report.js";
 
 const store = createStore("ferment");
 const freshSeed = () => (Date.now() % 1e9) | 0;
@@ -38,8 +39,9 @@ const freshGame = () => C.newGame(freshSeed(), { tutorial: tips });
 const SETTLE_MS = 350;
 
 /** Game state plus screen-only state. */
+const stored = C.loadSave(store.get("save"));
 const ui = {
-  s: C.loadSave(store.get("save")) ?? freshGame(),
+  s: stored ?? freshGame(),
   selected: null, // shelf slot index
   departing: null, // { customer, mood, line, pay, f, until }
   sheet: null, // { kind: "brew" | "tip", slot }
@@ -51,7 +53,9 @@ const ui = {
 
 function save() {
   store.set("save", ui.s);
+  saveTrail();
 }
+resumeTrail(ui.s, !!stored);
 
 const els = mountShop(document.body);
 document.title = "The Brine Nook · Playground";
@@ -61,6 +65,7 @@ const settings = mountSettings(els.root);
 const tutorialView = mountTutorial(els.root);
 const intro = mountIntro(els.root);
 onReplayIntro(() => dispatch({ type: "tutorial", do: "replay" }));
+onFirstError(() => toast(els.toasts, "Something went wrong. You can report it in Settings."));
 // When someone new steps up to the counter, the action bar changes under the thumb.
 let counterId = null;
 let counterAt = -Infinity;
@@ -91,6 +96,7 @@ function depart(customer, mood, line, extra = {}) {
 function dispatch(action) {
   const { state, events } = C.step(ui.s, action);
   ui.s = state;
+  noteAction(action, events, state);
   for (const e of events) react(e);
   return events;
 }
@@ -153,6 +159,7 @@ function react(e) {
 /** Swap in a whole other shop (a loaded code, a fresh start), dropping any open screen. */
 function replace(s) {
   ui.s = s;
+  startTrail(s);
   ui.selected = null;
   ui.departing = null;
   ui.bench = null;
@@ -181,6 +188,7 @@ els.root.addEventListener("click", (e) => {
   }
   const act = t.dataset.act;
   const s = ui.s;
+  noteTap(t, s);
   if (settingsAct(act, t, ui, (text) => toast(els.toasts, text), { replace, restart })) {
     // handled by the settings sheet
   } else if (introAct(act, ui, dispatch) || tutorialAct(act, ui, dispatch)) {

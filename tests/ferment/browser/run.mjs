@@ -21,6 +21,7 @@ import * as evening from "./evening.mjs";
 import * as audio from "./audio.mjs";
 import * as fx from "./fx.mjs";
 import * as settings from "./settings.mjs";
+import * as report from "./report.mjs";
 import * as orders from "./orders.mjs";
 import * as tipout from "./tipout.mjs";
 import * as intro from "./intro.mjs";
@@ -39,6 +40,7 @@ const ALL = [
   audio,
   fx,
   settings,
+  report,
   intro,
   saves,
   offline,
