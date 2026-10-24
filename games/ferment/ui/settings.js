@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * The settings sheet, opened from the gear in the shop's top bar: sound,
- * motion, strip style, the intro again, a backup code, start over, credits.
+ * motion, strip style, the intro again, a backup code, report a problem,
+ * start over, credits.
  *
  * Preferences live in createStore("ferment") under "settings", apart from the
  * save (so starting over or loading a code keeps them); sound stays in
@@ -28,6 +29,7 @@ import { saveCode, readCode } from "../core/index.js";
 import { isMuted, setMuted } from "./audio.js";
 import { patch } from "./dom.js";
 import { strip, stripLabels } from "./strip.js";
+import { prepareReport, sendReport, reportText, REPORT_TO } from "./report.js";
 
 const store = createStore("ferment");
 const DEFAULTS = { motion: "auto", strip: "plain" };
@@ -85,8 +87,10 @@ export function mountSettings(root) {
 
 /**
  * ui.settings: null when closed, else
- * { view: "main" | "backup" | "credits", confirm?: "restart" | "load",
- *   code?: string (the backup code shown), paste?: string, error?: string, copied?: boolean }
+ * { view: "main" | "backup" | "report" | "credits", confirm?: "restart" | "load",
+ *   code?: string (the backup code shown), paste?: string, error?: string, copied?: boolean,
+ *   report?: { code, sha } (once ready), note?: string, sent?: boolean,
+ *   waiting?: boolean (Write the email tapped before the report was ready) }
  */
 export function renderSettings(el, ui) {
   const st = ui.settings;
@@ -149,6 +153,7 @@ const VIEWS = {
       <div class="set-list">
         ${intro ? `<button data-act="set-intro">Watch the intro again</button>` : ""}
         <button data-act="set-backup">Back up or move my shop</button>
+        <button data-act="set-report">Report a problem</button>
         <button data-act="set-credits">Credits</button>
         <button class="warn" data-act="set-restart">Start over</button>
       </div>
@@ -170,6 +175,21 @@ const VIEWS = {
       <textarea class="code paste" rows="3" placeholder="Paste a shop code here" aria-label="Paste a shop code" autocomplete="off" autocapitalize="off" spellcheck="false">${esc(st.paste ?? "")}</textarea>
       ${st.error ? `<p class="set-error" role="alert">${st.error}</p>` : ""}
       <div class="btns"><button data-act="set-back">Back</button><button class="main" data-act="set-load">Load this shop</button></div>`;
+  },
+
+  // Nothing in this view changes when the report finishes getting ready: a redraw then
+  // would replace the box under the player's thumb and lose what they typed.
+  report(ui, st) {
+    return `<h2>Report a problem</h2>
+      <p>Say what went wrong in a sentence or two. Your shop and your last few minutes of play come along with it, so it can be put right.</p>
+      <textarea class="code report-note" rows="4" placeholder="What happened?" aria-label="What went wrong">${esc(st.note ?? "")}</textarea>
+      ${
+        st.sent
+          ? `<p>Your mail app should be open with the report ready, so just tap Send. Nothing opened? Copy the report and email it to <b>${REPORT_TO}</b>.</p>
+      <div class="btns"><button data-act="set-report-copy">${st.copied ? "Copied ✓" : "Copy the report"}</button></div>`
+          : ""
+      }
+      <div class="btns"><button data-act="set-back">Back</button><button class="main" data-act="set-report-send">Write the email</button></div>`;
   },
 
   credits() {
@@ -200,6 +220,9 @@ export function settingsAct(act, t, ui, toast, shop) {
   if (!st || !act?.startsWith("set-")) return false;
   const paste = /** @type {HTMLTextAreaElement | null} */ (
     t.closest(".panel")?.querySelector(".paste")
+  );
+  const note = /** @type {HTMLTextAreaElement | null} */ (
+    t.closest(".panel")?.querySelector(".report-note")
   );
   switch (act) {
     case "set-close":
@@ -232,6 +255,30 @@ export function settingsAct(act, t, ui, toast, shop) {
     case "set-backup":
       ui.settings = { view: "backup", code: saveCode(ui.s) };
       break;
+    case "set-report": {
+      /** @type {any} */
+      const view = { view: "report" };
+      ui.settings = view;
+      prepareReport(ui.s, { ...prefs, muted: isMuted() }).then((r) => {
+        view.report = r;
+        // Tapped before it was ready (it takes a moment): send now.
+        if (view.waiting && ui.settings === view) sendReport(view.note, r, ui.s.clock.day);
+        view.waiting = false;
+      });
+      break;
+    }
+    case "set-report-send":
+      st.note = note?.value ?? st.note ?? "";
+      st.sent = true;
+      if (st.report) sendReport(st.note, st.report, ui.s.clock.day);
+      else st.waiting = true;
+      break;
+    case "set-report-copy":
+      if (!st.report) break;
+      st.note = note?.value ?? st.note ?? "";
+      copyText(reportText(st.note, st.report, ui.s.clock.day));
+      st.copied = true;
+      break;
     case "set-credits":
       ui.settings = { view: "credits" };
       break;
@@ -262,6 +309,15 @@ export function settingsAct(act, t, ui, toast, shop) {
       return false;
   }
   return true;
+}
+
+/** Copy text with no box to fall back on (the report is too long to show). */
+function copyText(text) {
+  try {
+    navigator.clipboard.writeText(text).catch(() => {});
+  } catch {
+    /* nothing to select; the email is the main road */
+  }
 }
 
 /** Copy to the clipboard; where that's refused, select the code so a long-press copies it. */
