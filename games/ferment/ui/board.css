@@ -534,3 +534,14 @@
 .sheet.plan {
   z-index: 27;
 }
+
+/* --- tipping a jar out from the planner's shelf to make room --- */
+.plan .tipask h3 {
+  margin: 4px 0 8px;
+  font-size: 18px;
+}
+.plan .spot.full.sel {
+  opacity: 1;
+  border-color: #9e4936;
+  background: #f6e1da;
+}

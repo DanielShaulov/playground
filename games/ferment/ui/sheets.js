@@ -5,11 +5,10 @@
  */
 
 import { RECIPES } from "../content/recipes.js";
-import { crockAt, flavour, forecast, jarSize, menu } from "../core/index.js";
+import { crockAt, forecast, jarSize, menu } from "../core/index.js";
 import { jarSvg } from "./art/jar.js";
 import { strip } from "./strip.js";
-import { word } from "./text.js";
-import { keptFor } from "./board.js";
+import { tipAskHtml } from "./board.js";
 
 export function sheetHtml(s, sheet) {
   if (sheet.kind === "brew") {
@@ -40,13 +39,8 @@ export function sheetHtml(s, sheet) {
   if (sheet.kind === "tip") {
     const jar = s.shelf.slots[sheet.slot];
     if (!jar) return "";
-    const f = Math.round(flavour(jar) * 200) / 200;
-    const left = `${jar.servings} portion${jar.servings === 1 ? "" : "s"} left`;
-    const kept = keptFor(s, jar);
     return `<div class="panel tip-sheet"><h2>Tip out this jar?</h2>
-      <div class="recipe tip-jar">${jarSvg(jar, "icon")}<div class="info"><div class="name"><span>${RECIPES[jar.recipe].name}</span><span>${word(f)}</span></div>
-      ${strip({ f })}</div></div>
-      <p>${left} go down the drain and the spot is free for a new jar. Nothing comes back.${kept ? ` <b>${kept} ${kept.includes("&") ? "are" : "is"} counting on this jar</b>; their order will need another.` : ""}</p>
+      ${tipAskHtml(s, jar)}
       <div class="btns"><button data-act="cancel">Keep it</button><button class="main warn" data-act="tip">Tip it out</button></div></div>`;
   }
   return "";

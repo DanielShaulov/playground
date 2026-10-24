@@ -198,6 +198,7 @@ function actionsHtml(s, cust, sel) {
       ? `<button class="main warn" data-act="tip">Tip out jar<small>it has gone over</small></button>`
       : "";
   // A jar that hasn't popped can go too, after a confirm (the tip sheet), to free its spot.
+  // It always sits leftmost, so a customer stepping up never puts Send away under it.
   const early =
     sel && !tip ? `<button data-act="tip-ask">Tip out<small>free the spot</small></button>` : "";
   if (s.clock.phase === "morning") {
@@ -207,11 +208,15 @@ function actionsHtml(s, cust, sel) {
     return `${tip ? "" : early}${tip || `<button class="main" data-act="evening">🌙 Back to the evening</button>`}`;
   }
   if (!cust) {
-    return `<button data-act="close">Close early</button>${tip || early}`;
+    return `${early}<button data-act="close">Close early</button>${tip}`;
   }
+  const pre = cust.orderId
+    ? ""
+    : `<button data-act="preorder">Pre-order<small>due day ${dueFor(s, cust).due}</small></button>`;
+  const away = `<button data-act="away">Send away<small>♥ −${cust.orderId ? 2 : 1}</small></button>`;
+  // A jar this customer can't have: no serve button, so Tip out leads.
+  if (!tip && sel && sel.recipe !== cust.recipe) return `${early}${pre}${away}`;
   let main = tip;
-  // A jar this customer can't have: tipping it out takes the middle spot.
-  if (!main && sel && sel.recipe !== cust.recipe) main = early;
   if (!main) {
     const name = RECIPES[cust.recipe].name;
     const keptSel =
@@ -227,8 +232,5 @@ function actionsHtml(s, cust, sel) {
       main = `<button class="main" disabled>${have ? `Tap a ${lower(cust.recipe)} jar` : `No ${lower(cust.recipe)} on the shelf`}</button>`;
     }
   }
-  const pre = cust.orderId
-    ? ""
-    : `<button data-act="preorder">Pre-order<small>due day ${dueFor(s, cust).due}</small></button>`;
-  return `${pre}${main}<button data-act="away">Send away<small>♥ −${cust.orderId ? 2 : 1}</small></button>`;
+  return `${pre}${main}${away}`;
 }

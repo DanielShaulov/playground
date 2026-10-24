@@ -34,6 +34,8 @@ const freshSeed = () => (Date.now() % 1e9) | 0;
 /** A new shop starts with the intro and the keeper's notes, unless the page says ?tips=off (the phone flows). */
 const tips = new URLSearchParams(location.search).get("tips") !== "off";
 const freshGame = () => C.newGame(freshSeed(), { tutorial: tips });
+/** How long the action bar ignores taps after a new customer steps up to the counter. */
+const SETTLE_MS = 350;
 
 /** Game state plus screen-only state. */
 const ui = {
@@ -59,9 +61,20 @@ const settings = mountSettings(els.root);
 const tutorialView = mountTutorial(els.root);
 const intro = mountIntro(els.root);
 onReplayIntro(() => dispatch({ type: "tutorial", do: "replay" }));
+// When someone new steps up to the counter, the action bar changes under the thumb.
+let counterId = null;
+let counterAt = -Infinity;
+function noteCounter() {
+  const id = ui.s.customers.queue[0]?.id ?? null;
+  if (id !== counterId && id !== null) counterAt = performance.now();
+  // A keeper's note stops the shop and is read first, so nothing moves under the thumb.
+  if (tipsPaused(ui)) counterAt = -Infinity;
+  counterId = id;
+}
 // The evening and the bench cover the whole screen: the shop under them goes unpainted.
 const render = () => (
   els.root.classList.toggle("covered", !!(ui.evening || ui.bench)),
+  noteCounter(),
   renderShop(els, ui),
   renderEvening(evening, ui),
   renderBench(bench, ui),
@@ -157,6 +170,9 @@ els.root.addEventListener("click", (e) => {
   const t = /** @type {HTMLElement | null} */ (
     /** @type {HTMLElement} */ (e.target).closest("[data-act]")
   );
+  // A tap that lands on the action bar just as a customer steps up was meant for
+  // the button that was there before (Tip out, say), not Send away: drop it.
+  if (t && els.actions.contains(t) && performance.now() - counterAt < SETTLE_MS) return;
   if (!t) {
     if (e.target === els.sheet && ui.sheet) ui.sheet = null;
     if (e.target === settings) ui.settings = null;
