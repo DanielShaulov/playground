@@ -30,6 +30,20 @@ export async function run(page, snap) {
       timeout: 30000,
     });
     await page.waitForTimeout(1700); // let any departing customer clear the counter
+    if (round === 0) {
+      // Safari can size the shelf's content past the screen (seen on a phone in the
+      // browser, where its bars leave less room): the counter still shows all of
+      // the customer's meter and patience, and the shelf gives up the room.
+      const clipped = await page.evaluate(() => {
+        const shelf = /** @type {HTMLElement} */ (document.querySelector(".shelf"));
+        shelf.style.flexBasis = "2000px";
+        const talk = /** @type {HTMLElement} */ (document.querySelector(".counter .talk"));
+        const out = talk.scrollHeight - talk.clientHeight;
+        shelf.style.flexBasis = "";
+        return out;
+      });
+      assert.ok(clipped <= 1, `the counter clips ${clipped}px of the customer's meter`);
+    }
     s = await state();
     const c = s.customers.queue[0];
     const R = { hours: { dill: 48, hotsauce: 36, kimchi: 72, kraut: 120 } };
