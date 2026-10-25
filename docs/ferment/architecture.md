@@ -57,7 +57,8 @@ games/ferment/
                     planFor, kept portions (hold/release)
     jars.js         flavour, ageing, add-in maths
     bench.js        pantry, experiments, discovery, recipe card, previewCurve
-    progress.js     upgrades, shop tiers, goals ladder (state.progress)
+    progress.js     upgrades, shop tiers, goals ladder, shop pride (state.progress)
+    decor.js        shop decor: what is owned and up in each spot (state.decor)
     market.js       today's stalls (stock, prices), buy, marketToday
     rng.js          named random streams
     types.js        JSDoc types for the state, actions and events

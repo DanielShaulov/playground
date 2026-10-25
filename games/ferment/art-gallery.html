@@ -125,6 +125,21 @@
         width: 44px;
         height: 60px;
       }
+      .decor-wall {
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 10px;
+        border: 1px solid #e6d3b6;
+      }
+      .grid.decor svg.bag {
+        width: 60%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+      }
+      .grid.decor img {
+        width: 100%;
+      }
     </style>
   </head>
   <body>
@@ -142,6 +157,8 @@
       import { strip } from "./ui/strip.js";
       import { ingredientSvg } from "./ui/art/ingredients.js";
       import { windowArt, lightAt } from "./ui/art/scene.js";
+      import { DECOR, DECOR_IDS, SPOTS } from "./content/decor.js";
+      import { wallCss, woodVars, garlandArt, bagArt } from "./ui/art/decor.js";
       import {
         faceSvg,
         MOODS,
@@ -262,6 +279,43 @@
           const l = lightAt(h);
           return `<figure><img src="${dataUri(windowArt(h))}" alt=""><div class="light" style="--light:${l.light};--light-blend:${l.blend};background-color:${l.wall}"></div><figcaption>${name}<small>${Math.floor(h)}:${String(Math.round((h % 1) * 60)).padStart(2, "0")}</small></figcaption></figure>`;
         }).join("")}</div></section>`;
+
+      // Decor (content/decor.js): every piece in each spot, and every jar
+      // dressing on a fresh jar, a domed funky one and one whose lid popped.
+      const piece = (id) => {
+        const d = DECOR[id];
+        const label = `<figcaption>${d.name}<small>${d.pride ? "prize" : d.cost ? `${d.cost} coins` : "start"}</small></figcaption>`;
+        if (d.spot === "wall") {
+          const w = wallCss(id);
+          return `<figure><div class="decor-wall" style="background-color:${w.color};background-image:${w.image.replace(/"/g, "'")}"></div>${label}</figure>`;
+        }
+        if (d.spot === "wood") {
+          const w = woodVars(id);
+          return `<figure><div class="decor-wall" style="background:linear-gradient(${w.hi},${w.plank} 45%,${w.lo}) 0 0/100% 18px repeat-y;box-shadow:inset 0 -6px 0 ${w.dark}"></div>${label}</figure>`;
+        }
+        if (d.spot === "curtains" || d.spot === "sill")
+          return `<figure><img src="${dataUri(windowArt(11, { [d.spot]: id }))}" alt="">${label}</figure>`;
+        if (d.spot === "garland") {
+          const g = garlandArt(id, false);
+          const lit = garlandArt(id, true);
+          return `<figure><div class="decor-wall" style="background:${g ? `url('${dataUri(g.svg)}') 0 4px repeat-x, url('${dataUri(lit.svg)}') 0 40px repeat-x #3a3352` : "#f6ead8"}"></div>${label}</figure>`;
+        }
+        if (d.spot === "jars")
+          return [0.15, 0.9, 1.1]
+            .map(
+              (f, k) =>
+                `<figure>${jarArt(look("dill", Math.min(f, 1), { over: f > 1, dress: id }))}<figcaption>${d.name}<small>${["fresh", "domed", "popped"][k]}</small></figcaption></figure>`,
+            )
+            .join("");
+        return `<figure>${bagArt(id) || "<div class='decor-wall'></div>"}${label}</figure>`;
+      };
+      html += SPOTS.map(
+        (sp) =>
+          `<section data-section="decor-${sp.id}"><h2>Decor: ${sp.name.toLowerCase()}</h2><p>ui/art/decor.js${sp.id === "garland" ? " (top: by day, bottom: lit at night)" : ""}.</p>
+          <div class="grid decor">${DECOR_IDS.filter((id) => DECOR[id].spot === sp.id)
+            .map(piece)
+            .join("")}</div></section>`,
+      ).join("");
 
       // A shelf as the shop draws it: spots with crocks, a bigger jar, and a
       // jar with a portion kept back that stays readable when the jar is dimmed.

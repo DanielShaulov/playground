@@ -16,7 +16,8 @@ import { sendAway } from "./customers.js";
 import { preorder, startForOrder, acceptOrder, declineOrder, hold, release } from "./orders.js";
 import { experiment } from "./bench.js";
 import { buy } from "./market.js";
-import { upgrade, claimGoal, track } from "./progress.js";
+import { upgrade, claimGoal, claimPride, track } from "./progress.js";
+import { buyDecor, useDecor } from "./decor.js";
 import { tutorial, learn } from "./tutorial.js";
 
 /** @typedef {import("./types.js").State} State */
@@ -43,6 +44,9 @@ export const ACTIONS = {
   declineOrder,
   upgrade,
   claimGoal,
+  claimPride,
+  buyDecor,
+  useDecor,
   tutorial,
 };
 

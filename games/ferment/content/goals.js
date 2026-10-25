@@ -15,6 +15,12 @@
  * come first, then MORE repeats its kinds forever, each round asking more.
  * `n` is what to reach; `reward` is coins and, optionally, pantry stock.
  * GOAL_TEXT is how each kind reads on screen, with {n} for the number.
+ *
+ * PRIDE: the Shop pride goals, for a shop that has climbed the ladder for a
+ * while. They all show at once, each with its own words, and each wins a
+ * piece of decor that is never for sale (content/decor.js, `pride`). They
+ * read the same measures as the goals (core/progress.js measure), plus
+ * "tier" (the shop's tier) and "known" (hidden recipes found).
  */
 
 /** @type {import("../core/types.js").Tier[]} */
@@ -65,4 +71,15 @@ export const MORE = [
   { kind: "delight", n: 20, step: 25, coins: 50, more: 15 },
   { kind: "orders", n: 10, step: 12, coins: 50, more: 15 },
   { kind: "earned", n: 1000, step: 1500, coins: 50, more: 15 },
+];
+
+/** @type {import("../core/types.js").Pride[]} */
+export const PRIDE = [
+  { id: "famous", kind: "tier", n: 4, text: "Become Famous brine" },
+  { id: "pride", kind: "tier", n: 5, text: "Become Pride of the city" },
+  { id: "secrets", kind: "known", n: 5, text: "Find all five hidden recipes" },
+  { id: "everyone", kind: "regulars", n: 9, text: "Win all nine regulars" },
+  { id: "bigday", kind: "bestDay", n: 500, text: "Take 500 coins in one day" },
+  { id: "loved", kind: "delight", n: 300, text: "Delight 300 customers" },
+  { id: "busy", kind: "served", n: 400, text: "Sell 400 portions" },
 ];

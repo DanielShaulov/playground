@@ -163,8 +163,10 @@ export function audioReact(e) {
       play("discover");
       break;
     case "tierUp":
+    case "claimedPride":
       play("tierUp");
       break;
+    case "boughtDecor":
     case "bought":
       play("buy");
       break;

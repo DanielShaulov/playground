@@ -408,6 +408,42 @@ coins taken, delighted customers, best day's takings, orders handed over); the
 other goals read the shop as it is (menu size, regulars won, reputation,
 upgrades bought).
 
+**Shop pride** (`PRIDE` in `content/goals.js`) is for the late game, when
+the ladder's rounds start to feel the same and coins pile up with nothing
+left to buy (a tier 5 player on day 23 asked for more to aim for and spend
+on, 2026-10-25). Seven big goals sit beside the ladder, all open at once,
+shown on the goals corner from tier 2. Each is claimed once
+(`claimPride { id }`, event `claimedPride`; `prideReady` when one is newly
+met) and wins a piece of decor that is never sold, which goes up straight
+away:
+
+| Goal                         | Reads                | Wins              |
+| ---------------------------- | -------------------- | ----------------- |
+| Become Famous brine          | tier 4               | brass lanterns    |
+| Become Pride of the city     | tier 5               | gold ribbon jars  |
+| Find all five hidden recipes | discovered recipes 5 | embroidered roses |
+| Win all nine regulars        | regulars won 9       | postcard wall     |
+| Take 500 coins in one day    | best day 500         | gift box          |
+| Delight 300 customers        | delighted 300        | sleeping cat      |
+| Sell 400 portions            | portions sold 400    | cherry and brass  |
+
+## Shop decor
+
+The shop can be dressed (`state.decor`, `core/decor.js`, `content/decor.js`).
+Decor is **looks only**: it never changes prices, customers or jars. Seven
+spots each show one piece at a time: the back wall behind the jars, the
+shelf wood, the window's curtains, the window sill, a garland along the top
+of the shelf (fairy lights and lanterns glow after dark), a dressing on every
+jar (twine and tag, gingham caps, ribbon bows, wax seals; a cap follows the
+lid's dome so the gas still shows, and a popped jar loses what was on its
+lid), and the bag a served customer carries off. Each spot starts with a
+free piece. Others are bought once in the evening (`buyDecor { id }`, 100 to
+1200 coins, some waiting for a tier) and go up at once; anything owned can
+be put back up for free (`useDecor { id }`). About 9,800 coins of decor are
+for sale, a late-game sink after the upgrades run out. The decor corner of
+the evening shows the shop in miniature, and any piece can be tried on there
+before buying it.
+
 ## Onboarding
 
 A new shop opens with a short intro scene (three pictures, skippable): the

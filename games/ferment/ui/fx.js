@@ -525,6 +525,7 @@ export function fxReact(e, ui) {
       stamp(e.slot, e.order.name);
       break;
     case "tierUp":
+    case "claimedPride":
       celebrate();
       break;
     case "opened":

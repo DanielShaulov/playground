@@ -71,7 +71,7 @@
  *   meta: MetaSlice, clock: ClockSlice, shop: ShopSlice, shelf: ShelfSlice,
  *   customers: CustomersSlice, orders: OrdersSlice, bench: BenchSlice, pantry: PantrySlice,
  *   regulars: RegularsSlice, progress: ProgressSlice, market: MarketSlice,
- *   tutorial: TutorialSlice
+ *   tutorial: TutorialSlice, decor: DecorSlice
  * }} State
  *
  * @typedef {{ type: string, [key: string]: any }} Action
@@ -145,6 +145,9 @@
  * @typedef {{ name: string, earned: number }} Tier
  *   content/goals.js. Reached once `earned` coins have been taken in all; never lost.
  * @typedef {"served" | "earned" | "delight" | "bestDay" | "orders" | "recipes" | "regulars" | "rep" | "upgrades"} GoalKind
+ * @typedef {GoalKind | "tier" | "known"} PrideKind
+ * @typedef {{ id: string, kind: PrideKind, n: number, text: string }} Pride
+ *   content/goals.js PRIDE: a Shop pride goal; its reward is the decor piece naming it.
  * @typedef {{ coins: number, stock?: Record<string, number> }} Reward
  * @typedef {{ kind: GoalKind, n: number, reward: Reward }} Goal
  * @typedef {{ served: number, earned: number, delight: number, bestDay: number, orders: number }} Stats
@@ -152,11 +155,12 @@
  *   customers, the best day's takings, and orders handed over.
  * @typedef {{
  *   upgrades: Record<string, number>, crocks: Record<string, string>,
- *   tier: number, goal: number, stats: Stats
+ *   tier: number, goal: number, stats: Stats, pride: string[]
  * }} ProgressSlice
  *   upgrades: shelf / jars upgrade id → levels bought. crocks: shelf spot → crock
  *   upgrade id (a spot with none has a plain crock). tier: highest tier reached
  *   (index into TIERS). goal: index of the open rung of the goals ladder.
+ *   pride: Shop pride goals claimed (ids in PRIDE).
  * @typedef {{
  *   id: string, name: string, kind: Upgrade["kind"], text: string, level: number,
  *   next: (UpgradeLevel & { level: number }) | null, locked: boolean, pace?: number
@@ -165,6 +169,21 @@
  *   next: the next level to buy, null when maxed. locked: the next level needs a higher tier.
  * @typedef {{ i: number, goal: Goal, text: string, have: number, ready: boolean }} GoalNow
  *   goalNow(): the open rung, how far along it is, and whether it can be claimed.
+ * @typedef {{ pride: Pride, have: number, ready: boolean, claimed: boolean, reward: string }} PrideNow
+ *   prideNow(): one Shop pride goal, how far along it is, and its decor reward's id.
+ * @typedef {"wall" | "wood" | "curtains" | "sill" | "garland" | "jars" | "bag"} DecorSpot
+ * @typedef {{ spot: DecorSpot, name: string, cost: number, tier: number, pride?: string }} Decor
+ *   content/decor.js. cost 0 without pride: what the shop starts with. pride: never
+ *   sold, won by that Shop pride goal.
+ * @typedef {{ owned: string[], on: Partial<Record<DecorSpot, string>> }} DecorSlice
+ *   core/decor.js. owned: pieces bought or won (the starting pieces are always owned
+ *   and never listed). on: spot -> the piece up there (missing: the starting piece).
+ * @typedef {{
+ *   id: string, spot: DecorSpot, name: string, cost: number, tier: number,
+ *   owned: boolean, on: boolean, locked: boolean, pride: string | null
+ * }} DecorOffer
+ *   decorOffers(): one per piece. on: up in its spot now. locked: for sale but needs a
+ *   higher tier. pride: the Shop pride goal that wins it (never sold), else null.
  * @typedef {{
  *   day: number, items: Record<string, { price: number, left: number }>,
  *   drift: Record<string, number>

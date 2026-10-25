@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 import * as C from "../../../games/ferment/core/index.js";
 import { RECIPE_IDS, TIER_IDS } from "../../../games/ferment/content/recipes.js";
 import { UPGRADE_IDS } from "../../../games/ferment/content/upgrades.js";
+import { DECOR_IDS } from "../../../games/ferment/content/decor.js";
+import { PRIDE } from "../../../games/ferment/content/goals.js";
 import { TIERS } from "../../../games/ferment/content/goals.js";
 import {
   MAX_QUEUE,
@@ -45,7 +47,12 @@ function randomAction(rnd, s, { validSlots = false } = {}) {
     "upgrade",
     "claimGoal",
   ];
-  const type = kinds[Math.floor(rnd() * kinds.length)];
+  // Decor and Shop pride in the evening, when they can be bought.
+  const decor = ["buyDecor", "useDecor", "claimPride"];
+  const type =
+    s.clock.phase === "evening" && rnd() < 0.3
+      ? decor[Math.floor(rnd() * decor.length)]
+      : kinds[Math.floor(rnd() * kinds.length)];
   if (type === "brew")
     return {
       type,
@@ -59,6 +66,13 @@ function randomAction(rnd, s, { validSlots = false } = {}) {
       id: rnd() < 0.95 ? UPGRADE_IDS[Math.floor(rnd() * UPGRADE_IDS.length)] : "toString",
       slot: slot(),
     };
+  if (type === "buyDecor" || type === "useDecor")
+    return {
+      type,
+      id: rnd() < 0.95 ? DECOR_IDS[Math.floor(rnd() * DECOR_IDS.length)] : "toString",
+    };
+  if (type === "claimPride")
+    return { type, id: rnd() < 0.95 ? PRIDE[Math.floor(rnd() * PRIDE.length)].id : "toString" };
   if (type === "tick") return { type, n: 1 + Math.floor(rnd() * 30) };
   if (type === "startForOrder" || type === "acceptOrder" || type === "declineOrder") {
     const list = type === "startForOrder" ? s.orders.list : s.orders.offers;
@@ -90,6 +104,8 @@ function checkInvariants(s) {
   for (const k of Object.keys(s.progress.crocks)) assert.ok(Number(k) < s.shelf.slots.length);
   assert.ok(s.progress.tier >= 0 && s.progress.tier < TIERS.length);
   assert.ok(TIERS[s.progress.tier].earned <= s.progress.stats.earned);
+  assert.equal(new Set(s.decor.owned).size, s.decor.owned.length, "decor owned twice");
+  for (const [spot, id] of Object.entries(s.decor.on)) assert.equal(C.decorOn(s, spot), id);
   const ids = new Set();
   const own = (id) => {
     assert.ok(Number.isInteger(id) && id < s.meta.nextId, `id ${id} not yet handed out`);
@@ -137,6 +153,8 @@ function checkInvariants(s) {
 
 test(`fuzz: ${RUNS} random games of ${LENGTH} actions keep every invariant`, () => {
   let accepted = 0;
+  // Evening decor tries are mostly turned away (no coins, not owned), so they don't count.
+  let decorTries = 0;
   const seen = {};
   for (let run = 0; run < RUNS; run++) {
     const rnd = testRng(run * 7919 + 1);
@@ -150,6 +168,7 @@ test(`fuzz: ${RUNS} random games of ${LENGTH} actions keep every invariant`, () 
     let s = deepFreeze(fresh);
     for (let i = 0; i < LENGTH; i++) {
       const action = randomAction(rnd, s);
+      if (["buyDecor", "useDecor", "claimPride"].includes(action.type)) decorTries++;
       const r = C.step(s, action); // throws on a frozen input if step() mutates it
       if (r.events[0]?.type === "rejected") {
         assert.equal(r.state, s);
@@ -162,7 +181,18 @@ test(`fuzz: ${RUNS} random games of ${LENGTH} actions keep every invariant`, () 
       s = deepFreeze(r.state);
     }
   }
-  assert.ok(accepted > RUNS * LENGTH * 0.4, `only ${accepted} actions were accepted`);
-  for (const type of ["upgraded", "tierUp", "goalReady", "claimedGoal"])
+  assert.ok(
+    accepted > (RUNS * LENGTH - decorTries) * 0.4,
+    `only ${accepted} actions were accepted`,
+  );
+  for (const type of [
+    "upgraded",
+    "tierUp",
+    "goalReady",
+    "claimedGoal",
+    "boughtDecor",
+    "usedDecor",
+    "claimedPride",
+  ])
     assert.ok(seen[type] > 0, `no ${type} in ${RUNS} games`);
 });

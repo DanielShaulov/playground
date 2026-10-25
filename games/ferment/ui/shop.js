@@ -7,10 +7,11 @@
 
 import { RECIPES } from "../content/recipes.js";
 import { PATIENCE, PREORDER_PATIENCE } from "../content/tuning.js";
-import { flavour, isOver, dueFor } from "../core/index.js";
+import { flavour, isOver, dueFor, decorOn } from "../core/index.js";
 import { jarSvg, emptyJarSvg } from "./art/jar.js";
 import { faceSvg } from "./art/customer.js";
 import { paintScene } from "./art/scene.js";
+import { bagArt } from "./art/decor.js";
 import { strip, stripLabels } from "./strip.js";
 import { word, lower, requestLine, clockText } from "./text.js";
 import { sheetHtml } from "./sheets.js";
@@ -33,6 +34,7 @@ export function mountShop(parent) {
   </header>
   <div class="board" id="board"></div>
   <section class="counter" id="counter"></section>
+  <div class="garland" aria-hidden="true"></div>
   <section class="shelf" id="shelf"></section>
   <footer class="actions" id="actions"></footer>
   <div class="sheet" id="sheet" hidden></div>
@@ -108,7 +110,7 @@ export function renderShop(els, ui) {
       `<div class="face">${faceSvg(showing.customer.look, showing.mood)}</div>
        <div class="talk"><div class="say"><small>${showing.customer.name}</small>${showing.line}</div>
        ${showing.f !== undefined ? `<div>${strip({ win: showing.customer, f: showing.f, big: true })}${stripLabels}</div>` : ""}</div>
-       ${showing.pay ? `<div class="float">+${showing.pay} 🪙</div>` : ""}`,
+       ${showing.pay ? `${bagArt(decorOn(s, "bag"))}<div class="float">+${showing.pay} 🪙</div>` : ""}`,
     );
   } else if (cust) {
     const matching = s.shelf.slots.filter(
