@@ -351,6 +351,10 @@
     "decor": {
       "owned": [],
       "on": {}
+    },
+    "ending": {
+      "seen": false,
+      "name": ""
     }
   }
 }

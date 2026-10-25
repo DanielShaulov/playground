@@ -19,6 +19,7 @@ import { buy } from "./market.js";
 import { upgrade, claimGoal, claimPride, track } from "./progress.js";
 import { buyDecor, useDecor } from "./decor.js";
 import { tutorial, learn } from "./tutorial.js";
+import { ending } from "./ending.js";
 
 /** @typedef {import("./types.js").State} State */
 /** @typedef {import("./types.js").Action} Action */
@@ -48,6 +49,7 @@ export const ACTIONS = {
   buyDecor,
   useDecor,
   tutorial,
+  ending,
 };
 
 /** @returns {{ state: State, events: GameEvent[] }} */

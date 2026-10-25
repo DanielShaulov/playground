@@ -46,6 +46,7 @@ const CASES = {
     "tier 5, bigger jars, recipes found at the bench",
     (s) => s.progress.tier >= 5 && s.progress.upgrades.bigjars >= 1 && s.bench.known.length >= 1,
   ],
+  "month-end": ["the morning after day 30, the month's end still to see", (s) => C.endingDue(s)],
 };
 
 const caught = {};
@@ -56,7 +57,11 @@ const check = () => {
 };
 check();
 s = C.step(s, { type: "tutorial", do: "begin" }).state;
-for (let guard = 0; s.clock.day <= 40 && Object.keys(caught).length < 7; guard++) {
+for (
+  let guard = 0;
+  s.clock.day <= 40 && Object.keys(caught).length < Object.keys(CASES).length;
+  guard++
+) {
   if (guard > 500000) throw new Error("bot stuck");
   // Read each note as it comes, as a player would, so the notes move along.
   const tip = s.tutorial.now;

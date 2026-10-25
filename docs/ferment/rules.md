@@ -474,6 +474,32 @@ unfinished three times stops coming back. The shop clock waits while a note
 is up. "No more notes" turns them off; "Watch the intro again" in settings
 (the `tutorial` action with `do: "replay"`) starts again from the intro.
 
+## The first month's end
+
+The shop is endless, but the first month gets an ending (Hadash, 2026-10-25).
+On the morning after day 30 (`ENDING_DAY`, content/ending.js), before
+anything else, a short scene plays over the shop: Brine Lane at dusk with the
+player's own jars in the window, a letter from Agnes naming the regular who
+came most, and the shop's book with the month's numbers and tier. Then the
+credits roll, with the faces of every regular the shop has won. "Keep the
+shop open" goes back to day 31, and the game carries on as before.
+
+Before the credits, the keeper signs the shop's book with three letters on
+arcade-style wheels (`{ type: "ending", do: "sign", name }`, A-Z, once; kept in
+`state.ending.name` and shown in the credits). The month then goes on this
+phone's board of best first months (ui/scores.js, stored apart from the save
+so starting over keeps it): ranked by coins taken in the first 30 days, top
+10, one row per shop (seed). The house's scores (Agnes 8000, then 5000 down
+to 1000) are always on it to beat. A shop whose month's end came later than
+day 31's morning (a save already past day 30) signs but stays off the board,
+since its takings run past the month. Settings shows the board too.
+
+It shows once (`state.ending.seen`, action `{ type: "ending", do: "seen" }`,
+accepted only while `endingDue`). A save already past day 30 gets it on its
+next morning. The settings offer "Watch the ending again" once it has been
+seen; watching again changes nothing in the game. Bots and the sim never see
+it: it only waits for the player, and the clock doesn't run in the morning.
+
 ## Not in the game yet
 
 The screens for upgrades and the goals ladder.

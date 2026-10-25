@@ -34,15 +34,26 @@ const giftJars = () =>
     }),
   );
 
-/** Brine Lane at first light: the shop with its sign, awning and empty window. */
-function street() {
-  const [top, low] = skyAt(6.6);
-  const [a, b] = giftJars();
+/**
+ * Brine Lane at first light: the shop with its sign, awning and empty window.
+ * The end of the first month (ui/ending.js) draws it again at dusk: `jars`
+ * fill the window three rows of six, `lit` warms the glass, `sign` hangs on the door;
+ * `ids` keeps its gradients apart from the intro's when both are in the page.
+ */
+export function street({
+  hour = 6.6,
+  jars = giftJars(),
+  sign = "Closed",
+  lit = false,
+  ids = "in",
+} = {}) {
+  const [top, low] = skyAt(hour);
+  const glass = lit ? ["#f7d58e", "#c98f4a"] : ["#4b4e5c", "#2e3040"];
   return `<svg viewBox="0 0 320 240" class="intro-art" aria-hidden="true">
-  <defs><linearGradient id="in-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${low}"/></linearGradient>
-  <linearGradient id="in-glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4b4e5c"/><stop offset="1" stop-color="#2e3040"/></linearGradient>
-  <radialGradient id="in-lamp"><stop offset="0" stop-color="#ffd58a" stop-opacity=".75"/><stop offset="1" stop-color="#ffd58a" stop-opacity="0"/></radialGradient></defs>
-  <rect width="320" height="240" fill="url(#in-sky)"/>
+  <defs><linearGradient id="${ids}-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${low}"/></linearGradient>
+  <linearGradient id="${ids}-glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${glass[0]}"/><stop offset="1" stop-color="${glass[1]}"/></linearGradient>
+  <radialGradient id="${ids}-lamp"><stop offset="0" stop-color="#ffd58a" stop-opacity=".75"/><stop offset="1" stop-color="#ffd58a" stop-opacity="0"/></radialGradient></defs>
+  <rect width="320" height="240" fill="url(#${ids}-sky)"/>
   <circle cx="34" cy="96" r="16" fill="#ffe3b0" opacity=".55"/><circle cx="34" cy="96" r="8" fill="#fff1d2"/>
   <path d="M0 120 V70 L18 58 L36 70 V62 H58 V120 Z" fill="#a9927e"/>
   <path d="M262 120 V60 H282 V50 L300 40 L320 52 V120 Z" fill="#a9927e"/>
@@ -50,7 +61,7 @@ function street() {
   <rect x="10" y="108" width="14" height="18" fill="#8d7560"/><rect x="284" y="104" width="14" height="18" fill="#8d7560"/>
   <path d="M46 46 L160 18 L274 46 Z" fill="#8f6440"/><rect x="50" y="44" width="220" height="176" fill="#ead7b8"/>
   <rect x="50" y="44" width="220" height="5" fill="#d8c19c"/>
-  <rect x="130" y="56" width="60" height="28" rx="2" fill="#5b5f70"/><path d="M160 56 V84" stroke="#ead7b8" stroke-width="3"/>
+  <rect x="130" y="56" width="60" height="28" rx="2" fill="${lit ? "#e9b86a" : "#5b5f70"}"/><path d="M160 56 V84" stroke="#ead7b8" stroke-width="3"/>
   <rect x="126" y="84" width="68" height="7" rx="2" fill="#a65c34"/>
   <g fill="#e3c75a"><circle cx="134" cy="83" r="2.5"/><circle cx="146" cy="82" r="2.5"/><circle cx="174" cy="83" r="2.5"/><circle cx="186" cy="82" r="2.5"/></g>
   <g fill="#6f9a45"><circle cx="140" cy="84" r="2.4"/><circle cx="160" cy="83" r="2.6"/><circle cx="180" cy="84" r="2.4"/></g>
@@ -58,18 +69,21 @@ function street() {
   <text x="160" y="116.5" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14" font-style="italic" fill="#f3e6c4" letter-spacing=".5">The Brine Nook</text>
   <path d="M62 128 H258 V138 ${Array.from({ length: 14 }, (_, i) => `Q${251 - i * 14} 146 ${244 - i * 14} 138`).join(" ")} Z" fill="#f1e6cc"/>
   ${Array.from({ length: 7 }, (_, i) => `<path d="M${62 + i * 28} 128 H${76 + i * 28} V138 Q${69 + i * 28} 146 ${62 + i * 28} 138 Z" fill="#6f8f5a"/>`).join("")}
-  <rect x="74" y="150" width="112" height="62" fill="url(#in-glass)" stroke="#7d5435" stroke-width="4"/>
+  <rect x="74" y="150" width="112" height="62" fill="url(#${ids}-glass)" stroke="#7d5435" stroke-width="4"/>
   <path d="M80 172 H180 M80 192 H180" stroke="#6d6458" stroke-width="2"/>
-  ${place(a, 84, 156, 15, 17)}${place(b, 100, 156, 15, 17)}
+  ${jars
+    .slice(0, 18)
+    .map((j, i) => place(j, 84 + (i % 6) * 16, 156 + Math.floor(i / 6) * 20, 15, 17))
+    .join("")}
   <path d="M82 206 L104 154 M98 206 L118 156" stroke="#fff" stroke-width="3" opacity=".08"/>
-  <rect x="198" y="146" width="48" height="74" fill="#7d5435"/><rect x="204" y="152" width="36" height="28" fill="#4b4e5c"/>
+  <rect x="198" y="146" width="48" height="74" fill="#7d5435"/><rect x="204" y="152" width="36" height="28" fill="${lit ? "#e9b86a" : "#4b4e5c"}"/>
   <rect x="204" y="186" width="36" height="28" fill="none" stroke="#6a4529" stroke-width="2"/><circle cx="238" cy="194" r="2" fill="#e0b44a"/>
   <path d="M214 156 L222 150 L230 156" stroke="#d8c7a8" stroke-width="1" fill="none"/>
-  <rect x="210" y="156" width="24" height="12" rx="1.5" fill="#f3e6c4"/><text x="222" y="165" text-anchor="middle" font-family="Georgia, serif" font-size="6.5" fill="#4a3524">Closed</text>
+  <rect x="210" y="156" width="24" height="12" rx="1.5" fill="#f3e6c4"/><text x="222" y="165" text-anchor="middle" font-family="Georgia, serif" font-size="6.5" fill="#4a3524">${sign}</text>
   <rect x="0" y="218" width="320" height="22" fill="#9c8b7a"/>
   <g stroke="#867565" stroke-width="1">${Array.from({ length: 16 }, (_, i) => `<path d="M${i * 21 + (i % 2) * 6} 222 h14 M${i * 21 + 9} 231 h14"/>`).join("")}</g>
   <rect x="284" y="150" width="4" height="70" fill="#3d3a3a"/><path d="M276 150 h20 l-3 -14 h-14 Z" fill="#3d3a3a"/>
-  <circle cx="286" cy="144" r="18" fill="url(#in-lamp)"/><rect x="281" y="138" width="10" height="9" fill="#ffd58a"/>
+  <circle cx="286" cy="144" r="18" fill="url(#${ids}-lamp)"/><rect x="281" y="138" width="10" height="9" fill="#ffd58a"/>
 </svg>`;
 }
 
@@ -124,7 +138,7 @@ function inside() {
 </svg>`;
 }
 
-const ART = { street, letter, inside };
+const ART = { street: () => street(), letter, inside };
 
 export function mountIntro(parent) {
   const el = document.createElement("div");

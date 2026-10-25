@@ -19,6 +19,7 @@ import { freshProgress, slotCount } from "./progress.js";
 import { openMarket } from "./market.js";
 import { freshTutorial } from "./tutorial.js";
 import { freshDecor } from "./decor.js";
+import { freshEnding } from "./ending.js";
 
 /** @typedef {import("./types.js").State} State */
 
@@ -37,6 +38,7 @@ export const SLICES = {
   market: () => ({ day: 0, items: {}, drift: {} }),
   tutorial: () => freshTutorial(),
   decor: freshDecor,
+  ending: freshEnding,
 };
 
 /** @returns {State} */
