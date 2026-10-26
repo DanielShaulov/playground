@@ -2,7 +2,7 @@
 /**
  * The settings sheet, opened from the gear in the shop's top bar: sound,
  * motion, strip style, the intro again, a backup code, report a problem,
- * start over, credits.
+ * the board of best first months (ui/scores.js), start over, credits.
  *
  * Preferences live in createStore("ferment") under "settings", apart from the
  * save (so starting over or loading a code keeps them); sound stays in
@@ -19,7 +19,8 @@
  * Wiring: main.js calls mountSettings, renderSettings (in render) and
  * settingsAct (in the tap chain); shop.js puts settingsButton() in the top
  * bar. The onboarding screens register their intro with onReplayIntro(fn);
- * until one does, the sheet has no intro button.
+ * until one does, the sheet has no intro button. ui/ending.js's scene
+ * registers the same way (onReplayEnding), offered once it has been seen.
  *
  * Test hook: window.__fermentSettings = { prefs, set(key, value) }.
  */
@@ -28,6 +29,8 @@ import { createStore } from "../../../shared/storage.js";
 import { saveCode, readCode } from "../core/index.js";
 import { isMuted, setMuted } from "./audio.js";
 import { patch } from "./dom.js";
+import { scores, scoreTable } from "./scores.js";
+import { SIGN } from "../content/ending.js";
 import { strip, stripLabels } from "./strip.js";
 import { prepareReport, sendReport, reportText, REPORT_TO } from "./report.js";
 
@@ -67,6 +70,13 @@ export function onReplayIntro(fn) {
   intro = fn;
 }
 
+/** @type {(() => void) | null} */
+let ending = null;
+/** The first month's end hands over a way to watch it again, offered once it has been seen. */
+export function onReplayEnding(fn) {
+  ending = fn;
+}
+
 /** @type {any} */ (window).__fermentSettings = { prefs, set };
 
 /** The top-bar gear: a small inline-styled icon, so "Day 12 · 8:00" still fits on an iPhone SE. */
@@ -87,7 +97,7 @@ export function mountSettings(root) {
 
 /**
  * ui.settings: null when closed, else
- * { view: "main" | "backup" | "report" | "credits", confirm?: "restart" | "load",
+ * { view: "main" | "backup" | "report" | "scores" | "credits", confirm?: "restart" | "load",
  *   code?: string (the backup code shown), paste?: string, error?: string, copied?: boolean,
  *   report?: { code, sha } (once ready), note?: string, sent?: boolean,
  *   waiting?: boolean (Write the email tapped before the report was ready) }
@@ -152,8 +162,10 @@ const VIEWS = {
       <div class="set-preview">${strip({ win: { lo: 0.42, hi: 0.68 }, f: 0.6, big: true })}${stripLabels}</div>
       <div class="set-list">
         ${intro ? `<button data-act="set-intro">Watch the intro again</button>` : ""}
+        ${ending && ui.s.ending?.seen ? `<button data-act="set-ending">Watch the ending again</button>` : ""}
         <button data-act="set-backup">Back up or move my shop</button>
         <button data-act="set-report">Report a problem</button>
+        <button data-act="set-scores">${SIGN.board}</button>
         <button data-act="set-credits">Credits</button>
         <button class="warn" data-act="set-restart">Start over</button>
       </div>
@@ -190,6 +202,12 @@ const VIEWS = {
           : ""
       }
       <div class="btns"><button data-act="set-back">Back</button><button class="main" data-act="set-report-send">Write the email</button></div>`;
+  },
+
+  scores(ui) {
+    return `<h2>${SIGN.board}</h2>
+      ${scoreTable(scores(), ui.s.meta.seed)}
+      <div class="btns"><button class="main" data-act="set-back">Back</button></div>`;
   },
 
   credits() {
@@ -241,6 +259,10 @@ export function settingsAct(act, t, ui, toast, shop) {
       ui.settings = null;
       intro?.();
       break;
+    case "set-ending":
+      ui.settings = null;
+      ending?.();
+      break;
     case "set-restart":
       st.confirm = "restart";
       break;
@@ -278,6 +300,9 @@ export function settingsAct(act, t, ui, toast, shop) {
       st.note = note?.value ?? st.note ?? "";
       copyText(reportText(st.note, st.report, ui.s.clock.day));
       st.copied = true;
+      break;
+    case "set-scores":
+      ui.settings = { view: "scores" };
       break;
     case "set-credits":
       ui.settings = { view: "credits" };

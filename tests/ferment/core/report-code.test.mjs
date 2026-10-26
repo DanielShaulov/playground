@@ -55,6 +55,17 @@ test("found inside a whole email, re-wrapped by a mail app", async () => {
   assert.deepEqual(await decodeReport(email), json(r));
 });
 
+test("a line break anywhere past the tag still reads, even inside END", async () => {
+  const r = { v: 1, ...played() };
+  const flat = (await encodeReport(r)).replace(/\n/g, "");
+  for (let k = "FERMENT-REPORT1.".length; k < flat.length; k++)
+    assert.deepEqual(
+      await decodeReport(flat.slice(0, k) + "\n" + flat.slice(k)),
+      json(r),
+      `break at ${k}`,
+    );
+});
+
 test("a damaged or missing code reads as null", async () => {
   const code = await encodeReport({ v: 1, ...played() });
   assert.equal(await decodeReport("no report here"), null);

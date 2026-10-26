@@ -25,6 +25,7 @@ import * as report from "./report.mjs";
 import * as orders from "./orders.mjs";
 import * as tipout from "./tipout.mjs";
 import * as intro from "./intro.mjs";
+import * as ending from "./ending.mjs";
 import * as saves from "./saves.mjs";
 import * as offline from "./offline.mjs";
 import * as perf from "./perf.mjs";
@@ -44,6 +45,7 @@ const ALL = [
   settings,
   report,
   intro,
+  ending,
   saves,
   offline,
   perf,

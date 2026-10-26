@@ -13,7 +13,7 @@
  * · orders.js (orders, regulars, planFor) · jars.js (flavour, add-in maths)
  * · bench.js (pantry, experiments, discovery, recipe card) · market.js (stalls, buy)
  * · progress.js (upgrades, tiers, goals, shop pride) · decor.js (shop looks) · tutorial.js (intro, first-day notes)
- * · rng.js (named random streams) · save.js (backup codes).
+ * · ending.js (the first month's end) · rng.js (named random streams) · save.js (backup codes).
  */
 
 export { newGame, loadSave, SLICES } from "./state.js";
@@ -39,3 +39,4 @@ export { owns, decorOn, decorLook, decorOffers, decorCount } from "./decor.js";
 export { marketToday, priceAt } from "./market.js";
 export { saveCode, readCode } from "./save.js";
 export { tipNow } from "./tutorial.js";
+export { endingDue, monthOf, onTime } from "./ending.js";

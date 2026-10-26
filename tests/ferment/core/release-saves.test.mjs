@@ -22,6 +22,7 @@ test("the release fixtures are all there", () => {
     "high-tier",
     "kept-portions",
     "mid-tutorial",
+    "month-end",
     "regular-pending",
     "upgrades-crocks",
   ]);

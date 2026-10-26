@@ -71,7 +71,7 @@
  *   meta: MetaSlice, clock: ClockSlice, shop: ShopSlice, shelf: ShelfSlice,
  *   customers: CustomersSlice, orders: OrdersSlice, bench: BenchSlice, pantry: PantrySlice,
  *   regulars: RegularsSlice, progress: ProgressSlice, market: MarketSlice,
- *   tutorial: TutorialSlice, decor: DecorSlice
+ *   tutorial: TutorialSlice, decor: DecorSlice, ending: { seen: boolean, name: string }
  * }} State
  *
  * @typedef {{ type: string, [key: string]: any }} Action

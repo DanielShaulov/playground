@@ -1,8 +1,8 @@
 // Phone flow: each release save (tests/ferment/core/fixtures/) put in the
 // phone's storage and opened, as a player coming back to the game would.
 // The right screen comes up for it (the intro, a keeper's note, the evening,
-// the shelf with its extra spots), nothing breaks or overflows, and the first
-// tap still works. One shot per save, for the bug sweep.
+// the month's end, the shelf with its extra spots), nothing breaks or
+// overflows, and the first tap still works. One shot per save, for the bug sweep.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 
@@ -37,7 +37,11 @@ export async function run(page, snap) {
       new RegExp(`Day ${raw.clock.day}`),
     );
     assert.equal(await page.locator(".shelf .slot").count(), raw.shelf.slots.length);
+    const ending = await page.evaluate(() =>
+      window.__ferment.core.endingDue(window.__ferment.state),
+    );
     if (raw.tutorial.intro) await page.locator(".intro").waitFor();
+    else if (ending) await page.locator(".ending").waitFor();
     else if (raw.clock.phase === "evening") await page.locator(".evening .receipt").waitFor();
     else if (raw.tutorial.now) await page.locator(".tip-note:not([hidden])").waitFor();
     await page.waitForTimeout(150);
@@ -47,6 +51,12 @@ export async function run(page, snap) {
     if (raw.tutorial.intro) {
       await page.locator('[data-act="intro-skip"]').tap();
       await page.locator(".intro").waitFor({ state: "hidden" });
+    } else if (ending) {
+      await page.locator('[data-act="end-skip"]').tap();
+      await page.locator('[data-act="end-sign"]').tap();
+      await page.locator('.ending [data-act="end-next"]').tap();
+      await page.locator('[data-act="end-done"]').tap();
+      await page.locator(".ending").waitFor({ state: "hidden" });
     } else if (raw.clock.phase === "evening") {
       await page.locator('.evening .top [data-act="eve-close"]').tap();
     }

@@ -24,10 +24,17 @@ import { mountEvening, renderEvening, openEvening, eveningAct, eveningReact } fr
 import { audioReact } from "./audio.js";
 import { toast } from "./dom.js";
 import { fxReact } from "./fx.js";
-import { mountSettings, renderSettings, settingsAct, onReplayIntro } from "./settings.js";
+import {
+  mountSettings,
+  renderSettings,
+  settingsAct,
+  onReplayIntro,
+  onReplayEnding,
+} from "./settings.js";
 import { lower, LINES } from "./text.js";
 import { mountTutorial, renderTutorial, tutorialAct, tipsPaused } from "./tutorial.js";
 import { mountIntro, renderIntro, introAct } from "./intro.js";
+import { mountEnding, renderEnding, endingAct, replayEnding } from "./ending.js";
 import { resumeTrail, startTrail, saveTrail, noteAction, noteTap, onFirstError } from "./report.js";
 
 const store = createStore("ferment");
@@ -49,6 +56,7 @@ const ui = {
   bench: null, // the brewing bench when open (ui/bench.js)
   settings: null, // the settings sheet when open (ui/settings.js)
   intro: null, // the intro scene's picture while it shows (ui/intro.js)
+  ending: null, // the first month's end while it shows (ui/ending.js)
 };
 
 function save() {
@@ -64,7 +72,9 @@ const evening = mountEvening(els.root);
 const settings = mountSettings(els.root);
 const tutorialView = mountTutorial(els.root);
 const intro = mountIntro(els.root);
+const endingView = mountEnding(els.root);
 onReplayIntro(() => dispatch({ type: "tutorial", do: "replay" }));
+onReplayEnding(() => replayEnding(ui));
 onFirstError(() => toast(els.toasts, "Something went wrong. You can report it in Settings."));
 // When someone new steps up to the counter, the action bar changes under the thumb.
 let counterId = null;
@@ -85,6 +95,7 @@ const render = () => (
   renderBench(bench, ui),
   renderSettings(settings, ui),
   renderIntro(intro, ui),
+  renderEnding(endingView, ui),
   renderTutorial(tutorialView, ui, dispatch)
 );
 
@@ -165,6 +176,7 @@ function replace(s) {
   ui.bench = null;
   ui.sheet = null;
   ui.evening = null;
+  ui.ending = null;
   if (ui.s.clock.phase === "evening") openEvening(ui);
   save();
   render();
@@ -193,6 +205,8 @@ els.root.addEventListener("click", (e) => {
     // handled by the settings sheet
   } else if (introAct(act, ui, dispatch) || tutorialAct(act, ui, dispatch)) {
     // handled by the intro scene or the keeper's notes
+  } else if (endingAct(act, t, ui, dispatch)) {
+    // handled by the first month's end
   } else if (benchAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
     // handled by the bench
   } else if (boardAct(act, t, ui, dispatch, (text) => toast(els.toasts, text))) {
@@ -241,8 +255,8 @@ let saveT = 0;
 function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
-  // Settings, the planner, the keeper's notes and the tip-out confirm pause the shop, so nothing moves under the thumb.
-  const paused = ui.settings || ui.plan || ui.sheet?.kind === "tip" || tipsPaused(ui);
+  // Settings, the planner, the keeper's notes, the ending and the tip-out confirm pause the shop, so nothing moves under the thumb.
+  const paused = ui.settings || ui.plan || ui.sheet?.kind === "tip" || ui.ending || tipsPaused(ui);
   if (ui.s.clock.phase === "open" && !paused) {
     pending += dt / HOUR_SECONDS;
     const n = Math.floor(pending * C.STEPS_PER_HOUR);
