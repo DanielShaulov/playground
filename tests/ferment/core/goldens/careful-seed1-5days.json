@@ -357,7 +357,8 @@
         "delight": 10,
         "bestDay": 119,
         "orders": 4
-      }
+      },
+      "pride": []
     },
     "market": {
       "day": 6,
@@ -396,6 +397,10 @@
       "done": [],
       "tries": {},
       "script": 0
+    },
+    "decor": {
+      "owned": [],
+      "on": {}
     }
   }
 }

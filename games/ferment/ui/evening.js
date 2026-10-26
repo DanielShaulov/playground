@@ -6,7 +6,10 @@
  *   till       today's takings on a receipt, and what tonight holds
  *   market     the market stall (ui/market.js)
  *   workshop   upgrades, each drawn on the thing it changes (ui/upgrades.js)
- *   goals      the reputation track with its tiers, and the goals ladder
+ *   decor      dress the shop: walls, wood, curtains, sill, garland, jar
+ *              dressing and bags, tried on in a miniature (ui/decor.js)
+ *   goals      the takings track with its tiers, the goals ladder, and the
+ *              Shop pride goals that win decor
  *
  * The evening plans: buying, building, claiming, and jars can still go on
  * tonight to ripen overnight. The orders corner (ui/orders.js) lists every
@@ -14,22 +17,25 @@
  * card opens the planner over the evening. The ‹ back shows the shop; the shop's own button
  * comes back here.
  *
- * Tabs: till, orders, market, workshop, goals.
+ * Tabs: till, orders, market, workshop, decor, goals.
  *
- * Screen-only state: ui.evening = { tab, spot } (null while the shop shows).
- * Buttons carry data-act="eve-…", "mk-…", "up-…" or "sleep"; main.js hands
+ * Screen-only state: ui.evening = { tab, spot, peek } (null while the shop shows).
+ * Buttons carry data-act="eve-…", "mk-…", "up-…", "dc-…" or "sleep"; main.js hands
  * them to eveningAct().
  */
 
 import { RECIPES } from "../content/recipes.js";
 import { UPGRADES } from "../content/upgrades.js";
+import { DECOR } from "../content/decor.js";
 import { INGREDIENTS } from "../content/ingredients.js";
 import { ingredientSvg } from "./art/ingredients.js";
-import { TIERS } from "../content/goals.js";
-import { goalNow, goalAt, goalText, tierOf, upgradeOffers } from "../core/index.js";
+import { PRIDE, TIERS } from "../content/goals.js";
+import { goalNow, goalAt, goalText, tierOf, upgradeOffers, prideNow } from "../core/index.js";
 import { marketHtml, marketAct, rareToday } from "./market.js";
 import { upgradesHtml, upgradesAct } from "./upgrades.js";
 import { ordersHtml, ordersNow } from "./orders.js";
+import { decorHtml, decorAct } from "./decor.js";
+import { decorSwatch } from "./art/decor.js";
 import { patch } from "./dom.js";
 
 const TABS = [
@@ -37,6 +43,7 @@ const TABS = [
   ["orders", "📋", "Orders"],
   ["market", "🧺", "Market"],
   ["workshop", "🔨", "Workshop"],
+  ["decor", "🪴", "Decor"],
   ["goals", "🏆", "Goals"],
 ];
 
@@ -64,7 +71,7 @@ export function mountEvening(parent) {
 
 /** Show the evening, on `tab` (the till unless said otherwise). */
 export function openEvening(ui, tab = "till") {
-  ui.evening = { tab, spot: ui.evening?.spot ?? {} };
+  ui.evening = { tab, spot: ui.evening?.spot ?? {}, peek: {} };
   ui.sheet = null;
   ui.departing = null;
 }
@@ -94,11 +101,20 @@ export function eveningAct(act, t, ui, dispatch, toast) {
     ui.evening = null;
   } else if (act === "eve-tab") {
     ui.evening.tab = t.dataset.tab;
+    ui.evening.peek = {};
+  } else if (act === "eve-pride") {
+    const events = dispatch({ type: "claimPride", id: t.dataset.id });
+    const no = events.find((e) => e.type === "rejected");
+    if (no) toast(no.why[0].toUpperCase() + no.why.slice(1));
   } else if (act === "eve-claim") {
     const events = dispatch({ type: "claimGoal" });
     const no = events.find((e) => e.type === "rejected");
     if (no) toast(no.why[0].toUpperCase() + no.why.slice(1));
-  } else if (!marketAct(act, t, dispatch, toast) && !upgradesAct(act, t, ui, dispatch, toast)) {
+  } else if (
+    !marketAct(act, t, dispatch, toast) &&
+    !upgradesAct(act, t, ui, dispatch, toast) &&
+    !decorAct(act, t, ui, dispatch, toast)
+  ) {
     return false;
   }
   return true;
@@ -120,6 +136,17 @@ export function eveningReact(e, toast) {
     }
     case "claimedGoal":
       toast(`Goal claimed: +${e.goal.reward.coins} 🪙`);
+      break;
+    case "boughtDecor":
+      toast(`${DECOR[e.id].name}: up in the shop`);
+      break;
+    case "prideReady": {
+      const p = PRIDE.find((x) => x.id === e.id);
+      toast(`🎀 Shop pride: ${p ? p.text : "goal met"}! Claim it in Goals`);
+      break;
+    }
+    case "claimedPride":
+      toast(`🎀 ${DECOR[e.decor].name}: yours, and up in the shop`);
       break;
     case "goalReady":
       toast(`🏆 Goal met: ${goalText(e.goal)}`);
@@ -165,6 +192,12 @@ function tillHtml(s) {
     ]);
   const g = goalNow(s);
   if (g.ready) notes.push(["goals", `🏆 Goal met: ${g.text}. Claim 🪙 ${g.goal.reward.coins}`]);
+  const pride = prideNow(s).filter((p) => p.ready);
+  if (pride.length)
+    notes.push([
+      "goals",
+      `🎀 Shop pride: ${pride[0].pride.text.toLowerCase()}. Claim the ${DECOR[pride[0].reward].name.toLowerCase()}`,
+    ]);
   const can = upgradeOffers(s).filter(
     (o) => o.next && !o.locked && s.shop.coins >= o.next.cost && o.kind !== "crock",
   );
@@ -251,8 +284,38 @@ function goalsHtml(s) {
     </li>`);
   for (let i = now.i - 1; i >= Math.max(0, now.i - 2); i--)
     rungs.push(`<li class="rung done"><span class="txt">✓ ${goalText(goalAt(i))}</span></li>`);
-  return `${track}<section class="card ladder"><h3>Goals</h3><ol>${rungs.join("")}</ol>
+  return `${track}${prideHtml(s)}<section class="card ladder"><h3>Goals</h3><ol>${rungs.join("")}</ol>
     <p class="more">The ladder goes on, each rung asking a little more.</p></section>`;
+}
+
+/**
+ * Shop pride: the big goals beside the ladder, each winning a piece of decor
+ * no money buys. Shown once the shop is Neighbourhood favourite (tier 2), so
+ * the early game keeps to the ladder; met ones come first.
+ */
+function prideHtml(s) {
+  if (tierOf(s) < 2) return "";
+  const all = prideNow(s);
+  const order = (p) => (p.ready ? 0 : p.claimed ? 2 : 1);
+  const rows = all
+    .slice()
+    .sort((a, b) => order(a) - order(b))
+    .map((p) => {
+      const piece = DECOR[p.reward];
+      const frac = Math.max(0, Math.min(1, p.have / p.pride.n));
+      const bar = p.claimed
+        ? ""
+        : `<div class="bar"><b style="width:${(frac * 100).toFixed(1)}%"></b><span>${Math.min(p.have, p.pride.n)} / ${p.pride.n}</span></div>`;
+      return `<li class="pride${p.ready ? " ready" : ""}${p.claimed ? " done" : ""}">
+        <span class="prize">${decorSwatch(p.reward)}</span>
+        <span class="ptxt"><b>${p.claimed ? "✓ " : ""}${p.pride.text}</b><small>Wins: ${piece.name.toLowerCase()}</small>${bar}</span>
+        ${p.ready ? `<button class="claim" data-act="eve-pride" data-id="${p.pride.id}">Claim</button>` : ""}
+      </li>`;
+    })
+    .join("");
+  const got = all.filter((p) => p.claimed).length;
+  return `<section class="card prides"><h3>Shop pride<small>${got} of ${all.length}</small></h3><ul>${rows}</ul>
+    <p class="more">Each wins a piece for the shop that no money buys. See it in Decor.</p></section>`;
 }
 
 // ---------- render ----------
@@ -269,7 +332,7 @@ export function renderEvening(view, ui) {
   patch(r.coins, `🪙 ${s.shop.coins}`);
   const dot = {
     market: rareToday(s).length > 0,
-    goals: goalNow(s).ready,
+    goals: goalNow(s).ready || prideNow(s).some((p) => p.ready),
     orders: ordersNow(s).some((x) => x.todo),
   };
   patch(
@@ -286,9 +349,11 @@ export function renderEvening(view, ui) {
         ? marketHtml(s)
         : ev.tab === "workshop"
           ? upgradesHtml(s, ui)
-          : ev.tab === "goals"
-            ? goalsHtml(s)
-            : tillHtml(s);
+          : ev.tab === "decor"
+            ? decorHtml(s, ui)
+            : ev.tab === "goals"
+              ? goalsHtml(s)
+              : tillHtml(s);
   const was = r.body.dataset.tab;
   patch(r.body, `<div class="corner c-${ev.tab}">${body}</div>`);
   if (was !== ev.tab) {

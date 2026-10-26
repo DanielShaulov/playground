@@ -66,7 +66,7 @@ svg.ing {
 
 /* While the evening or the bench covers the screen, the shop under it isn't
    drawn at all (a slow phone spent ~100 ms painting it unseen on closing). */
-.app.covered > :is(.top, .board, .counter, .shelf, .actions) {
+.app.covered > :is(.top, .board, .counter, .garland, .shelf, .actions) {
   visibility: hidden;
 }
 
@@ -392,7 +392,9 @@ svg.ing {
   padding: 6px 10px 0;
   border-radius: 8px 8px 0 0;
   background-color: var(--panel);
-  background-image: linear-gradient(rgba(255, 250, 240, 0.25), rgba(120, 80, 40, 0.06));
+  /* --paper: the back wall the shop has put up (ui/art/decor.js) */
+  background-image:
+    linear-gradient(rgba(255, 250, 240, 0.25), rgba(120, 80, 40, 0.06)), var(--paper, none);
   background-attachment: local;
   box-shadow:
     inset 6px 0 0 var(--plank),
@@ -510,6 +512,33 @@ svg.ing {
 }
 .slot.fits:not(.sel) {
   background-color: #e4f1dc;
+}
+
+/* What the shop has hung along the top of the shelf (decor, ui/art/decor.js),
+   over the shelf's top board and clear of the first row's lids. */
+.garland {
+  flex: none;
+  height: 26px;
+  margin: -8px 10px -22px;
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--garland, none) left top / var(--garland-w, 0) 26px repeat-x;
+}
+/* The bag a served customer carries off (decor), set down on the counter. */
+.counter .bag {
+  position: absolute;
+  left: 58px;
+  bottom: 8px;
+  width: 30px;
+  height: auto;
+  animation: bag-in 0.35s ease-out;
+}
+@keyframes bag-in {
+  from {
+    transform: translateY(8px) scale(0.8);
+    opacity: 0;
+  }
 }
 
 /* --- shelf marks for upgrades (ui/shop.js) --- */

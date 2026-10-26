@@ -8,10 +8,15 @@
  *
  * Content: content/upgrades.js (what can be bought), content/goals.js (tiers,
  * goals). Actions: `upgrade` (evening) and `claimGoal`.
+ *
+ * Shop pride (PRIDE in content/goals.js): goals beside the ladder, all open at
+ * once, each claimed once (`claimPride { id }`) for a piece of decor that is
+ * never sold; it goes up in its spot straight away (state.decor, core/decor.js).
  */
 
 import { UPGRADES, UPGRADE_IDS } from "../content/upgrades.js";
-import { GOALS, GOAL_TEXT, MORE, TIERS } from "../content/goals.js";
+import { GOALS, GOAL_TEXT, MORE, PRIDE, TIERS } from "../content/goals.js";
+import { DECOR, DECOR_IDS } from "../content/decor.js";
 import { SERVINGS, SLOTS } from "../content/tuning.js";
 import { MAX_STOCK } from "../content/ingredients.js";
 import { menu } from "./bench.js";
@@ -28,6 +33,7 @@ export function freshProgress() {
     tier: 0,
     goal: 0,
     stats: { served: 0, earned: 0, delight: 0, bestDay: 0, orders: 0 },
+    pride: [],
   };
 }
 
@@ -103,8 +109,13 @@ export function goalAt(/** @type {number} */ i) {
 export const goalText = (/** @type {Goal} */ goal) =>
   GOAL_TEXT[goal.kind].replace("{n}", String(goal.n));
 
-/** Where the shop stands on a goal's measure. */
-export function measure(/** @type {State} */ s, /** @type {GoalKind} */ kind) {
+/** Where the shop stands on a goal's (or a Shop pride goal's) measure. */
+export function measure(
+  /** @type {State} */ s,
+  /** @type {import("./types.js").PrideKind} */ kind,
+) {
+  if (kind === "tier") return s.progress.tier;
+  if (kind === "known") return s.bench.known.length;
   if (kind === "recipes") return menu(s).length;
   if (kind === "regulars") return Object.values(s.regulars.met).filter((m) => !m.pending).length;
   if (kind === "rep") return s.shop.rep;
@@ -120,6 +131,26 @@ export function goalNow(/** @type {State} */ s) {
   /** @type {import("./types.js").GoalNow} */
   const now = { i, goal, text: goalText(goal), have, ready: have >= goal.n };
   return now;
+}
+
+/** The decor piece a Shop pride goal wins. @type {Record<string, string>} */
+const PRIZE = {};
+for (const id of DECOR_IDS) {
+  const pride = DECOR[id].pride;
+  if (pride) PRIZE[pride] = id;
+}
+
+/**
+ * Every Shop pride goal: how far along it is, whether it can be claimed (or
+ * was), and the decor it wins.
+ * @returns {import("./types.js").PrideNow[]}
+ */
+export function prideNow(/** @type {State} */ s) {
+  return PRIDE.map((pride) => {
+    const have = measure(s, pride.kind);
+    const claimed = s.progress.pride.includes(pride.id);
+    return { pride, have, ready: !claimed && have >= pride.n, claimed, reward: PRIZE[pride.id] };
+  });
 }
 
 /**
@@ -163,6 +194,19 @@ export function claimGoal(s, _action, events) {
   events.push({ type: "claimedGoal", i: now.i, goal: now.goal });
 }
 
+/** { type: "claimPride", id } — claim a met Shop pride goal: its decor is the shop's, and goes up. */
+export function claimPride(s, { id }, events) {
+  const now = prideNow(s).find((p) => p.pride.id === id);
+  if (!now) return "no such goal";
+  if (now.claimed) return "already claimed";
+  if (!now.ready) return "not done yet";
+  s.progress.pride.push(id);
+  const piece = now.reward;
+  if (!s.decor.owned.includes(piece)) s.decor.owned.push(piece);
+  s.decor.on[DECOR[piece].spot] = piece;
+  events.push({ type: "claimedPride", id, decor: piece });
+}
+
 /** True when the shop has taken in all the coins a tier asks for. */
 const reached = (/** @type {State} */ s, /** @type {import("./types.js").Tier} */ t) =>
   s.progress.stats.earned >= t.earned;
@@ -198,4 +242,9 @@ export function track(
   const now = goalNow(s);
   if (now.ready && (before.progress.goal !== now.i || !goalNow(before).ready))
     events.push({ type: "goalReady", i: now.i, goal: now.goal });
+  const was = prideNow(before);
+  prideNow(s).forEach((p, k) => {
+    if (p.ready && !was[k].ready && !was[k].claimed)
+      events.push({ type: "prideReady", id: p.pride.id });
+  });
 }

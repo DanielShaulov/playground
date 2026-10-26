@@ -81,8 +81,8 @@
 /* tabs: four corners of the evening */
 .evening .tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 5px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
   padding: 0 12px;
 }
 .evening .tab {
@@ -695,7 +695,7 @@
   background: #efe2cf;
   color: var(--fg);
 }
-.evening .rung .bar {
+.evening :is(.rung, .pride) .bar {
   flex-basis: 100%;
   position: relative;
   height: 20px;
@@ -703,13 +703,13 @@
   background: #efe2cf;
   overflow: hidden;
 }
-.evening .rung .bar b {
+.evening :is(.rung, .pride) .bar b {
   position: absolute;
   inset: 0 auto 0 0;
   background: var(--go);
   border-radius: 10px;
 }
-.evening .rung .bar span {
+.evening :is(.rung, .pride) .bar span {
   position: relative;
   display: block;
   text-align: center;
@@ -872,4 +872,289 @@
   font-weight: 600;
   color: var(--fg-dim);
   line-height: 1.2;
+}
+
+/* --- decor (ui/decor.js) --- */
+.evening .dprev h3,
+.evening .dspot h3,
+.evening .prides h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.evening .dprev h3 small,
+.evening .dspot h3 small,
+.evening .prides h3 small {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg-dim);
+}
+.evening .dprev .undo {
+  margin-left: auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  background: #fff;
+  font-weight: 800;
+  font-size: 13px;
+}
+.evening .dprev.trying .mini {
+  box-shadow: 0 0 0 3px var(--tangy);
+}
+/* The shop in miniature: the counter with its window and bag, then a shelf row. */
+.evening .mini {
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--wall);
+  border: 2px solid var(--line);
+}
+.evening .mcounter {
+  position: relative;
+  height: 92px;
+  background: linear-gradient(#f4e6cf, #ecd9bb);
+  border-bottom: 10px solid var(--plank);
+  box-shadow: 0 4px 0 var(--wood-dark);
+}
+.evening .mwin {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  height: 86px;
+  transform: translateX(-50%);
+}
+.evening .mbag {
+  position: absolute;
+  right: 18%;
+  bottom: 0;
+  width: 34px;
+}
+.evening .mbag svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.evening .mshelf {
+  position: relative;
+  margin: 4px 0 0;
+  padding: 18px 14px 0;
+  background-color: var(--panel);
+  background-image: var(--paper, none);
+  box-shadow:
+    inset 6px 0 0 var(--plank),
+    inset -6px 0 0 var(--plank),
+    inset 0 6px 0 var(--wood-dark);
+}
+.evening .mgarland {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 4px;
+  height: 26px;
+  background-repeat: repeat-x;
+}
+.evening .mrow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding-bottom: 4px;
+  border-bottom: 10px solid var(--plank);
+  margin: 0 -14px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.evening .mrow svg {
+  width: 100%;
+  height: 84px;
+}
+.evening .swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 8px;
+}
+.evening .sw {
+  min-height: 84px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 4px 2px 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font: inherit;
+}
+.evening .sw small {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.evening .sw.on {
+  border-color: var(--go-dark);
+  background: #eef5e6;
+}
+.evening .sw.on small {
+  color: var(--good);
+}
+.evening .sw.try {
+  border-color: var(--tangy);
+  box-shadow: 0 3px 0 var(--tangy);
+}
+.evening .sw.locked .pic {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+.evening .sw.prize small {
+  color: #a8842c;
+}
+.evening .sw .pic {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.evening .sw .pic > *,
+.evening .prize > * {
+  max-width: 100%;
+  max-height: 100%;
+}
+.evening .sw-wall,
+.evening .sw-wood,
+.evening .sw-garland,
+.evening .sw-none {
+  display: block;
+  width: 48px;
+  height: 50px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+.evening .sw-wood {
+  background:
+    linear-gradient(var(--h), var(--p) 45%, var(--l)) 0 0 / 100% 14px repeat-y,
+    var(--d);
+  box-shadow:
+    inset 0 -3px 0 var(--d),
+    inset 5px 0 0 var(--d);
+}
+.evening .sw-garland {
+  background-color: #f6ead8;
+  background-repeat: repeat-x;
+  background-position: 0 8px;
+}
+.evening .sw-none {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);
+}
+.evening img.sw-window {
+  height: 56px;
+  width: auto;
+}
+.evening .sw-jar,
+.evening .sw-jar svg {
+  display: block;
+  height: 56px;
+  width: 44px;
+}
+.evening .sw svg.bag,
+.evening .prize svg.bag {
+  width: 40px;
+  height: 44px;
+}
+.evening .dline {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.evening .dline b {
+  font-size: 15px;
+}
+.evening .dline button {
+  min-height: 48px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: var(--card);
+  font: inherit;
+  font-weight: 800;
+}
+.evening .dline button.buy {
+  background: var(--go);
+  border-color: var(--go-dark);
+  color: #fff;
+}
+.evening .dline button.go {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px;
+  text-align: left;
+}
+
+/* Shop pride, on the goals corner. */
+.evening .prides ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.evening .pride {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: #fff;
+}
+.evening .pride.ready {
+  border-color: var(--coin);
+  background: #fff8e1;
+}
+.evening .pride.done {
+  opacity: 0.7;
+}
+.evening .pride .prize {
+  flex: 0 0 52px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.evening .pride .ptxt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.evening .pride .ptxt small {
+  color: var(--fg-dim);
+  font-weight: 700;
+}
+.evening .pride .bar {
+  margin-top: 4px;
+}
+.evening .pride .claim {
+  flex: none;
+  padding: 0 14px;
+}
+
+/* Six tabs on an iPhone SE: the labels need a size down to stay apart. */
+@media (max-width: 374px) {
+  .evening .tab {
+    font-size: 9.5px;
+    letter-spacing: -0.2px;
+  }
+  .evening .pride .prize {
+    flex-basis: 40px;
+  }
+  .evening .pride .claim {
+    padding: 0 10px;
+    font-size: 14px;
+  }
 }

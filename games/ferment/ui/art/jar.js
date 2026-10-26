@@ -23,11 +23,63 @@ import { flavour, isOver } from "../../core/index.js";
 /**
  * @typedef {{
  *   id: number, recipe: string, f: number, over: boolean,
- *   servings: number, size: number, adds: string[]
+ *   servings: number, size: number, adds: string[], dress?: string
  * }} JarLook
  *   f is flavour 0 (crisp) → 1 (funky); servings counts down from size, the
- *   portions the jar was started with.
+ *   portions the jar was started with. dress: the shop's jar dressing
+ *   (content/decor.js "jars" spot; missing: whatever dressJars() last set).
  */
+
+/** The jar dressing every jar wears unless its look says otherwise. */
+let dressing = "plain";
+
+/** Dress every jar drawn from now on (the shop's decor: scene.js paintScene). */
+export function dressJars(/** @type {string} */ id) {
+  dressing = id;
+}
+
+/**
+ * The jar's dressing: what is tied round its neck (drawn even once the lid
+ * has popped) and what sits over its lid (not once it has). A cloth cap
+ * follows the lid's dome, so the gas inside still shows.
+ */
+function dressArt(
+  /** @type {string} */ id,
+  /** @type {number} */ dome,
+  /** @type {boolean} */ over,
+  /** @type {string} */ uid,
+) {
+  const band = (/** @type {string} */ c, /** @type {string} */ dark) =>
+    `<path d="M-19.5 -30 H19.5 V-27 H-19.5Z" fill="${c}"/><path d="M-19.5 -27 H19.5" stroke="${dark}" stroke-width=".6"/>`;
+  const tag = (/** @type {string} */ c, /** @type {string} */ edge) =>
+    `<path d="M-18 -28.5 Q-24 -26 -25.5 -21" stroke="#8a6a44" stroke-width=".8" fill="none"/>
+     <g transform="rotate(14 -26 -21)"><path d="M-30 -21 H-22 V-12 L-26 -9.5 L-30 -12Z" fill="${c}" stroke="${edge}" stroke-width=".7"/><circle cx="-26" cy="-19" r=".9" fill="${edge}"/>
+     <path d="M-28.5 -16 H-23.5 M-28.5 -13.5 H-24.5" stroke="${edge}" stroke-width=".6" opacity=".8"/></g>`;
+  const bow = (/** @type {string} */ c, /** @type {string} */ dark) =>
+    `<path d="M0 -28.5 Q-9 -36 -11 -30 Q-11 -24 0 -28.5Z M0 -28.5 Q9 -36 11 -30 Q11 -24 0 -28.5Z" fill="${c}" stroke="${dark}" stroke-width=".6"/>
+     <path d="M-1 -28 L-5 -18 L-2.5 -19.5 L-1 -17.5Z M1 -28 L5 -18 L2.5 -19.5 L1 -17.5Z" fill="${c}" stroke="${dark}" stroke-width=".5"/>
+     <rect x="-2" y="-30.5" width="4" height="4" rx="1" fill="${dark}"/>`;
+  const top = n1(-38 - dome * 2 - 2.5);
+  if (id === "twine")
+    return `<path d="M-19.5 -29.5 H19.5 M-19.5 -27.8 H19.5" stroke="#a88355" stroke-width="1"/>${tag("#e9d3a8", "#8a6a44")}`;
+  if (id === "cloth") {
+    if (over) return `<path d="M-19.5 -29 H19.5" stroke="#a88355" stroke-width="1.2"/>`;
+    return `<defs><pattern id="${uid}c" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="4" fill="#fbf3e6"/><rect width="2" height="4" fill="#d9534a" opacity=".55"/><rect width="4" height="2" fill="#d9534a" opacity=".55"/></pattern></defs>
+      <path d="M-25 -26 Q-27 -33 -21.5 -36 Q0 ${top} 21.5 -36 Q27 -33 25 -26 Q22 -24 19 -26.5 Q15 -24 11 -26.5 Q7 -24 3 -26.5 Q0 -24 -3 -26.5 Q-7 -24 -11 -26.5 Q-15 -24 -19 -26.5 Q-22 -24 -25 -26Z" fill="url(#${uid}c)" stroke="#b8463c" stroke-width=".8"/>
+      <path d="M-21 -30.5 Q0 -29 21 -30.5" stroke="#a88355" stroke-width="1.3" fill="none"/>`;
+  }
+  if (id === "bow") return `${band("#c8463a", "#9e3127")}${bow("#d4524a", "#9e3127")}`;
+  if (id === "wax") {
+    const seal = over
+      ? ""
+      : `<path d="M-21.5 -39 H21.5 V-31 Q19 -30 18 -27 Q17 -30 14 -31 Q10 -29.5 9 -25.5 Q8 -30 4 -31 H-6 Q-9 -30 -10 -26.5 Q-11 -30 -14 -31 H-21.5Z" fill="#8f1f24"/>
+         <path d="M-21.5 -38 H21.5" stroke="#b8363a" stroke-width="1"/><circle cx="0" cy="-34" r="4.4" fill="#a3262c" stroke="#6d151a" stroke-width=".8"/><path d="M-2 -34 h4 M0 -36 v4" stroke="#d4686a" stroke-width=".8"/>`;
+    return `${band("#efe1c6", "#c9b28a")}${seal}`;
+  }
+  if (id === "gold")
+    return `${band("#d9b864", "#a8842c")}${tag("#f5e7b8", "#a8842c")}${bow("#e3c470", "#a8842c")}`;
+  return "";
+}
 
 /** A tiny xorshift generator for decoration only (never for rules). */
 function seeded(n) {
@@ -170,6 +222,7 @@ export function jarLook(/** @type {import("../../core/types.js").Jar} */ jar) {
     servings: jar.servings,
     size: jar.size ?? SERVINGS,
     adds: jar.adds ?? [],
+    dress: dressing,
   };
 }
 
@@ -292,7 +345,7 @@ export function jarArt(/** @type {JarLook} */ look, cls = "jar") {
     ${notches}
     <rect x="-19" y="-20" width="4.5" height="46" rx="2.25" fill="#fff" opacity=".6"/>
     <rect x="16" y="-21" width="2" height="9" rx="1" fill="#fff" opacity=".55"/>
-    ${lid}${bail}</g>
+    ${lid}${dressArt(look.dress ?? dressing, dome, over, uid)}${bail}</g>
   </svg>`;
 }
 

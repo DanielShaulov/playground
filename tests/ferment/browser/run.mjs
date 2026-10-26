@@ -28,6 +28,7 @@ import * as intro from "./intro.mjs";
 import * as saves from "./saves.mjs";
 import * as offline from "./offline.mjs";
 import * as perf from "./perf.mjs";
+import * as decor from "./decor.mjs";
 
 const ALL = [
   day,
@@ -35,6 +36,7 @@ const ALL = [
   bench,
   board,
   evening,
+  decor,
   orders,
   tipout,
   audio,

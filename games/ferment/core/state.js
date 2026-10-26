@@ -18,6 +18,7 @@ import { freshToday } from "./shop.js";
 import { freshProgress, slotCount } from "./progress.js";
 import { openMarket } from "./market.js";
 import { freshTutorial } from "./tutorial.js";
+import { freshDecor } from "./decor.js";
 
 /** @typedef {import("./types.js").State} State */
 
@@ -35,6 +36,7 @@ export const SLICES = {
   progress: freshProgress,
   market: () => ({ day: 0, items: {}, drift: {} }),
   tutorial: () => freshTutorial(),
+  decor: freshDecor,
 };
 
 /** @returns {State} */
@@ -78,6 +80,8 @@ export function loadSave(/** @type {any} */ raw) {
   if (!isObj(s.progress.upgrades) || !isObj(s.progress.crocks) || !isObj(s.progress.stats))
     return null;
   s.progress.stats = { ...freshProgress().stats, ...s.progress.stats };
+  if (!Array.isArray(s.progress.pride) || !Array.isArray(s.decor.owned) || !isObj(s.decor.on))
+    return null;
   if (!Array.isArray(s.shelf.slots) || s.shelf.slots.length !== slotCount(s)) return null;
   if (s.shelf.slots.some((j) => j && !Object.hasOwn(RECIPES, j.recipe))) return null;
   if (s.shelf.slots.some((j) => j && !validAdds(j.adds))) return null;

@@ -42,7 +42,10 @@ export async function decodeReport(/** @type {unknown} */ text) {
   const at = text.indexOf(REPORT_TAG);
   if (at < 0) return null;
   // Whitespace inside the code is a mail app re-wrapping it.
-  const m = text.slice(at).match(/^FERMENT-REPORT1\.\s*([zj])\.([A-Za-z0-9_\-\s]+?)\.\s*END/);
+  // A wrap can fall anywhere after the tag, even inside the END mark.
+  const m = text
+    .slice(at)
+    .match(/^FERMENT-REPORT1\s*\.\s*([zj])\s*\.([A-Za-z0-9_\-\s]+?)\.\s*E\s*N\s*D/);
   if (!m) return null;
   const bytes = fromB64(m[2].replace(/\s+/g, ""));
   if (!bytes) return null;
