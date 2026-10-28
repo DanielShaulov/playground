@@ -59,7 +59,10 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() =>
-        caches.match(request).then((hit) => hit ?? caches.match("./index.html")),
+        // ignoreSearch: stylesheets carry a ?v=<deploy> (scripts/stamp-build.mjs).
+        caches
+          .match(request, { ignoreSearch: true })
+          .then((hit) => hit ?? caches.match("./index.html")),
       ),
   );
 });
