@@ -44,4 +44,10 @@ export const GAMES = [
     blurb: "Ferment demo: read the jars, serve the window.",
     icon: "🫙",
   },
+  {
+    id: "perihelion",
+    title: "Perihelion",
+    blurb: "Sling through gravity wells. Hold mid-flight to grapple orbit.",
+    icon: "🪐",
+  },
 ];
