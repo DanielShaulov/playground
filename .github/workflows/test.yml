@@ -28,6 +28,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run test:perihelion
       - run: npm run test:ferment
       - run: npm run typecheck
 
@@ -60,6 +61,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run test:perihelion:browser
       - run: npm run test:ferment:browser
       # Checkwiz's rules tests drive its page in a browser and need `npm start`.
       - run: |
