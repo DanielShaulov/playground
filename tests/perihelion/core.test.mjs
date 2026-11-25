@@ -182,21 +182,43 @@ test("Orbit Grapple orbits calmly, engages golden gate detent, and releases WYSI
   assert.equal(s.phase, "clear", "releasing on the golden exit arc should hit the Warp Gate WYSIWYG!");
 });
 
-test("Ships unlock at star milestones and apply their flight traits", () => {
+test("Ships and chapters unlock in strict order without skipping ahead", () => {
   assert.equal(SHIPS.length, 4);
   const profile = createProfile();
   assert.equal(isShipUnlocked("solaris", 0), true);
   assert.equal(isShipUnlocked("aegis", 0), false);
   assert.equal(selectShip(profile, "aegis"), false);
 
-  // Grant 10 stars -> unlocks Aegis and Chapter 2 (Pulsar)
-  profile.orbits.h1 = { clear: true, par: true, sweep: true, stars: 3, bestShots: 1, bestScore: 1000 };
-  profile.orbits.h2 = { clear: true, par: true, sweep: true, stars: 3, bestShots: 1, bestScore: 1000 };
-  profile.orbits.h3 = { clear: true, par: true, sweep: true, stars: 3, bestShots: 1, bestScore: 1000 };
+  // 9 stars unlocks Aegis, but Pulsar requires 10 stars (or Helios 6)
+  for (const id of ["h1", "h2", "h3"]) {
+    profile.orbits[id] = { clear: true, par: true, sweep: true, stars: 3, bestShots: 1, bestScore: 1000 };
+  }
   assert.equal(totalStars(profile), 9);
   assert.equal(isShipUnlocked("aegis", 9), true);
-  assert.equal(isChapterUnlocked(profile, 1), true);
   assert.equal(selectShip(profile, "aegis"), true);
+  assert.equal(isChapterUnlocked(profile, 1), false);
+
+  // 3-starring all of Helios (18 stars) unlocks Pulsar ONLY — never Harmonic!
+  for (const id of ["h4", "h5", "h6"]) {
+    profile.orbits[id] = { clear: true, par: true, sweep: true, stars: 3, bestShots: 1, bestScore: 1000 };
+  }
+  assert.equal(totalStars(profile), 18);
+  assert.equal(isChapterUnlocked(profile, 1), true);
+  assert.equal(isChapterUnlocked(profile, 2), false, "Harmonic must stay locked until Pulsar is played");
+  assert.equal(isChapterUnlocked(profile, 3), false);
+
+  // 3-starring all of Pulsar too (36 stars total) unlocks Harmonic ONLY — never Singularity!
+  for (const id of ["p1", "p2", "p3", "p4", "p5", "p6"]) {
+    profile.orbits[id] = { clear: true, par: true, sweep: true, stars: 3, bestShots: 1, bestScore: 1000 };
+  }
+  assert.equal(totalStars(profile), 36);
+  assert.equal(isChapterUnlocked(profile, 2), true);
+  assert.equal(isChapterUnlocked(profile, 3), false, "Singularity must stay locked until Harmonic is played");
+
+  // Playing Harmonic and reaching 38 stars unlocks Singularity!
+  profile.orbits.m1 = { clear: true, par: true, sweep: false, stars: 2, bestShots: 1, bestScore: 900 };
+  assert.equal(totalStars(profile), 38);
+  assert.equal(isChapterUnlocked(profile, 3), true);
 
   // Aegis shield bounces off planet once; Gemini launches 2 probes
   const orbit = buildOrbit("h1");

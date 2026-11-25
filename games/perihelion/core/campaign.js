@@ -32,7 +32,7 @@ export const CHAPTERS = [
     bgTop: "#0a0814",
     bgMid: "#191229",
     bgBot: "#24131c",
-    starsToUnlock: 6,
+    starsToUnlock: 10,
   },
   {
     id: "harmonic",
@@ -44,7 +44,7 @@ export const CHAPTERS = [
     bgTop: "#041016",
     bgMid: "#09212a",
     bgBot: "#13132b",
-    starsToUnlock: 16,
+    starsToUnlock: 22,
   },
   {
     id: "singularity",
@@ -56,7 +56,7 @@ export const CHAPTERS = [
     bgTop: "#09040e",
     bgMid: "#1b0b22",
     bgBot: "#240a16",
-    starsToUnlock: 28,
+    starsToUnlock: 38,
   },
 ];
 
