@@ -1103,7 +1103,7 @@ export function createRenderer() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    const powerCol = pred.hitGate ? "#fde047" : power > 0.8 ? "#fb923c" : "#38bdf8";
+    const powerCol = pred.hitObjective ? "#fde047" : power > 0.8 ? "#fb923c" : "#38bdf8";
     ctx.strokeStyle = powerCol;
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
@@ -1125,7 +1125,7 @@ export function createRenderer() {
       const pt = pts[i];
       const frac = 1 - i / pts.length;
       const rad = 1.6 + frac * 2.5;
-      ctx.fillStyle = pred.hitGate
+      ctx.fillStyle = pred.hitObjective
         ? `rgba(253, 224, 71, ${0.2 + frac * 0.8})`
         : `rgba(186, 230, 253, ${0.14 + frac * 0.78})`;
       ctx.beginPath();
@@ -1160,7 +1160,7 @@ export function createRenderer() {
 
         if (flight.grappleExit && flight.grappleExit.points.length > 0) {
           const pts = flight.grappleExit.points;
-          const hit = flight.grappleExit.hitGate;
+          const hit = flight.grappleExit.hitObjective;
           for (let i = 0; i < pts.length; i++) {
             const pt = pts[i];
             const frac = 1 - i / pts.length;
@@ -1629,7 +1629,10 @@ export function createRenderer() {
     const keysLeft = remainingKeys(orbit);
     const leftCrystals = orbit.crystals.filter((c) => c.alive).length;
     if (session.phase === "flight" && session.flight && session.flight.probes[0].tether) {
-      sub = "ORBIT LOCKED · RELEASE WHEN ARC HITS GATE";
+      sub =
+        keysLeft > 0
+          ? "ORBIT LOCKED · RELEASE ON KEY PRISM"
+          : "ORBIT LOCKED · RELEASE WHEN ARC HITS GATE";
       subCol = "#5eead4";
     } else if (session.phase === "flight" && session.flight && session.flight.nearestGrappleId) {
       sub = "HOLD ANYWHERE TO GRAPPLE ORBIT";

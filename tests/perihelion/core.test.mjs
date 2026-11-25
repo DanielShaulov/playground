@@ -181,11 +181,29 @@ test("Ships unlock at star milestones and apply their flight traits", () => {
   assert.equal(gemFlight.probes.length, 2);
 });
 
-test("Keyed gates stay locked until keys break, and Daily Gauntlet tracks probes & profile save roundtrip", () => {
+test("Keyed gates stay locked until keys break, and trajectory highlights Key Prisms instead of locked gate", () => {
   const orbit = buildOrbit("p4");
   assert.equal(isGateUnlocked(orbit), false);
+
+  // Shooting straight at the locked gate from just below it must NOT trigger gold/detent
+  const lockedPred = predictTrajectory(orbit, orbit.gate.x, orbit.gate.y + 80, 0, -420, "solaris", 30);
+  assert.equal(lockedPred.hitGate, false);
+  assert.equal(lockedPred.hitKey, false);
+  assert.equal(lockedPred.hitObjective, false);
+
+  // Shooting at a remaining Key Prism DOES trigger gold/detent
+  const key = orbit.crystals.find((c) => c.isKey);
+  const keyPred = predictTrajectory(orbit, key.x, key.y + 60, 0, -400, "solaris", 24);
+  assert.equal(keyPred.hitKey, true);
+  assert.equal(keyPred.hitObjective, true);
+  assert.equal(keyPred.hitGate, false);
+
+  // Once all keys are broken, shooting at the gate triggers hitGate + hitObjective!
   for (const c of orbit.crystals) if (c.isKey) c.alive = false;
   assert.equal(isGateUnlocked(orbit), true);
+  const openPred = predictTrajectory(orbit, orbit.gate.x, orbit.gate.y + 80, 0, -420, "solaris", 30);
+  assert.equal(openPred.hitGate, true);
+  assert.equal(openPred.hitObjective, true);
 
   const profile = createProfile();
   const daily = createSession({ mode: "daily", seed: 999, dateLabel: "2026-11-25" });

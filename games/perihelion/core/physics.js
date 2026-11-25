@@ -141,6 +141,9 @@ export function predictTrajectory(orbit, startX, startY, vx, vy, shipId = "solar
   let whCooldown = 0;
   let hitGate = false;
 
+  const lockedKeys = orbit.crystals.filter((c) => c.alive && c.isKey);
+  const hitKeyIds = new Set();
+
   for (let i = 0; i < steps; i++) {
     const next = rk4Step(x, y, curVx, curVy, orbit.bodies, h);
     x = next.x;
@@ -150,6 +153,14 @@ export function predictTrajectory(orbit, startX, startY, vx, vy, shipId = "solar
     if (whCooldown > 0) whCooldown -= h;
 
     let breakHere = false;
+
+    // Track Key Prisms shattered along this predicted path
+    for (let k = 0; k < lockedKeys.length; k++) {
+      const key = lockedKeys[k];
+      if (!hitKeyIds.has(key.id) && Math.hypot(x - key.x, y - key.y) <= key.r + PROBE_R + 3) {
+        hitKeyIds.add(key.id);
+      }
+    }
 
     // Preview bumper ricochets cleanly too!
     for (const bp of orbit.bumpers) {
@@ -195,9 +206,24 @@ export function predictTrajectory(orbit, startX, startY, vx, vy, shipId = "solar
 
     points.push({ x, y, breakHere });
 
-    if (Math.hypot(x - orbit.gate.x, y - orbit.gate.y) <= orbit.gate.r + PROBE_R) {
-      hitGate = true;
-      break;
+    // Gate check: only counts as a warp hit if unlocked (or unlocked earlier along this very path!)
+    const gateD = Math.hypot(x - orbit.gate.x, y - orbit.gate.y);
+    if (gateD <= orbit.gate.r + PROBE_R) {
+      if (hitKeyIds.size >= lockedKeys.length) {
+        hitGate = true;
+        break;
+      } else {
+        // Preview honest bounce off the locked gate
+        const nx = (x - orbit.gate.x) / (gateD || 1);
+        const ny = (y - orbit.gate.y) / (gateD || 1);
+        x = orbit.gate.x + nx * (orbit.gate.r + PROBE_R + 2);
+        y = orbit.gate.y + ny * (orbit.gate.r + PROBE_R + 2);
+        const vn = curVx * nx + curVy * ny;
+        if (vn < 0) {
+          curVx -= 1.85 * vn * nx;
+          curVy -= 1.85 * vn * ny;
+        }
+      }
     }
 
     let crashed = false;
@@ -211,7 +237,14 @@ export function predictTrajectory(orbit, startX, startY, vx, vy, shipId = "solar
     if (x < -28 || x > WORLD_W + 28 || y < -28 || y > WORLD_H + 28) break;
   }
 
-  return { points, hitGate };
+  const hitKey = lockedKeys.length > 0 && hitKeyIds.size > 0;
+  return {
+    points,
+    hitGate,
+    hitKey,
+    hitObjective: hitGate || hitKey,
+    hitKeyIds: [...hitKeyIds],
+  };
 }
 
 /**
@@ -574,7 +607,7 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
   } else if (main.alive && main.tether) {
     flight.nearestGrappleId = main.tether.bodyId;
     flight.grappleExit = predictGrappleExit(orbit, main, shipId);
-    const nowHit = Boolean(flight.grappleExit && flight.grappleExit.hitGate);
+    const nowHit = Boolean(flight.grappleExit && flight.grappleExit.hitObjective);
     if (nowHit && !main.tether.aimingGate) {
       events.push({ type: "tether_gate_lock", x: orbit.gate.x, y: orbit.gate.y });
     }
