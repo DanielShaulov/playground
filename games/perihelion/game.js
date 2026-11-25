@@ -20,6 +20,7 @@ import {
   stepFlight,
 } from "./core/physics.js";
 import {
+  createProfile,
   sanitizeProfile,
   totalStars,
   isOrbitUnlocked,
@@ -55,6 +56,7 @@ let profile = sanitizeProfile(store.get("profile", null));
 let scene = "title"; // title | chart | play
 let chartChapter = ORBIT_BY_ID[nextPlayableOrbitId(profile)].chapter;
 let session = null;
+let confirmReset = false;
 
 // Pointer / aiming / grapple state
 let pointerDown = false;
@@ -127,9 +129,20 @@ function openChart(chapterIdx = null) {
   if (chapterIdx !== null) chartChapter = chapterIdx;
   else if (session && session.mode === "campaign") chartChapter = session.orbit.chapter;
   else chartChapter = ORBIT_BY_ID[nextPlayableOrbitId(profile)].chapter;
+  confirmReset = false;
   scene = "chart";
   aimDrag = null;
   holdingGrapple = false;
+  syncHud();
+}
+
+function resetAllProgress() {
+  profile = createProfile();
+  store.clear("profile");
+  saveProfile();
+  session = null;
+  chartChapter = 0;
+  confirmReset = false;
   syncHud();
 }
 
@@ -244,7 +257,18 @@ createInput(stage, {
 
     if (scene === "chart") {
       pointerDownOnUi = true;
-      const rects = uiRects("chart", null, profile, chartChapter);
+      const rects = uiRects("chart", null, profile, chartChapter, confirmReset);
+      if (confirmReset) {
+        if (rects.confirmResetYes && hitRect(wp, rects.confirmResetYes)) {
+          audio.playCrash();
+          vibrate(20);
+          resetAllProgress();
+        } else if (rects.confirmResetCancel && hitRect(wp, rects.confirmResetCancel)) {
+          audio.playDraft();
+          confirmReset = false;
+        }
+        return;
+      }
       for (const tab of rects.tabs) {
         if (hitRect(wp, tab)) {
           audio.playDraft();
@@ -275,7 +299,10 @@ createInput(stage, {
           return;
         }
       }
-      if (rects.launchNext && hitRect(wp, rects.launchNext)) {
+      if (rects.resetChart && hitRect(wp, rects.resetChart)) {
+        audio.playDraft();
+        confirmReset = true;
+      } else if (rects.launchNext && hitRect(wp, rects.launchNext)) {
         audio.playDraft();
         openOrbit(nextPlayableOrbitId(profile));
       } else if (rects.daily && hitRect(wp, rects.daily)) {
@@ -440,6 +467,7 @@ createLoop((dt, elapsed) => {
       scene,
       profile,
       chartChapter,
+      confirmReset,
       session,
       aim: computeAimState(),
       demoOrbit,
@@ -454,8 +482,8 @@ createLoop((dt, elapsed) => {
 // --- Verification hook ------------------------------------------------------
 
 window.__perihelion = {
-  getState: () => ({ scene, profile, session, chartChapter, vp }),
-  uiRects: () => uiRects(scene, session, profile, chartChapter),
+  getState: () => ({ scene, profile, session, chartChapter, confirmReset, vp }),
+  uiRects: () => uiRects(scene, session, profile, chartChapter, confirmReset),
   worldToScreen: (wx, wy) => ({
     x: vp.ox + wx * vp.scale,
     y: vp.oy + wy * vp.scale,

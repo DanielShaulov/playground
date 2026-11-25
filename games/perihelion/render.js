@@ -57,7 +57,7 @@ export function hitRect(p, r) {
  * Compute clickable UI rectangles in 400 x 720 world coordinates.
  * Every touch target is >= 50u tall (>= 44px even on 320px iPhone SE).
  */
-export function uiRects(scene, session, profile, chartChapter = 0) {
+export function uiRects(scene, session, profile, chartChapter = 0, confirmReset = false) {
   if (scene === "title") {
     const stars = totalStars(profile);
     if (stars > 0 || profile.seenPullTutorial) {
@@ -76,6 +76,12 @@ export function uiRects(scene, session, profile, chartChapter = 0) {
   }
 
   if (scene === "chart") {
+    if (confirmReset) {
+      return {
+        confirmResetYes: { x: 42, y: 396, w: 316, h: 60 },
+        confirmResetCancel: { x: 42, y: 470, w: 316, h: 56 },
+      };
+    }
     const tabs = CHAPTERS.map((ch, i) => ({
       chapter: i,
       x: 16 + i * 93,
@@ -99,10 +105,16 @@ export function uiRects(scene, session, profile, chartChapter = 0) {
       w: 88,
       h: 82,
     }));
+    const hasProgress =
+      totalStars(profile) > 0 ||
+      profile.seenPullTutorial ||
+      profile.seenGrappleTutorial ||
+      profile.bestDailyScore > 0;
     return {
       tabs,
       nodes,
       ships,
+      resetChart: hasProgress ? { x: 292, y: 454, w: 92, h: 52 } : null,
       launchNext: { x: 16, y: 646, w: 224, h: 56 },
       daily: { x: 248, y: 646, w: 74, h: 56 },
       mute: { x: 330, y: 646, w: 54, h: 56 },
@@ -1269,6 +1281,12 @@ export function createRenderer() {
       g.addColorStop(1, "#f59e0b");
       ctx.fillStyle = g;
       ctx.fill();
+    } else if (style === "danger") {
+      const g = ctx.createLinearGradient(r.x, r.y, r.x + r.w, r.y + r.h);
+      g.addColorStop(0, "#ef4444");
+      g.addColorStop(1, "#dc2626");
+      ctx.fillStyle = g;
+      ctx.fill();
     } else if (style === "secondary") {
       ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
       ctx.fill();
@@ -1545,9 +1563,26 @@ export function createRenderer() {
     ctx.fillStyle = "#94a3b8";
     ctx.font = `700 10.5px ${MONO}`;
     ctx.fillText("PROBE HANGAR", 18, 511);
-    ctx.textAlign = "right";
     ctx.fillStyle = "#fbbf24";
-    ctx.fillText(`★ ${starsTotal} / 72`, WORLD_W - 18, 511);
+    ctx.fillText(`·  ★ ${starsTotal} / 72`, 112, 511);
+
+    if (rects.resetChart) {
+      const rr = rects.resetChart;
+      const pillY = rr.y + 8;
+      const pillH = 30;
+      roundRect(ctx, rr.x + 6, pillY, rr.w - 6, pillH, 10);
+      ctx.fillStyle = "rgba(30, 20, 32, 0.78)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(248, 113, 113, 0.42)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.fillStyle = "#fca5a5";
+      ctx.font = `700 10px ${MONO}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("↻ RESET", rr.x + 6 + (rr.w - 6) * 0.5, pillY + pillH * 0.5 + 0.5);
+      ctx.textBaseline = "alphabetic";
+    }
 
     for (const sRect of rects.ships) {
       const s = getShip(sRect.id);
@@ -1856,6 +1891,38 @@ export function createRenderer() {
     ctx.restore();
   }
 
+  function drawResetConfirmOverlay(ctx, profile) {
+    ctx.save();
+    ctx.fillStyle = "rgba(5, 8, 20, 0.84)";
+    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+    roundRect(ctx, 24, 240, WORLD_W - 48, 314, 22);
+    ctx.fillStyle = "rgba(18, 22, 38, 0.98)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(248, 113, 113, 0.55)";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#f87171";
+    ctx.font = `800 11.5px ${MONO}`;
+    ctx.fillText("FRESH EXPEDITION", WORLD_W * 0.5, 276);
+
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = `800 24px ${FONT}`;
+    ctx.fillText("Reset Star Chart?", WORLD_W * 0.5, 310);
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = `500 13px ${FONT}`;
+    ctx.fillText("Clears all earned stars, unlocked ships,", WORLD_W * 0.5, 344);
+    ctx.fillText("tutorials & daily records.", WORLD_W * 0.5, 364);
+
+    const rects = uiRects("chart", null, profile, 0, true);
+    drawButton(ctx, rects.confirmResetYes, "YES, RESET ALL", "START BACK AT HELIOS 1", "danger");
+    drawButton(ctx, rects.confirmResetCancel, "CANCEL", "", "ghost");
+    ctx.restore();
+  }
+
   // --- Main Render Entry -----------------------------------------------------
 
   function render(ctx, vp, view, t) {
@@ -1884,6 +1951,9 @@ export function createRenderer() {
       drawTitleOverlay(ctx, view.profile, view.dailyLabel, view.muted, t);
     } else if (view.scene === "chart") {
       drawChartScreen(ctx, view.profile, view.chartChapter, view.dailyLabel, view.muted, t);
+      if (view.confirmReset) {
+        drawResetConfirmOverlay(ctx, view.profile);
+      }
     } else if (view.session) {
       const s = view.session;
       drawOrbitWorld(

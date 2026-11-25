@@ -251,6 +251,24 @@ async function run() {
     assert.equal(dailyEnd.session.phase, "daily_over");
     await page.screenshot({ path: path.join(SHOTS_DIR, "07-daily-over.png") });
 
+    // 7. Verify Star Chart 2-step Reset flow (tap RESET -> confirm -> persists clean)
+    await page.evaluate(() => window.__perihelion.openChart(0));
+    await page.waitForTimeout(140);
+    const chartRects = await page.evaluate(() => window.__perihelion.uiRects());
+    assert.ok(chartRects.resetChart, "RESET button should appear when player has progress");
+    await tapWorldRect(page, chartRects.resetChart);
+    await page.waitForTimeout(120);
+    await page.screenshot({ path: path.join(SHOTS_DIR, "07b-reset-confirm.png") });
+
+    const confirmRects = await page.evaluate(() => window.__perihelion.uiRects());
+    assert.ok(confirmRects.confirmResetYes);
+    await tapWorldRect(page, confirmRects.confirmResetYes);
+    await page.waitForTimeout(120);
+
+    const afterReset = await page.evaluate(() => window.__perihelion.getState());
+    assert.deepEqual(afterReset.profile.orbits, {});
+    assert.equal(afterReset.profile.seenPullTutorial, false);
+
     assert.deepEqual(errors, [], `unexpected errors: ${errors.join("; ")}`);
     await context.close();
 
