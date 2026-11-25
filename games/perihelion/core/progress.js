@@ -89,8 +89,11 @@ export function isChapterUnlocked(profile, chapterIdx) {
   const ch = CHAPTERS[chapterIdx];
   if (!ch) return false;
   if (chapterIdx === 0) return true;
+  if (!isChapterUnlocked(profile, chapterIdx - 1)) return false;
+  // Require playing the previous chapter before unlocking the next one
+  if (chapterStars(profile, chapterIdx - 1) <= 0) return false;
   if (totalStars(profile) >= ch.starsToUnlock) return true;
-  // Also unlock if the player cleared the boss orbit of the previous chapter
+  // Also unlock if the player cleared the final orbit of the previous chapter
   const prevLast = ORBIT_SPECS.find((o) => o.chapter === chapterIdx - 1 && o.index === 6);
   return Boolean(prevLast && profile.orbits[prevLast.id]?.clear);
 }
@@ -325,6 +328,7 @@ export function stepSession(session, profile, dt, holding = false) {
         session.score += warpBonus;
 
         const prevStarsTotal = totalStars(profile);
+        const prevChaptersUnlocked = CHAPTERS.map((_, i) => isChapterUnlocked(profile, i));
         const prevRec = profile.orbits[session.orbitId] || {
           clear: false,
           par: false,
@@ -349,12 +353,7 @@ export function stepSession(session, profile, dt, holding = false) {
           (s) => s.starsRequired > prevStarsTotal && s.starsRequired <= newStarsTotal,
         ).map((s) => s.id);
         const newlyUnlockedChapters = CHAPTERS.filter(
-          (c) =>
-            c.num > 1 &&
-            ((c.starsToUnlock > prevStarsTotal && c.starsToUnlock <= newStarsTotal) ||
-              (session.orbit.index === 6 &&
-                c.num === session.orbit.chapter + 2 &&
-                !prevRec.clear)),
+          (_, i) => !prevChaptersUnlocked[i] && isChapterUnlocked(profile, i),
         ).map((c) => c.name);
 
         const nextId = nextOrbitIdAfter(session.orbitId);
