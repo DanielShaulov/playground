@@ -1,31 +1,30 @@
 /**
- * Pure RK4 N-body orbital physics, live trajectory prediction, orbit grapple
- * tether, Perihelion Graze detection, and collision resolution.
+ * Pure RK4 N-body orbital physics, live trajectory prediction, real-time
+ * Orbit Grapple exit-arc prediction, spacetime warping, and collision resolution.
  * No DOM dependencies — runs identically in browser and Node tests.
  */
 
-import { hasRelic } from "./relics.js";
-import { WORLD_W, WORLD_H, isGateUnlocked } from "./sectors.js";
+import { getShip } from "./ships.js";
+import { WORLD_W, WORLD_H, isGateUnlocked } from "./campaign.js";
 
 export const PROBE_R = 7;
 export const MIN_PULL = 14;
-export const MAX_PULL = 145;
-export const BASE_MAX_SPEED = 560;
-export const MIN_LAUNCH_SPEED = 150;
+export const MAX_PULL = 148;
+export const BASE_MAX_SPEED = 565;
+export const MIN_LAUNCH_SPEED = 145;
 export const GRAVITY_SOFT = 460;
-export const BASE_GRAPPLE_RANGE = 165;
+export const BASE_GRAPPLE_RANGE = 172;
 export const MAX_FLIGHT_SECONDS = 14;
 
 /**
  * Convert a relative pull vector (start - current) into launch velocity.
- * Returns null if pull is inside the cancel deadzone.
+ * Returns null if inside the cancel deadzone.
  */
-export function pullToVelocity(pullDx, pullDy, ownedRelics = []) {
+export function pullToVelocity(pullDx, pullDy, shipId = "solaris") {
   const dist = Math.hypot(pullDx, pullDy);
   if (dist < MIN_PULL) return null;
-  const maxSpeed = hasRelic(ownedRelics, "tachyon_launch")
-    ? BASE_MAX_SPEED * 1.22
-    : BASE_MAX_SPEED;
+  const { traits } = getShip(shipId);
+  const maxSpeed = BASE_MAX_SPEED * traits.speedMult;
   const frac = Math.min(1, (dist - MIN_PULL) / (MAX_PULL - MIN_PULL));
   const speed = MIN_LAUNCH_SPEED + Math.pow(frac, 0.92) * (maxSpeed - MIN_LAUNCH_SPEED);
   return {
@@ -56,17 +55,34 @@ export function computeAccel(x, y, bodies) {
 }
 
 /**
+ * Subtle spacetime displacement for rendering gravity-warped background grids.
+ */
+export function warpSpacePoint(x, y, bodies) {
+  let wx = x;
+  let wy = y;
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i];
+    const dx = b.x - x;
+    const dy = b.y - y;
+    const d2 = dx * dx + dy * dy + 2400;
+    const d = Math.sqrt(d2);
+    const strength = (b.gm / 1.1e7) * (b.kind === "singularity" ? 20 : 13);
+    const pull = Math.max(-18, Math.min(20, (strength * 1400) / d2));
+    wx += (dx / d) * pull;
+    wy += (dy / d) * pull;
+  }
+  return { x: wx, y: wy };
+}
+
+/**
  * RK4 single-step integration for position & velocity under gravity.
  */
 export function rk4Step(x, y, vx, vy, bodies, h) {
   const a1 = computeAccel(x, y, bodies);
-  const k1vx = a1.ax,
-    k1vy = a1.ay;
-
   const x2 = x + vx * (h * 0.5);
   const y2 = y + vy * (h * 0.5);
-  const vx2 = vx + k1vx * (h * 0.5);
-  const vy2 = vy + k1vy * (h * 0.5);
+  const vx2 = vx + a1.ax * (h * 0.5);
+  const vy2 = vy + a1.ay * (h * 0.5);
   const a2 = computeAccel(x2, y2, bodies);
 
   const x3 = x + vx2 * (h * 0.5);
@@ -84,27 +100,24 @@ export function rk4Step(x, y, vx, vy, bodies, h) {
   return {
     x: x + ((vx + 2 * vx2 + 2 * vx3 + vx4) * h) / 6,
     y: y + ((vy + 2 * vy2 + 2 * vy3 + vy4) * h) / 6,
-    vx: vx + ((k1vx + 2 * a2.ax + 2 * a3.ax + a4.ax) * h) / 6,
-    vy: vy + ((k1vy + 2 * a2.ay + 2 * a3.ay + a4.ay) * h) / 6,
+    vx: vx + ((a1.ax + 2 * a2.ax + 2 * a3.ax + a4.ax) * h) / 6,
+    vy: vy + ((a1.ay + 2 * a2.ay + 2 * a3.ay + a4.ay) * h) / 6,
   };
 }
 
 /**
- * Find the best attractive body within grapple tether range.
- * Repulsors cannot be orbit-grappled (they push away).
+ * Find the nearest attractive body within Orbit Grapple range.
  */
-export function findGrappleTarget(sector, probe, ownedRelics = []) {
-  const range = hasRelic(ownedRelics, "graviton_drive")
-    ? BASE_GRAPPLE_RANGE * 1.3
-    : BASE_GRAPPLE_RANGE;
+export function findGrappleTarget(orbit, probe, shipId = "solaris") {
+  const { traits } = getShip(shipId);
+  const range = BASE_GRAPPLE_RANGE * traits.grappleRangeMult;
   let best = null;
-  let bestScore = Infinity;
-  for (const b of sector.bodies) {
+  let bestEdge = Infinity;
+  for (const b of orbit.bodies) {
     if (b.gm <= 0) continue;
-    const d = Math.hypot(probe.x - b.x, probe.y - b.y);
-    const edgeDist = d - b.r;
-    if (edgeDist <= range && edgeDist < bestScore) {
-      bestScore = edgeDist;
+    const edgeDist = Math.hypot(probe.x - b.x, probe.y - b.y) - b.r;
+    if (edgeDist <= range && edgeDist < bestEdge) {
+      bestEdge = edgeDist;
       best = b;
     }
   }
@@ -112,58 +125,67 @@ export function findGrappleTarget(sector, probe, ownedRelics = []) {
 }
 
 /**
- * Predict the probe's orbital trajectory for the aiming dotted arc.
- * Accounts for planets, repulsors, wormholes, and Forcefield Walls.
+ * Predict an RK4 trajectory arc from (startX, startY) with velocity (vx, vy).
+ * Works both for initial slingshot aiming AND live Orbit Grapple exit preview!
  */
-export function predictTrajectory(sector, startX, startY, vx, vy, ownedRelics = []) {
-  const longSight = hasRelic(ownedRelics, "long_sight");
-  const ricochet = hasRelic(ownedRelics, "ricochet_field");
-  const steps = longSight ? 84 : 52;
+export function predictTrajectory(orbit, startX, startY, vx, vy, shipId = "solaris", maxSteps = null) {
+  const { traits } = getShip(shipId);
+  const steps = maxSteps ?? traits.trajectorySteps;
   const h = 0.024;
   const points = [];
   let x = startX;
   let y = startY;
   let curVx = vx;
   let curVy = vy;
-  let warpsLeft = longSight ? 2 : 1;
+  let warpsLeft = 2;
   let whCooldown = 0;
-  let bouncesLeft = ricochet ? 3 : 0;
   let hitGate = false;
 
   for (let i = 0; i < steps; i++) {
-    const next = rk4Step(x, y, curVx, curVy, sector.bodies, h);
+    const next = rk4Step(x, y, curVx, curVy, orbit.bodies, h);
     x = next.x;
     y = next.y;
     curVx = next.vx;
     curVy = next.vy;
     if (whCooldown > 0) whCooldown -= h;
 
-    // Forcefield side bounce preview
-    if (bouncesLeft > 0) {
-      if (x < PROBE_R) {
-        x = PROBE_R;
-        curVx = Math.abs(curVx) * 0.94;
-        bouncesLeft--;
-      } else if (x > WORLD_W - PROBE_R) {
-        x = WORLD_W - PROBE_R;
-        curVx = -Math.abs(curVx) * 0.94;
-        bouncesLeft--;
+    let breakHere = false;
+
+    // Preview bumper ricochets cleanly too!
+    for (const bp of orbit.bumpers) {
+      const dx = x - bp.x;
+      const dy = y - bp.y;
+      const d = Math.hypot(dx, dy);
+      if (d < bp.r + PROBE_R && d > 0.001) {
+        const nx = dx / d;
+        const ny = dy / d;
+        x = bp.x + nx * (bp.r + PROBE_R + 1);
+        y = bp.y + ny * (bp.r + PROBE_R + 1);
+        const vn = curVx * nx + curVy * ny;
+        if (vn < 0) {
+          curVx -= 2 * vn * nx;
+          curVy -= 2 * vn * ny;
+        }
+        const spd = Math.hypot(curVx, curVy);
+        if (spd < 350) {
+          const s = 350 / (spd || 1);
+          curVx *= s;
+          curVy *= s;
+        }
       }
     }
 
-    let breakHere = false;
-
     // Wormhole preview
-    if (warpsLeft > 0 && whCooldown <= 0 && sector.wormholes.length === 2) {
-      for (const w of sector.wormholes) {
+    if (warpsLeft > 0 && whCooldown <= 0 && orbit.wormholes.length === 2) {
+      for (const w of orbit.wormholes) {
         if (Math.hypot(x - w.x, y - w.y) <= w.r + PROBE_R * 0.6) {
-          const dst = sector.wormholes.find((o) => o.id === w.target);
+          const dst = orbit.wormholes.find((o) => o.id === w.target);
           if (dst) {
             const spd = Math.hypot(curVx, curVy) || 1;
-            x = dst.x + (curVx / spd) * (dst.r + 6);
-            y = dst.y + (curVy / spd) * (dst.r + 6);
+            x = dst.x + (curVx / spd) * (dst.r + 7);
+            y = dst.y + (curVy / spd) * (dst.r + 7);
             warpsLeft--;
-            whCooldown = 0.25;
+            whCooldown = 0.28;
             breakHere = true;
             break;
           }
@@ -173,15 +195,13 @@ export function predictTrajectory(sector, startX, startY, vx, vy, ownedRelics = 
 
     points.push({ x, y, breakHere });
 
-    // Gate check
-    if (Math.hypot(x - sector.gate.x, y - sector.gate.y) <= sector.gate.r + PROBE_R) {
+    if (Math.hypot(x - orbit.gate.x, y - orbit.gate.y) <= orbit.gate.r + PROBE_R) {
       hitGate = true;
       break;
     }
 
-    // Body crash stops prediction
     let crashed = false;
-    for (const b of sector.bodies) {
+    for (const b of orbit.bodies) {
       if (Math.hypot(x - b.x, y - b.y) <= b.r + PROBE_R * 0.85) {
         crashed = true;
         break;
@@ -195,43 +215,68 @@ export function predictTrajectory(sector, startX, startY, vx, vy, ownedRelics = 
 }
 
 /**
- * Create a live flight state when launching from the sector's launch pad.
+ * Compute exact release velocity if the player releases Orbit Grapple right now.
  */
-export function createFlight(sector, vx, vy, ownedRelics = []) {
-  // Reset per-shot graze flags on bodies
-  for (const b of sector.bodies) b.grazed = false;
+export function grappleReleaseVelocity(probe) {
+  if (!probe.tether) return { vx: probe.vx, vy: probe.vy, boosted: false };
+  const charge = probe.tether.charge;
+  if (charge <= 0.1) return { vx: probe.vx, vy: probe.vy, boosted: false };
+  const boost = 1 + (0.2 + charge * 0.34);
+  let vx = probe.vx * boost;
+  let vy = probe.vy * boost;
+  const spd = Math.hypot(vx, vy);
+  if (spd > 780) {
+    vx = (vx / spd) * 780;
+    vy = (vy / spd) * 780;
+  }
+  return { vx, vy, boosted: true };
+}
 
-  const mainProbe = {
+/**
+ * Predict the live curved exit trajectory while holding Orbit Grapple!
+ */
+export function predictGrappleExit(orbit, probe, shipId = "solaris") {
+  if (!probe || !probe.alive || !probe.tether) return null;
+  const rel = grappleReleaseVelocity(probe);
+  return predictTrajectory(orbit, probe.x, probe.y, rel.vx, rel.vy, shipId, 44);
+}
+
+/**
+ * Create a live flight state when launching from the orbit's launch pad.
+ */
+export function createFlight(orbit, vx, vy, shipId = "solaris") {
+  for (const b of orbit.bodies) b.grazed = false;
+  const { traits } = getShip(shipId);
+
+  const main = {
     id: "main",
     isTwin: false,
-    x: sector.launch.x,
-    y: sector.launch.y,
+    x: orbit.launch.x,
+    y: orbit.launch.y,
     vx,
     vy,
     alive: true,
-    trail: [{ x: sector.launch.x, y: sector.launch.y }],
+    trail: [{ x: orbit.launch.x, y: orbit.launch.y }],
     whCooldown: 0,
-    wallBounces: hasRelic(ownedRelics, "ricochet_field") ? 3 : 0,
-    tether: null, // { bodyId, orbitR, charge, dir }
+    tether: null,
   };
 
-  const probes = [mainProbe];
+  const probes = [main];
 
-  if (hasRelic(ownedRelics, "twin_probe")) {
-    const angle = 0.14; // ~8 deg companion spread
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
+  if (traits.twinProbe) {
+    const a = 0.13;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
     probes.push({
       id: "twin",
       isTwin: true,
-      x: sector.launch.x,
-      y: sector.launch.y,
-      vx: (vx * cos - vy * sin) * 0.96,
-      vy: (vx * sin + vy * cos) * 0.96,
+      x: orbit.launch.x,
+      y: orbit.launch.y,
+      vx: (vx * c - vy * s) * 0.97,
+      vy: (vx * s + vy * c) * 0.97,
       alive: true,
-      trail: [{ x: sector.launch.x, y: sector.launch.y }],
+      trail: [{ x: orbit.launch.x, y: orbit.launch.y }],
       whCooldown: 0,
-      wallBounces: hasRelic(ownedRelics, "ricochet_field") ? 2 : 0,
       tether: null,
     });
   }
@@ -242,57 +287,50 @@ export function createFlight(sector, vx, vy, ownedRelics = []) {
     chain: 0,
     crystalsThisShot: 0,
     grazesThisShot: 0,
+    usedGrapple: false,
     settled: false,
-    outcome: null, // 'warp' | 'crash' | 'mine' | 'oob' | 'timeout' | 'recall'
+    outcome: null,
     nearestGrappleId: null,
+    grappleExit: null,
   };
 }
 
 /**
  * Step active flight physics by `dt` seconds.
- * Returns an array of gameplay events for scoring, audio, and VFX.
+ * Returns structured events for scoring, audio, and VFX.
  */
-export function stepFlight(sector, flight, dt, holding, ownedRelics = []) {
+export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
   const events = [];
   if (flight.settled) return events;
 
+  const { traits } = getShip(shipId);
   flight.elapsed += dt;
   const substeps = 4;
   const h = dt / substeps;
-  const hasMagWake = hasRelic(ownedRelics, "magnetic_wake");
-  const hasGraviton = hasRelic(ownedRelics, "graviton_drive");
-  const hasAegis = hasRelic(ownedRelics, "aegis_hull");
-  const hasNova = hasRelic(ownedRelics, "perihelion_nova");
   const main = flight.probes[0];
 
-  // Update tether lock / release on main probe
+  // Tether lock / release on main probe
   if (main.alive) {
     if (holding && !main.tether) {
-      const target = findGrappleTarget(sector, main, ownedRelics);
+      const target = findGrappleTarget(orbit, main, shipId);
       if (target) {
         const dx = main.x - target.x;
         const dy = main.y - target.y;
-        const dist = Math.max(target.r + 20, Math.hypot(dx, dy));
-        // Determine current angular direction (CW or CCW)
+        const dist = Math.max(target.r + 22, Math.hypot(dx, dy));
         const cross = dx * main.vy - dy * main.vx;
         const dir = cross >= 0 ? 1 : -1;
         main.tether = { bodyId: target.id, orbitR: dist, charge: 0, dir };
+        flight.usedGrapple = true;
         events.push({ type: "tether_lock", x: main.x, y: main.y, bodyId: target.id });
       }
     } else if (!holding && main.tether) {
       const charge = main.tether.charge;
       const bodyId = main.tether.bodyId;
+      const rel = grappleReleaseVelocity(main);
       main.tether = null;
-      if (charge > 0.12) {
-        const boost = 1 + (0.2 + charge * 0.34);
-        main.vx *= boost;
-        main.vy *= boost;
-        // Clamp extreme speed
-        const spd = Math.hypot(main.vx, main.vy);
-        if (spd > 780) {
-          main.vx = (main.vx / spd) * 780;
-          main.vy = (main.vy / spd) * 780;
-        }
+      if (rel.boosted) {
+        main.vx = rel.vx;
+        main.vy = rel.vy;
         events.push({ type: "tether_release", x: main.x, y: main.y, charge, bodyId });
       } else {
         events.push({ type: "tether_cancel", x: main.x, y: main.y, bodyId });
@@ -307,70 +345,62 @@ export function stepFlight(sector, flight, dt, holding, ownedRelics = []) {
       if (!probe.alive) continue;
       if (probe.whCooldown > 0) probe.whCooldown = Math.max(0, probe.whCooldown - h);
 
-      // Gravity integration
-      const next = rk4Step(probe.x, probe.y, probe.vx, probe.vy, sector.bodies, h);
+      const next = rk4Step(probe.x, probe.y, probe.vx, probe.vy, orbit.bodies, h);
       probe.x = next.x;
       probe.y = next.y;
       probe.vx = next.vx;
       probe.vy = next.vy;
 
-      // Active orbit tether constraint + slingshot overcharge
+      // Active Orbit Grapple constraint + tangential slingshot acceleration
       if (probe.tether) {
-        const body = sector.bodies.find((b) => b.id === probe.tether.bodyId);
-        if (!body) {
+        const b = orbit.bodies.find((body) => body.id === probe.tether.bodyId);
+        if (!b) {
           probe.tether = null;
         } else {
-          const dx = probe.x - body.x;
-          const dy = probe.y - body.y;
+          const dx = probe.x - b.x;
+          const dy = probe.y - b.y;
           const d = Math.hypot(dx, dy) || 1;
           const nx = dx / d;
           const ny = dy / d;
-          const minSafeR = body.r + 18;
-          // Gently tighten orbit slightly toward comfortable slingshot radius
+          const minSafeR = b.r + 20;
           probe.tether.orbitR = Math.max(minSafeR, probe.tether.orbitR - 14 * h);
 
-          // Damp radial velocity so the probe circularizes cleanly without crashing
           const vRad = probe.vx * nx + probe.vy * ny;
-          probe.vx -= nx * vRad * Math.min(1, 14 * h);
-          probe.vy -= ny * vRad * Math.min(1, 14 * h);
+          probe.vx -= nx * vRad * Math.min(1, 15 * h);
+          probe.vy -= ny * vRad * Math.min(1, 15 * h);
 
-          // Correct distance gently onto orbit radius
           const err = d - probe.tether.orbitR;
-          probe.x -= nx * err * Math.min(1, 12 * h);
-          probe.y -= ny * err * Math.min(1, 12 * h);
+          probe.x -= nx * err * Math.min(1, 13 * h);
+          probe.y -= ny * err * Math.min(1, 13 * h);
 
-          // Tangential acceleration builds slingshot speed & charge
           const tx = -ny * probe.tether.dir;
           const ty = nx * probe.tether.dir;
           const vTan = probe.vx * tx + probe.vy * ty;
-          const targetV = hasGraviton ? 470 : 410;
+          const targetV = 415 * (traits.grappleChargeMult > 1 ? 1.12 : 1);
           if (vTan < targetV) {
-            const accelT = hasGraviton ? 380 : 280;
-            probe.vx += tx * accelT * h;
-            probe.vy += ty * accelT * h;
+            probe.vx += tx * 300 * traits.grappleChargeMult * h;
+            probe.vy += ty * 300 * traits.grappleChargeMult * h;
           }
-          const chargeRate = hasGraviton ? 1.55 : 1.05;
-          probe.tether.charge = Math.min(1, probe.tether.charge + chargeRate * h);
+          probe.tether.charge = Math.min(1, probe.tether.charge + 1.05 * traits.grappleChargeMult * h);
         }
       }
 
-      // Magnetic Wake gently pulls nearby crystals toward the probe
-      if (hasMagWake) {
-        for (const c of sector.crystals) {
+      // Aegis magnetic crystal wake
+      if (traits.magneticWake) {
+        for (const c of orbit.crystals) {
           if (!c.alive) continue;
           const dx = probe.x - c.x;
           const dy = probe.y - c.y;
           const d = Math.hypot(dx, dy);
           if (d > 2 && d < 62) {
-            const pull = 195 * h;
-            c.x += (dx / d) * pull;
-            c.y += (dy / d) * pull;
+            c.x += (dx / d) * 195 * h;
+            c.y += (dy / d) * 195 * h;
           }
         }
       }
 
-      // Crystals & Resonance Keys
-      for (const c of sector.crystals) {
+      // Crystals & Key Prisms
+      for (const c of orbit.crystals) {
         if (!c.alive) continue;
         if (Math.hypot(probe.x - c.x, probe.y - c.y) <= c.r + PROBE_R + 3) {
           c.alive = false;
@@ -381,13 +411,14 @@ export function stepFlight(sector, flight, dt, holding, ownedRelics = []) {
             x: c.x,
             y: c.y,
             chain: flight.chain,
-            gateJustUnlocked: c.isKey && isGateUnlocked(sector),
+            points: (c.isKey ? 250 : 100) * flight.chain,
+            gateJustUnlocked: c.isKey && isGateUnlocked(orbit),
           });
         }
       }
 
-      // Solar Bumpers (elastic ricochet)
-      for (const bp of sector.bumpers) {
+      // Solar Bumpers
+      for (const bp of orbit.bumpers) {
         const dx = probe.x - bp.x;
         const dy = probe.y - bp.y;
         const d = Math.hypot(dx, dy);
@@ -402,22 +433,21 @@ export function stepFlight(sector, flight, dt, holding, ownedRelics = []) {
             probe.vy -= 2 * vn * ny;
           }
           const spd = Math.hypot(probe.vx, probe.vy);
-          const minBounce = 340;
-          if (spd < minBounce) {
-            const scale = minBounce / (spd || 1);
-            probe.vx *= scale;
-            probe.vy *= scale;
+          if (spd < 350) {
+            const sc = 350 / (spd || 1);
+            probe.vx *= sc;
+            probe.vy *= sc;
           }
           bp.flash = 1;
-          events.push({ type: "bumper", x: bp.x, y: bp.y });
+          events.push({ type: "bumper", x: bp.x, y: bp.y, points: 75 });
         }
       }
 
       // Wormholes
-      if (probe.whCooldown <= 0 && sector.wormholes.length === 2) {
-        for (const w of sector.wormholes) {
+      if (probe.whCooldown <= 0 && orbit.wormholes.length === 2) {
+        for (const w of orbit.wormholes) {
           if (Math.hypot(probe.x - w.x, probe.y - w.y) <= w.r + PROBE_R * 0.5) {
-            const dst = sector.wormholes.find((o) => o.id === w.target);
+            const dst = orbit.wormholes.find((o) => o.id === w.target);
             if (dst) {
               const spd = Math.hypot(probe.vx, probe.vy) || 1;
               probe.x = dst.x + (probe.vx / spd) * (dst.r + 7);
@@ -425,52 +455,44 @@ export function stepFlight(sector, flight, dt, holding, ownedRelics = []) {
               probe.whCooldown = 0.3;
               probe.tether = null;
               probe.trail.push({ x: probe.x, y: probe.y, breakHere: true });
-              events.push({
-                type: "wormhole",
-                fromX: w.x,
-                fromY: w.y,
-                toX: dst.x,
-                toY: dst.y,
-              });
+              events.push({ type: "wormhole", fromX: w.x, fromY: w.y, toX: dst.x, toY: dst.y });
               break;
             }
           }
         }
       }
 
-      // Warp Gate check
-      const gateD = Math.hypot(probe.x - sector.gate.x, probe.y - sector.gate.y);
-      if (gateD <= sector.gate.r + PROBE_R * 0.6) {
-        if (isGateUnlocked(sector)) {
+      // Warp Gate
+      const gateD = Math.hypot(probe.x - orbit.gate.x, probe.y - orbit.gate.y);
+      if (gateD <= orbit.gate.r + PROBE_R * 0.65) {
+        if (isGateUnlocked(orbit)) {
           flight.settled = true;
           flight.outcome = "warp";
-          events.push({ type: "gate_warp", x: sector.gate.x, y: sector.gate.y });
+          events.push({ type: "gate_warp", x: orbit.gate.x, y: orbit.gate.y });
           break;
         } else {
-          // Locked gate gently deflects the probe so you can still grab keys!
-          const nx = (probe.x - sector.gate.x) / (gateD || 1);
-          const ny = (probe.y - sector.gate.y) / (gateD || 1);
-          probe.x = sector.gate.x + nx * (sector.gate.r + PROBE_R + 2);
-          probe.y = sector.gate.y + ny * (sector.gate.r + PROBE_R + 2);
+          const nx = (probe.x - orbit.gate.x) / (gateD || 1);
+          const ny = (probe.y - orbit.gate.y) / (gateD || 1);
+          probe.x = orbit.gate.x + nx * (orbit.gate.r + PROBE_R + 2);
+          probe.y = orbit.gate.y + ny * (orbit.gate.r + PROBE_R + 2);
           const vn = probe.vx * nx + probe.vy * ny;
           if (vn < 0) {
             probe.vx -= 1.85 * vn * nx;
             probe.vy -= 1.85 * vn * ny;
           }
-          events.push({ type: "gate_locked", x: sector.gate.x, y: sector.gate.y });
+          events.push({ type: "gate_locked", x: orbit.gate.x, y: orbit.gate.y });
         }
       }
 
-      // Celestial Body Crash & Perihelion Graze
-      for (const b of sector.bodies) {
+      // Body Crash & Perihelion Graze
+      for (const b of orbit.bodies) {
         const dx = probe.x - b.x;
         const dy = probe.y - b.y;
         const d = Math.hypot(dx, dy);
 
-        // Collision with body core
         if (d <= b.r + PROBE_R * 0.8) {
-          if (!probe.isTwin && hasAegis && !sector.aegisUsed) {
-            sector.aegisUsed = true;
+          if (!probe.isTwin && traits.aegisShield && !orbit.aegisUsed) {
+            orbit.aegisUsed = true;
             const nx = dx / (d || 1);
             const ny = dy / (d || 1);
             probe.x = b.x + nx * (b.r + PROBE_R + 4);
@@ -483,18 +505,11 @@ export function stepFlight(sector, flight, dt, holding, ownedRelics = []) {
           } else {
             probe.alive = false;
             probe.tether = null;
-            events.push({
-              type: "planet_crash",
-              x: probe.x,
-              y: probe.y,
-              isTwin: probe.isTwin,
-              bodyKind: b.kind,
-            });
+            events.push({ type: "planet_crash", x: probe.x, y: probe.y, isTwin: probe.isTwin });
           }
           break;
         }
 
-        // Perihelion Graze (main probe skimming inside the Roche ring!)
         if (!probe.isTwin && !b.grazed && d <= b.grazeR) {
           b.grazed = true;
           b.grazeFlash = 1;
@@ -505,51 +520,25 @@ export function stepFlight(sector, flight, dt, holding, ownedRelics = []) {
             type: "graze",
             x: probe.x,
             y: probe.y,
-            bodyX: b.x,
-            bodyY: b.y,
             isSingularity: isSing,
             chain: flight.chain,
+            points: isSing ? 450 : 200,
           });
-          // Perihelion Nova blasts nearby crystals and mines
-          if (hasNova) {
-            const novaR = 96;
-            events.push({ type: "nova", x: probe.x, y: probe.y, r: novaR });
-            for (const c of sector.crystals) {
-              if (c.alive && Math.hypot(c.x - probe.x, c.y - probe.y) <= novaR) {
-                c.alive = false;
-                flight.chain += 1;
-                flight.crystalsThisShot += 1;
-                events.push({
-                  type: c.isKey ? "key" : "crystal",
-                  x: c.x,
-                  y: c.y,
-                  chain: flight.chain,
-                  gateJustUnlocked: c.isKey && isGateUnlocked(sector),
-                });
-              }
-            }
-            for (const m of sector.mines) {
-              if (m.alive && Math.hypot(m.x - probe.x, m.y - probe.y) <= novaR) {
-                m.alive = false;
-                events.push({ type: "mine_cleared", x: m.x, y: m.y });
-              }
-            }
-          }
         }
       }
 
       if (!probe.alive) continue;
 
       // Mines
-      for (const m of sector.mines) {
+      for (const m of orbit.mines) {
         if (!m.alive) continue;
         const dx = probe.x - m.x;
         const dy = probe.y - m.y;
         const d = Math.hypot(dx, dy);
         if (d <= m.r + PROBE_R) {
           m.alive = false;
-          if (!probe.isTwin && hasAegis && !sector.aegisUsed) {
-            sector.aegisUsed = true;
+          if (!probe.isTwin && traits.aegisShield && !orbit.aegisUsed) {
+            orbit.aegisUsed = true;
             const nx = dx / (d || 1);
             const ny = dy / (d || 1);
             const vn = probe.vx * nx + probe.vy * ny;
@@ -569,28 +558,8 @@ export function stepFlight(sector, flight, dt, holding, ownedRelics = []) {
 
       if (!probe.alive) continue;
 
-      // Side Forcefield Walls (if relic owned)
-      if (probe.wallBounces > 0) {
-        if (probe.x < PROBE_R) {
-          probe.x = PROBE_R;
-          probe.vx = Math.abs(probe.vx) * 0.94;
-          probe.wallBounces -= 1;
-          events.push({ type: "wall_bounce", x: PROBE_R, y: probe.y });
-        } else if (probe.x > WORLD_W - PROBE_R) {
-          probe.x = WORLD_W - PROBE_R;
-          probe.vx = -Math.abs(probe.vx) * 0.94;
-          probe.wallBounces -= 1;
-          events.push({ type: "wall_bounce", x: WORLD_W - PROBE_R, y: probe.y });
-        }
-      }
-
       // Out of bounds
-      if (
-        probe.x < -34 ||
-        probe.x > WORLD_W + 34 ||
-        probe.y < -34 ||
-        probe.y > WORLD_H + 34
-      ) {
+      if (probe.x < -34 || probe.x > WORLD_W + 34 || probe.y < -34 || probe.y > WORLD_H + 34) {
         probe.alive = false;
         probe.tether = null;
         events.push({ type: "oob", x: probe.x, y: probe.y, isTwin: probe.isTwin });
@@ -598,38 +567,29 @@ export function stepFlight(sector, flight, dt, holding, ownedRelics = []) {
     }
   }
 
-  // Record smooth trails
   for (const probe of flight.probes) {
     if (!probe.alive) continue;
     probe.trail.push({ x: probe.x, y: probe.y });
-    if (probe.trail.length > 54) probe.trail.shift();
+    if (probe.trail.length > 56) probe.trail.shift();
   }
 
-  // Highlight nearest eligible grapple body for HUD indicator
   if (main.alive && !main.tether) {
-    const tgt = findGrappleTarget(sector, main, ownedRelics);
+    const tgt = findGrappleTarget(orbit, main, shipId);
     flight.nearestGrappleId = tgt ? tgt.id : null;
-  } else if (main.tether) {
+    flight.grappleExit = null;
+  } else if (main.alive && main.tether) {
     flight.nearestGrappleId = main.tether.bodyId;
+    flight.grappleExit = predictGrappleExit(orbit, main, shipId);
   } else {
     flight.nearestGrappleId = null;
+    flight.grappleExit = null;
   }
 
-  // Settle flight once all probes have expired or time limit reached
   if (!flight.settled) {
     const anyAlive = flight.probes.some((p) => p.alive);
     if (!anyAlive) {
       flight.settled = true;
-      const lastMainEv = [...events]
-        .reverse()
-        .find((e) => !e.isTwin && (e.type === "planet_crash" || e.type === "mine_hit" || e.type === "oob"));
-      flight.outcome = lastMainEv
-        ? lastMainEv.type === "mine_hit"
-          ? "mine"
-          : lastMainEv.type === "oob"
-            ? "oob"
-            : "crash"
-        : "crash";
+      flight.outcome = "crash";
     } else if (flight.elapsed >= MAX_FLIGHT_SECONDS) {
       flight.settled = true;
       flight.outcome = "timeout";

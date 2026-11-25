@@ -1,17 +1,18 @@
 /**
- * Perihelion — orbital gravity slingshot roguelike for one thumb.
+ * Perihelion — orbital gravity slingshot across 24 handcrafted orbits.
  *
- * Pull back anywhere to aim with a live RK4 gravity trajectory preview.
- * Hold anywhere mid-flight to grapple into a planet's orbit and build a
- * slingshot overcharge, then release to whip out along the tangent.
+ * Pull back anywhere to bend a live RK4 gravity arc around planets, repulsors,
+ * binaries, wormholes, and singularities. Hold anywhere mid-flight to grapple
+ * into a planet's orbit with a live curved exit trajectory, then release to whip
+ * straight into the Warp Gate.
  */
 
 import { createLoop, createInput, vibrate } from "../../shared/engine.js";
 import { createShell } from "../../shared/ui.js";
 import { createStore } from "../../shared/storage.js";
 
-import { createRng, dailySeedInfo } from "./core/rng.js";
-import { generateSector, updateSectorMotion } from "./core/sectors.js";
+import { dailySeedInfo } from "./core/rng.js";
+import { ORBIT_BY_ID, buildOrbit, updateOrbitMotion } from "./core/campaign.js";
 import {
   pullToVelocity,
   predictTrajectory,
@@ -19,21 +20,23 @@ import {
   stepFlight,
 } from "./core/physics.js";
 import {
-  createRun,
-  launchProbe,
-  stepRun,
-  recallProbe,
-  pickRelic,
-  continueEndless,
-  serializeRun,
-  deserializeRun,
-} from "./core/run.js";
+  sanitizeProfile,
+  totalStars,
+  isOrbitUnlocked,
+  nextPlayableOrbitId,
+  selectShip,
+  createSession,
+  retryOrbit,
+  launchSessionProbe,
+  recallSessionProbe,
+  stepSession,
+} from "./core/progress.js";
 import { createAudio } from "./audio.js";
 import { createRenderer, computeViewport, uiRects, hitRect } from "./render.js";
 
 // --- Shell, storage, audio & renderer ---------------------------------------
 
-const shell = createShell({ title: "Perihelion", stats: ["Sector", "Score", "Best"] });
+const shell = createShell({ title: "Perihelion", stats: ["Stars", "Orbit", "Score"] });
 const { stage } = shell;
 const store = createStore("perihelion");
 const audio = createAudio(store.get("muted", false));
@@ -45,96 +48,88 @@ stage.onResize((w, h) => {
 });
 
 const daily = dailySeedInfo();
-
-function getBest() {
-  return store.get("best", 0);
-}
-
-function loadSavedRun() {
-  return deserializeRun(store.get("run", null));
-}
+let profile = sanitizeProfile(store.get("profile", null));
 
 // --- Live State -------------------------------------------------------------
 
-let scene = "title"; // title | play
-let run = null;
-let savedRun = loadSavedRun();
-let isNewBest = false;
+let scene = "title"; // title | chart | play
+let chartChapter = ORBIT_BY_ID[nextPlayableOrbitId(profile)].chapter;
+let session = null;
 
 // Pointer / aiming / grapple state
 let pointerDown = false;
-let aimDrag = null; // { startX, startY, curX, curY }
+let aimDrag = null;
 let holdingGrapple = false;
 let pointerDownOnUi = false;
 
-// Background live orbital demo behind the Title Screen
-let demoSector = generateSector(2, createRng(2026));
+// Animated background orbital demo behind Title Screen
+let demoOrbit = buildOrbit("h4");
 let demoFlight = null;
 let demoCooldown = 0.2;
 
 function resetDemoFlight() {
-  demoSector = generateSector(2, createRng(2026));
-  demoFlight = createFlight(demoSector, 155, -425, []);
+  demoOrbit = buildOrbit("h4");
+  demoFlight = createFlight(demoOrbit, 155, -420, "solaris");
 }
 resetDemoFlight();
 
-function syncHud() {
-  if (scene === "play" && run) {
-    shell.setStat("Sector", run.sectorNum);
-    shell.setStat("Score", run.score.toLocaleString());
-    shell.setStat("Best", Math.max(getBest(), run.score).toLocaleString());
-  } else {
-    shell.setStat("Sector", savedRun ? savedRun.sectorNum : 1);
-    shell.setStat("Score", savedRun ? savedRun.score.toLocaleString() : "0");
-    shell.setStat("Best", getBest().toLocaleString());
-  }
-}
-
-function persistState() {
-  if (!run) return;
-  if (run.score > getBest()) {
-    store.setBest("best", run.score);
-    isNewBest = true;
-  }
-  const snap = serializeRun(run);
-  if (snap) {
-    store.set("run", snap);
-    savedRun = deserializeRun(snap);
-  } else {
-    store.clear("run");
-    savedRun = null;
-  }
+function saveProfile() {
+  store.set("profile", profile);
   syncHud();
 }
 
-function startNewRun(mode = "standard", customSeed = undefined) {
-  audio.unlock();
-  run = createRun({
-    mode,
-    seed: customSeed,
-    dateLabel: mode === "daily" ? daily.label : null,
-  });
-  scene = "play";
-  isNewBest = false;
-  aimDrag = null;
-  holdingGrapple = false;
-  renderer.clearFx();
-  persistState();
+function syncHud() {
+  shell.setStat("Stars", `${totalStars(profile)}★`);
+  if (scene === "play" && session) {
+    shell.setStat(
+      "Orbit",
+      session.mode === "daily" ? `D${session.dailyStage}` : `${session.orbit.globalNum}/24`,
+    );
+    shell.setStat("Score", session.score.toLocaleString());
+  } else {
+    shell.setStat("Orbit", `${Object.values(profile.orbits).filter((r) => r.clear).length}/24`);
+    shell.setStat("Score", profile.bestDailyScore.toLocaleString());
+  }
 }
 
-function resumeSavedRun() {
+function openOrbit(orbitId) {
   audio.unlock();
-  const loaded = loadSavedRun();
-  if (!loaded) {
-    startNewRun("standard");
-    return;
-  }
-  run = loaded;
+  session = createSession({
+    mode: "campaign",
+    orbitId,
+    shipId: profile.selectedShip,
+  });
+  chartChapter = session.orbit.chapter;
   scene = "play";
-  isNewBest = false;
   aimDrag = null;
   holdingGrapple = false;
   renderer.clearFx();
+  syncHud();
+}
+
+function openDaily(customSeed = undefined) {
+  audio.unlock();
+  session = createSession({
+    mode: "daily",
+    shipId: profile.selectedShip,
+    seed: customSeed,
+    dateLabel: daily.label,
+  });
+  scene = "play";
+  aimDrag = null;
+  holdingGrapple = false;
+  renderer.clearFx();
+  syncHud();
+}
+
+function openChart(chapterIdx = null) {
+  audio.unlock();
+  if (chapterIdx !== null) chartChapter = chapterIdx;
+  else if (session && session.mode === "campaign") chartChapter = session.orbit.chapter;
+  else chartChapter = ORBIT_BY_ID[nextPlayableOrbitId(profile)].chapter;
+  scene = "chart";
+  aimDrag = null;
+  holdingGrapple = false;
   syncHud();
 }
 
@@ -183,25 +178,25 @@ function triggerEventAudioAndHaptics(events) {
     } else if (ev.type === "planet_crash" || ev.type === "mine_hit") {
       if (!ev.isTwin) {
         audio.playCrash();
-        vibrate(28);
+        vibrate(26);
       }
     }
   }
 }
 
 function computeAimState() {
-  if (scene !== "play" || !run || run.phase !== "aim" || !aimDrag) return null;
+  if (scene !== "play" || !session || session.phase !== "aim" || !aimDrag) return null;
   const pullDx = aimDrag.startX - aimDrag.curX;
   const pullDy = aimDrag.startY - aimDrag.curY;
-  const vel = pullToVelocity(pullDx, pullDy, run.relics);
+  const vel = pullToVelocity(pullDx, pullDy, session.shipId);
   if (!vel) return null;
   const pred = predictTrajectory(
-    run.sector,
-    run.sector.launch.x,
-    run.sector.launch.y,
+    session.orbit,
+    session.orbit.launch.x,
+    session.orbit.launch.y,
     vel.vx,
     vel.vy,
-    run.relics,
+    session.shipId,
   );
   return {
     pullDx,
@@ -228,69 +223,115 @@ createInput(stage, {
 
     if (scene === "title") {
       pointerDownOnUi = true;
-      const rects = uiRects("title", null, Boolean(savedRun));
-      if (rects.resume && hitRect(wp, rects.resume)) {
+      const rects = uiRects("title", null, profile);
+      if (rects.primary && hitRect(wp, rects.primary)) {
         audio.playDraft();
-        resumeSavedRun();
-      } else if (rects.start && hitRect(wp, rects.start)) {
+        openOrbit(nextPlayableOrbitId(profile));
+      } else if (rects.chart && hitRect(wp, rects.chart)) {
         audio.playDraft();
-        startNewRun("standard");
+        openChart();
       } else if (rects.daily && hitRect(wp, rects.daily)) {
         audio.playDraft();
-        startNewRun("daily");
+        openDaily();
       } else if (rects.mute && hitRect(wp, rects.mute)) {
         toggleMute();
       }
       return;
     }
 
-    if (!run) return;
-
-    if (run.phase === "draft") {
+    if (scene === "chart") {
       pointerDownOnUi = true;
-      const rects = uiRects("play", run, false);
-      for (const card of rects.cards || []) {
-        if (hitRect(wp, card)) {
+      const rects = uiRects("chart", null, profile, chartChapter);
+      for (const tab of rects.tabs) {
+        if (hitRect(wp, tab)) {
           audio.playDraft();
-          vibrate(12);
-          pickRelic(run, card.id);
-          renderer.clearFx();
-          persistState();
+          chartChapter = tab.chapter;
           return;
         }
       }
-      return;
-    }
-
-    if (run.phase === "victory" || run.phase === "over") {
-      pointerDownOnUi = true;
-      const rects = uiRects("play", run, false);
-      if (rects.primary && hitRect(wp, rects.primary)) {
-        audio.playDraft();
-        if (run.phase === "victory") {
-          continueEndless(run);
-          persistState();
-        } else {
-          startNewRun(run.mode);
+      for (const node of rects.nodes) {
+        if (hitRect(wp, node)) {
+          if (isOrbitUnlocked(profile, node.id)) {
+            audio.playDraft();
+            openOrbit(node.id);
+          } else {
+            audio.playLockedBounce();
+          }
+          return;
         }
-      } else if (rects.secondary && hitRect(wp, rects.secondary)) {
-        audio.playDraft();
-        if (run.phase === "victory") {
-          startNewRun("standard");
-        } else {
-          startNewRun(run.mode === "daily" ? "standard" : "daily");
+      }
+      for (const sRect of rects.ships) {
+        if (hitRect(wp, sRect)) {
+          if (selectShip(profile, sRect.id)) {
+            audio.playDraft();
+            vibrate(10);
+            saveProfile();
+          } else {
+            audio.playLockedBounce();
+          }
+          return;
         }
-      } else if (rects.home && hitRect(wp, rects.home)) {
+      }
+      if (rects.daily && hitRect(wp, rects.daily)) {
         audio.playDraft();
-        scene = "title";
-        savedRun = loadSavedRun();
-        syncHud();
+        openDaily();
+      } else if (rects.mute && hitRect(wp, rects.mute)) {
+        toggleMute();
       }
       return;
     }
 
-    if (run.phase === "aim") {
-      const rects = uiRects("play", run, false);
+    if (!session) return;
+
+    if (session.phase === "clear") {
+      pointerDownOnUi = true;
+      const rects = uiRects("play", session, profile);
+      if (rects.next && hitRect(wp, rects.next) && session.clearResult?.nextOrbitId) {
+        audio.playDraft();
+        openOrbit(session.clearResult.nextOrbitId);
+      } else if (rects.replay && hitRect(wp, rects.replay)) {
+        audio.playDraft();
+        retryOrbit(session);
+        session.lastTrail = null;
+        renderer.clearFx();
+        syncHud();
+      } else if (rects.chart && hitRect(wp, rects.chart)) {
+        audio.playDraft();
+        openChart();
+      }
+      return;
+    }
+
+    if (session.phase === "daily_over" || session.phase === "daily_won") {
+      pointerDownOnUi = true;
+      const rects = uiRects("play", session, profile);
+      if (rects.retryDaily && hitRect(wp, rects.retryDaily)) {
+        audio.playDraft();
+        openDaily();
+      } else if (rects.chart && hitRect(wp, rects.chart)) {
+        audio.playDraft();
+        openChart();
+      }
+      return;
+    }
+
+    if (session.phase === "aim") {
+      const rects = uiRects("play", session, profile);
+      if (rects.chartBtn && hitRect(wp, rects.chartBtn)) {
+        pointerDownOnUi = true;
+        audio.playDraft();
+        openChart();
+        return;
+      }
+      if (rects.restartBtn && hitRect(wp, rects.restartBtn)) {
+        pointerDownOnUi = true;
+        audio.playDraft();
+        retryOrbit(session);
+        session.lastTrail = null;
+        renderer.clearFx();
+        syncHud();
+        return;
+      }
       if (rects.mute && hitRect(wp, rects.mute)) {
         pointerDownOnUi = true;
         toggleMute();
@@ -300,15 +341,15 @@ createInput(stage, {
       return;
     }
 
-    if (run.phase === "flight") {
-      const rects = uiRects("play", run, false);
+    if (session.phase === "flight") {
+      const rects = uiRects("play", session, profile);
       if (rects.recall && hitRect(wp, rects.recall)) {
         pointerDownOnUi = true;
-        const evs = recallProbe(run);
+        const evs = recallSessionProbe(session, profile);
         audio.playCrash();
-        vibrate(18);
+        vibrate(16);
         renderer.pushEventFx(evs);
-        persistState();
+        saveProfile();
         return;
       }
       holdingGrapple = true;
@@ -318,7 +359,7 @@ createInput(stage, {
   onMove(p) {
     if (!pointerDown || pointerDownOnUi) return;
     const wp = vp.toWorld(p.x, p.y);
-    if (scene === "play" && run && run.phase === "aim" && aimDrag) {
+    if (scene === "play" && session && session.phase === "aim" && aimDrag) {
       aimDrag.curX = wp.x;
       aimDrag.curY = wp.y;
     }
@@ -333,14 +374,14 @@ createInput(stage, {
       return;
     }
 
-    if (scene === "play" && run && run.phase === "aim" && aimDrag) {
+    if (scene === "play" && session && session.phase === "aim" && aimDrag) {
       const aim = computeAimState();
       aimDrag = null;
       if (aim) {
-        launchProbe(run, aim.vx, aim.vy);
+        launchSessionProbe(session, profile, aim.vx, aim.vy);
         audio.playLaunch(aim.power);
         vibrate(14);
-        syncHud();
+        saveProfile();
       }
     }
   },
@@ -354,9 +395,9 @@ createLoop((dt, elapsed) => {
   renderer.updateFx(dt);
 
   if (scene === "title") {
-    updateSectorMotion(demoSector, dt, 1);
+    updateOrbitMotion(demoOrbit, dt, 1);
     if (demoFlight && !demoFlight.settled) {
-      const evs = stepFlight(demoSector, demoFlight, dt, false, []);
+      const evs = stepFlight(demoOrbit, demoFlight, dt, false, "solaris");
       renderer.pushEventFx(evs, { showPopups: false });
     } else {
       demoCooldown -= dt;
@@ -365,25 +406,24 @@ createLoop((dt, elapsed) => {
         demoCooldown = 0.8;
       }
     }
-  } else if (run) {
-    const prevPhase = run.phase;
-    const prevScore = run.score;
-    const events = stepRun(run, dt, holdingGrapple);
+  } else if (scene === "play" && session) {
+    const prevPhase = session.phase;
+    const prevScore = session.score;
+    const events = stepSession(session, profile, dt, holdingGrapple);
     if (events.length > 0) {
       renderer.pushEventFx(events);
       triggerEventAudioAndHaptics(events);
     }
-    if (run.score !== prevScore) {
-      if (run.score > getBest()) {
-        store.setBest("best", run.score);
-        isNewBest = true;
-      }
+    if (session.score !== prevScore) {
       syncHud();
     }
-    if (run.phase !== prevPhase) {
+    if (session.phase !== prevPhase) {
       holdingGrapple = false;
       aimDrag = null;
-      persistState();
+      if (session.phase === "clear" && session.clearResult) {
+        audio.playStars(session.clearResult.starsThisAttempt);
+      }
+      saveProfile();
     }
   }
 
@@ -392,33 +432,34 @@ createLoop((dt, elapsed) => {
     vp,
     {
       scene,
-      run,
+      profile,
+      chartChapter,
+      session,
       aim: computeAimState(),
-      demoSector,
+      demoOrbit,
       demoFlight,
-      bestScore: Math.max(getBest(), run ? run.score : 0),
-      isNewBest,
       dailyLabel: daily.label,
-      savedRun,
       muted: audio.muted,
     },
     elapsed,
   );
 });
 
-// --- Verification hook (used by tests/perihelion/browser.test.mjs) ----------
+// --- Verification hook ------------------------------------------------------
 
 window.__perihelion = {
-  getState: () => ({ scene, run, best: getBest(), vp }),
-  uiRects: () => uiRects(scene, run, Boolean(savedRun)),
+  getState: () => ({ scene, profile, session, chartChapter, vp }),
+  uiRects: () => uiRects(scene, session, profile, chartChapter),
   worldToScreen: (wx, wy) => ({
     x: vp.ox + wx * vp.scale,
     y: vp.oy + wy * vp.scale,
   }),
-  startSeed: (seed) => startNewRun("standard", seed),
+  openOrbit,
+  openChart,
+  openDaily,
   launchDirect: (vx, vy) => {
-    if (scene === "play" && run && run.phase === "aim") {
-      launchProbe(run, vx, vy);
+    if (scene === "play" && session && session.phase === "aim") {
+      launchSessionProbe(session, profile, vx, vy);
     }
   },
 };

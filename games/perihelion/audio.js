@@ -160,5 +160,13 @@ export function createAudio(initialMuted = false) {
       tone(587.33, 0.16, { type: "sine", gain: 0.1 });
       tone(880.0, 0.24, { type: "sine", gain: 0.11, delay: 0.05 });
     },
+
+    playStars(count = 1) {
+      const notes = [587.33, 880.0, 1174.66];
+      for (let i = 0; i < Math.min(3, count); i++) {
+        tone(notes[i], 0.36, { type: "sine", gain: 0.11, delay: i * 0.11 });
+        tone(notes[i] * 2, 0.22, { type: "triangle", gain: 0.04, delay: i * 0.11 });
+      }
+    },
   };
 }

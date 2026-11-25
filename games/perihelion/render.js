@@ -1,19 +1,38 @@
 /**
  * Canvas 2D renderer and pure UI hit-box layout for Perihelion.
- * Uses a 400 x 720 logical world fitted uniformly inside any portrait viewport,
- * with full-bleed cosmic starfield & nebula filling the entire screen.
+ * Features:
+ * - Warped spacetime gravity grid responding to planets, repulsors & singularities
+ * - Living 24-orbit Constellation Star Chart across 4 themed chapters + Ship Hangar
+ * - Hands-on animated tutorials (Ghost Thumb pull on Orbit 1, Slow-Mo Grapple on Orbit 2)
+ * - Diegetic leader-line callouts introducing new cosmic bodies on first sight
+ * - Ghost previous-shot trace & live curved RK4 Orbit Grapple exit trajectory
+ * - Sleek non-blocking 3-star Clear Ribbon (zero powerup card modals!)
  */
 
-import { WORLD_W, WORLD_H, FINAL_SECTOR, planetTheme, isGateUnlocked, remainingKeys } from "./core/sectors.js";
-import { RELIC_BY_ID, hasRelic } from "./core/relics.js";
-import { PROBE_R } from "./core/physics.js";
+import {
+  WORLD_W,
+  WORLD_H,
+  CHAPTERS,
+  ORBIT_SPECS,
+  ORBIT_BY_ID,
+  planetTheme,
+  isGateUnlocked,
+  remainingKeys,
+} from "./core/campaign.js";
+import { SHIPS, getShip, isShipUnlocked } from "./core/ships.js";
+import { PROBE_R, warpSpacePoint, predictTrajectory, pullToVelocity } from "./core/physics.js";
+import {
+  totalStars,
+  chapterStars,
+  isChapterUnlocked,
+  isOrbitUnlocked,
+  nextPlayableOrbitId,
+  DAILY_STAGES,
+} from "./core/progress.js";
 
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
-/**
- * Compute uniform world-to-screen transform for any stage size.
- */
 export function computeViewport(stageW, stageH) {
   const scale = Math.min(stageW / WORLD_W, stageH / WORLD_H);
   const ox = (stageW - WORLD_W * scale) * 0.5;
@@ -35,50 +54,88 @@ export function hitRect(p, r) {
 }
 
 /**
- * Compute clickable UI rectangles in world coordinates for the current state.
- * Every touch target is >= 50u tall (>= 44px even on iPhone SE 320px width).
+ * Compute clickable UI rectangles in 400 x 720 world coordinates.
+ * Every touch target is >= 50u tall (>= 44px even on 320px iPhone SE).
  */
-export function uiRects(scene, run, hasSavedRun) {
+export function uiRects(scene, session, profile, chartChapter = 0) {
   if (scene === "title") {
-    if (hasSavedRun) {
+    const stars = totalStars(profile);
+    if (stars > 0 || profile.seenPullTutorial) {
       return {
-        resume: { x: 42, y: 428, w: 316, h: 64 },
-        start: { x: 42, y: 506, w: 316, h: 60 },
+        primary: { x: 42, y: 428, w: 316, h: 64 },
+        chart: { x: 42, y: 506, w: 316, h: 60 },
         daily: { x: 42, y: 578, w: 316, h: 58 },
         mute: { x: 324, y: 654, w: 60, h: 50 },
       };
     }
     return {
-      start: { x: 42, y: 468, w: 316, h: 66 },
-      daily: { x: 42, y: 548, w: 316, h: 60 },
+      primary: { x: 42, y: 468, w: 316, h: 66 },
+      chart: { x: 42, y: 548, w: 316, h: 60 },
       mute: { x: 324, y: 654, w: 60, h: 50 },
     };
   }
-  if (!run) return {};
-  if (run.phase === "draft") {
+
+  if (scene === "chart") {
+    const tabs = CHAPTERS.map((ch, i) => ({
+      chapter: i,
+      x: 16 + i * 93,
+      y: 18,
+      w: 88,
+      h: 54,
+    }));
+    const nodes = ORBIT_SPECS.filter((o) => o.chapter === chartChapter).map((o) => ({
+      id: o.id,
+      cx: o.mapPos.x,
+      cy: o.mapPos.y,
+      x: o.mapPos.x - 32,
+      y: o.mapPos.y - 32,
+      w: 64,
+      h: 64,
+    }));
+    const ships = SHIPS.map((s, i) => ({
+      id: s.id,
+      x: 16 + i * 93,
+      y: 522,
+      w: 88,
+      h: 82,
+    }));
     return {
-      cards: run.draftChoices.map((id, i) => ({
-        id,
-        x: 26,
-        y: 256 + i * 110,
-        w: 348,
-        h: 94,
-      })),
+      tabs,
+      nodes,
+      ships,
+      daily: { x: 16, y: 646, w: 298, h: 56 },
+      mute: { x: 324, y: 646, w: 60, h: 56 },
     };
   }
-  if (run.phase === "victory" || run.phase === "over") {
+
+  if (!session) return {};
+
+  if (session.phase === "clear") {
+    const hasNext = Boolean(session.clearResult && session.clearResult.nextOrbitId);
     return {
-      primary: { x: 42, y: 472, w: 316, h: 64 },
-      secondary: { x: 42, y: 548, w: 316, h: 58 },
-      home: { x: 100, y: 618, w: 200, h: 52 },
+      next: hasNext ? { x: 36, y: 530, w: 328, h: 62 } : null,
+      replay: { x: 36, y: 604, w: 158, h: 56 },
+      chart: { x: 206, y: 604, w: 158, h: 56 },
     };
   }
-  if (run.phase === "flight") {
+
+  if (session.phase === "daily_over" || session.phase === "daily_won") {
+    return {
+      retryDaily: { x: 42, y: 492, w: 316, h: 62 },
+      chart: { x: 42, y: 568, w: 316, h: 58 },
+    };
+  }
+
+  if (session.phase === "flight") {
     return {
       recall: { x: 266, y: 656, w: 118, h: 52 },
     };
   }
+
+  // Aim phase bottom bar
   return {
+    chartBtn: { x: 16, y: 656, w: 94, h: 50 },
+    restartBtn: session.mode === "campaign" ? { x: 118, y: 656, w: 96, h: 50 } : null,
     mute: { x: 326, y: 656, w: 58, h: 50 },
   };
 }
@@ -93,17 +150,42 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/**
- * Create a self-contained VFX & starfield renderer.
- */
+function drawStarIcon(ctx, cx, cy, r, filled, strokeCol = "rgba(148,163,184,0.4)") {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rad = i % 2 === 0 ? r : r * 0.44;
+    const px = Math.cos(a) * rad;
+    const py = Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  if (filled) {
+    ctx.fillStyle = "#fbbf24";
+    ctx.fill();
+    ctx.strokeStyle = "#fef08a";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
+    ctx.fill();
+    ctx.strokeStyle = strokeCol;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function createRenderer() {
-  // Normalized full-bleed background stars (0..1 across entire stage)
-  const stars = Array.from({ length: 110 }, (_, i) => ({
+  const stars = Array.from({ length: 120 }, (_, i) => ({
     nx: ((Math.sin(i * 127.1) * 43758.5453) % 1 + 1) % 1,
     ny: ((Math.sin(i * 311.7) * 43758.5453) % 1 + 1) % 1,
-    r: 0.55 + (i % 5) * 0.28,
-    alpha: 0.22 + ((i * 37) % 65) / 100,
-    twinkle: 1.2 + (i % 7) * 0.45,
+    r: 0.55 + (i % 5) * 0.27,
+    alpha: 0.2 + ((i * 37) % 68) / 100,
+    twinkle: 1.1 + (i % 7) * 0.45,
     phase: i * 1.13,
     tint: i % 9 === 0 ? "#bae6fd" : i % 11 === 0 ? "#fde68a" : "#e2e8f0",
   }));
@@ -115,7 +197,7 @@ export function createRenderer() {
   let flash = 0;
   let flashColor = "#fbbf24";
 
-  function addBurst(x, y, color, count = 16, speed = 150) {
+  function addBurst(x, y, color, count = 16, speed = 155) {
     for (let i = 0; i < count; i++) {
       const a = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
       const sp = speed * (0.35 + Math.random() * 0.85);
@@ -138,8 +220,8 @@ export function createRenderer() {
   }
 
   function addPopup(x, y, text, color = "#67e8f9", size = 14) {
-    const cx = Math.max(46, Math.min(WORLD_W - 46, x));
-    const cy = Math.max(48, Math.min(WORLD_H - 70, y));
+    const cx = Math.max(48, Math.min(WORLD_W - 48, x));
+    const cy = Math.max(48, Math.min(WORLD_H - 72, y));
     popups.push({ x: cx, y: cy, text, color, size, life: 0.95, maxLife: 0.95 });
   }
 
@@ -155,7 +237,6 @@ export function createRenderer() {
           const label = ev.chain > 1 ? `+${ev.points} ×${ev.chain}` : `+${ev.points}`;
           pop(ev.x, ev.y - 10, label, "#67e8f9", ev.chain > 2 ? 16 : 14);
         }
-        if (ev.siphonProbe) pop(ev.x, ev.y - 28, "+1 PROBE!", "#4ade80", 15);
       } else if (ev.type === "key") {
         addBurst(ev.x, ev.y, "#fde047", 24, 190);
         addRing(ev.x, ev.y, "#fbbf24", 62, 0.5, 3);
@@ -164,7 +245,7 @@ export function createRenderer() {
           ev.y - 12,
           ev.gateJustUnlocked ? "GATE UNLOCKED!" : `KEY +${ev.points ?? 250}`,
           "#fde047",
-          16,
+          15,
         );
         shake = Math.max(shake, 5);
       } else if (ev.type === "graze") {
@@ -172,18 +253,9 @@ export function createRenderer() {
         addBurst(ev.x, ev.y, col, 18, 175);
         addRing(ev.x, ev.y, col, 52, 0.42, 2.5);
         if (ev.points !== undefined) {
-          pop(
-            ev.x,
-            ev.y - 14,
-            ev.isSingularity ? `SINGULARITY GRAZE +${ev.points}` : `GRAZE! +${ev.points}`,
-            col,
-            14,
-          );
+          pop(ev.x, ev.y - 14, `GRAZE! +${ev.points}`, col, 14);
         }
         shake = Math.max(shake, 4);
-      } else if (ev.type === "nova") {
-        addRing(ev.x, ev.y, "#fb923c", ev.r, 0.45, 3.5);
-        addBurst(ev.x, ev.y, "#fdba74", 22, 220);
       } else if (ev.type === "bumper") {
         addBurst(ev.x, ev.y, "#fde047", 12, 140);
         addRing(ev.x, ev.y, "#fbbf24", 42, 0.3, 2.5);
@@ -194,40 +266,35 @@ export function createRenderer() {
         addRing(ev.toX, ev.toY, "#818cf8", 54, 0.45, 2.5);
         addBurst(ev.toX, ev.toY, "#a5b4fc", 16, 150);
       } else if (ev.type === "tether_lock") {
-        addRing(ev.x, ev.y, "#2dd4bf", 34, 0.28, 2);
+        addRing(ev.x, ev.y, "#2dd4bf", 38, 0.3, 2.2);
       } else if (ev.type === "tether_release") {
-        addBurst(ev.x, ev.y, "#5eead4", 16, 170);
-        addRing(ev.x, ev.y, "#fbbf24", 48, 0.35, 2.5);
+        addBurst(ev.x, ev.y, "#5eead4", 18, 175);
+        addRing(ev.x, ev.y, "#fbbf24", 50, 0.36, 2.5);
         if (ev.points !== undefined) pop(ev.x, ev.y - 14, `WHIP! +${ev.points}`, "#5eead4", 14);
       } else if (ev.type === "aegis_bounce") {
         addBurst(ev.x, ev.y, "#60a5fa", 20, 180);
         addRing(ev.x, ev.y, "#93c5fd", 58, 0.42, 3);
-        pop(ev.x, ev.y - 16, "AEGIS SAVED!", "#93c5fd", 14);
+        pop(ev.x, ev.y - 16, "AEGIS SHIELD!", "#93c5fd", 14);
         shake = Math.max(shake, 5);
-      } else if (ev.type === "wall_bounce") {
-        addBurst(ev.x, ev.y, "#818cf8", 10, 120);
-        addRing(ev.x, ev.y, "#818cf8", 32, 0.28, 2);
       } else if (ev.type === "gate_locked") {
         addRing(ev.x, ev.y, "#a78bfa", 44, 0.32, 2);
         pop(ev.x, ev.y + 34, "BREAK KEY PRISMS!", "#fde047", 13);
       } else if (ev.type === "gate_warp") {
         addBurst(ev.x, ev.y, "#fde047", 36, 240);
-        addRing(ev.x, ev.y, "#fbbf24", 110, 0.65, 4);
+        addRing(ev.x, ev.y, "#fbbf24", 115, 0.65, 4);
         if (showPopups) {
-          flash = 0.45;
+          flash = 0.42;
           flashColor = "#fde047";
           shake = Math.max(shake, 6);
         }
       } else if (ev.type === "planet_crash" || ev.type === "mine_hit") {
-        addBurst(ev.x, ev.y, "#f87171", ev.isTwin ? 12 : 26, 200);
-        addRing(ev.x, ev.y, "#ef4444", ev.isTwin ? 30 : 62, 0.45, 3);
+        addBurst(ev.x, ev.y, "#f87171", ev.isTwin ? 12 : 24, 195);
+        addRing(ev.x, ev.y, "#ef4444", ev.isTwin ? 30 : 58, 0.42, 3);
         if (!ev.isTwin && showPopups) {
-          shake = Math.max(shake, 9);
-          flash = 0.28;
+          shake = Math.max(shake, 8);
+          flash = 0.22;
           flashColor = "#ef4444";
         }
-      } else if (ev.type === "mine_cleared") {
-        addBurst(ev.x, ev.y, "#fb923c", 14, 150);
       }
     }
   }
@@ -246,7 +313,7 @@ export function createRenderer() {
     for (const r of rings) r.life -= dt;
     rings = rings.filter((r) => r.life > 0);
     for (const pp of popups) {
-      pp.y -= 32 * dt;
+      pp.y -= 30 * dt;
       pp.life -= dt;
     }
     popups = popups.filter((pp) => pp.life > 0);
@@ -260,17 +327,17 @@ export function createRenderer() {
     flash = 0;
   }
 
-  // --- Background ------------------------------------------------------------
+  // --- Full-Bleed Cosmic Backdrop --------------------------------------------
 
-  function drawBackdrop(ctx, stageW, stageH, t) {
+  function drawBackdrop(ctx, stageW, stageH, chapterIdx, t) {
+    const ch = CHAPTERS[chapterIdx] || CHAPTERS[0];
     const bg = ctx.createLinearGradient(0, 0, 0, stageH);
-    bg.addColorStop(0, "#050814");
-    bg.addColorStop(0.52, "#0b1126");
-    bg.addColorStop(1, "#130d24");
+    bg.addColorStop(0, ch.bgTop);
+    bg.addColorStop(0.55, ch.bgMid);
+    bg.addColorStop(1, ch.bgBot);
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, stageW, stageH);
 
-    // Subtle breathing nebula washes
     const drawNebula = (cx, cy, rad, col) => {
       const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, rad);
       g.addColorStop(0, col);
@@ -279,25 +346,18 @@ export function createRenderer() {
       ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
     };
     drawNebula(
-      stageW * (0.2 + 0.04 * Math.sin(t * 0.25)),
+      stageW * (0.22 + 0.04 * Math.sin(t * 0.25)),
       stageH * 0.28,
+      Math.max(stageW, stageH) * 0.45,
+      ch.glow,
+    );
+    drawNebula(
+      stageW * (0.8 + 0.04 * Math.cos(t * 0.2)),
+      stageH * 0.68,
       Math.max(stageW, stageH) * 0.44,
-      "rgba(56, 189, 248, 0.075)",
-    );
-    drawNebula(
-      stageW * (0.82 + 0.04 * Math.cos(t * 0.2)),
-      stageH * 0.65,
-      Math.max(stageW, stageH) * 0.46,
-      "rgba(168, 85, 247, 0.085)",
-    );
-    drawNebula(
-      stageW * 0.5,
-      stageH * 0.12,
-      Math.max(stageW, stageH) * 0.3,
-      "rgba(251, 191, 36, 0.05)",
+      "rgba(168, 85, 247, 0.07)",
     );
 
-    // Twinkling starfield
     for (const s of stars) {
       const tw = 0.52 + 0.48 * Math.sin(t * s.twinkle + s.phase);
       ctx.globalAlpha = s.alpha * tw;
@@ -309,34 +369,68 @@ export function createRenderer() {
     ctx.globalAlpha = 1;
   }
 
+  // --- Warped Spacetime Grid (Visualizes Invisible Gravity Wells!) -----------
+
+  function drawWarpedGrid(ctx, bodies) {
+    if (!bodies || bodies.length === 0) return;
+    ctx.save();
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.065)";
+    ctx.lineWidth = 1;
+    const step = 40;
+    const cols = Math.floor(WORLD_W / step);
+    const rows = Math.floor(WORLD_H / step);
+
+    // Precompute warped grid nodes
+    const pts = [];
+    for (let r = 1; r < rows; r++) {
+      const row = [];
+      for (let c = 0; c <= cols; c++) {
+        row.push(warpSpacePoint(c * step, r * step, bodies));
+      }
+      pts.push(row);
+    }
+
+    // Horizontal warped lines
+    for (let r = 0; r < pts.length; r++) {
+      ctx.beginPath();
+      for (let c = 0; c < pts[r].length; c++) {
+        const p = pts[r][c];
+        if (c === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+    // Vertical warped lines
+    for (let c = 1; c < cols; c++) {
+      ctx.beginPath();
+      for (let r = 0; r < pts.length; r++) {
+        const p = pts[r][c];
+        if (r === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // --- World Entities --------------------------------------------------------
 
-  function drawSectorWorld(ctx, sector, state, t) {
-    const ownedRelics = state.relics || [];
-    const hasEdgeShield = hasRelic(ownedRelics, "ricochet_field");
-    const unlocked = isGateUnlocked(sector);
+  function drawOrbitWorld(ctx, orbit, state, t) {
+    const ship = getShip(state.shipId || "solaris");
+    const unlocked = isGateUnlocked(orbit);
 
-    // Subtle astronomical framing & Forcefield side edges
-    ctx.strokeStyle = hasEdgeShield
-      ? "rgba(129, 140, 248, 0.55)"
-      : "rgba(148, 163, 184, 0.08)";
-    ctx.lineWidth = hasEdgeShield ? 2.5 : 1;
-    ctx.beginPath();
-    ctx.moveTo(2, 16);
-    ctx.lineTo(2, WORLD_H - 16);
-    ctx.moveTo(WORLD_W - 2, 16);
-    ctx.lineTo(WORLD_W - 2, WORLD_H - 16);
-    ctx.stroke();
+    // Warped spacetime gravity fabric
+    drawWarpedGrid(ctx, orbit.bodies);
 
     // Binary orbit tracks
     const drawnOrbits = new Set();
-    for (const b of sector.bodies) {
+    for (const b of orbit.bodies) {
       if (!b.orbit) continue;
       const key = `${b.orbit.cx},${b.orbit.cy},${b.orbit.rx}`;
       if (drawnOrbits.has(key)) continue;
       drawnOrbits.add(key);
       ctx.save();
-      ctx.strokeStyle = "rgba(148, 163, 184, 0.16)";
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.17)";
       ctx.setLineDash([5, 6]);
       ctx.lineWidth = 1.2;
       ctx.beginPath();
@@ -345,11 +439,27 @@ export function createRenderer() {
       ctx.restore();
     }
 
-    // Wormhole link & vortices
-    if (sector.wormholes.length === 2) {
-      const [wa, wb] = sector.wormholes;
+    // Ghost previous-shot trace for surgical micro-adjustments!
+    if (state.lastTrail && state.lastTrail.length > 2 && state.phase === "aim") {
       ctx.save();
-      ctx.strokeStyle = "rgba(99, 102, 241, 0.22)";
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.26)";
+      ctx.setLineDash([4, 6]);
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(state.lastTrail[0].x, state.lastTrail[0].y);
+      for (let i = 1; i < state.lastTrail.length; i++) {
+        if (state.lastTrail[i].breakHere) ctx.moveTo(state.lastTrail[i].x, state.lastTrail[i].y);
+        else ctx.lineTo(state.lastTrail[i].x, state.lastTrail[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Wormholes
+    if (orbit.wormholes.length === 2) {
+      const [wa, wb] = orbit.wormholes;
+      ctx.save();
+      ctx.strokeStyle = "rgba(99, 102, 241, 0.24)";
       ctx.setLineDash([4, 6]);
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -358,7 +468,7 @@ export function createRenderer() {
       ctx.stroke();
       ctx.restore();
 
-      for (const w of sector.wormholes) {
+      for (const w of orbit.wormholes) {
         ctx.save();
         ctx.translate(w.x, w.y);
         const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, w.r + 14);
@@ -387,45 +497,49 @@ export function createRenderer() {
       }
     }
 
-    // Key Prism -> Locked Gate energy filaments
+    // Key Prism -> Gate beams
     if (!unlocked) {
       ctx.save();
-      ctx.strokeStyle = "rgba(251, 191, 36, 0.28)";
+      ctx.strokeStyle = "rgba(251, 191, 36, 0.30)";
       ctx.setLineDash([5, 5]);
       ctx.lineWidth = 1.6;
-      for (const c of sector.crystals) {
+      for (const c of orbit.crystals) {
         if (!c.alive || !c.isKey) continue;
         ctx.beginPath();
         ctx.moveTo(c.x, c.y);
-        ctx.lineTo(sector.gate.x, sector.gate.y);
+        ctx.lineTo(orbit.gate.x, orbit.gate.y);
         ctx.stroke();
       }
       ctx.restore();
     }
 
     // Warp Gate
-    drawWarpGate(ctx, sector.gate, unlocked, state.aimHitGate, t);
+    const exitHitGate = Boolean(
+      state.flight && state.flight.grappleExit && state.flight.grappleExit.hitGate,
+    );
+    drawWarpGate(ctx, orbit.gate, unlocked, state.aimHitGate || exitHitGate, t);
 
     // Celestial Bodies
     const nearestGrappleId = state.flight ? state.flight.nearestGrappleId : null;
     const activeTether =
       state.flight && state.flight.probes[0] ? state.flight.probes[0].tether : null;
-    for (const b of sector.bodies) {
+    for (const b of orbit.bodies) {
       drawBody(
         ctx,
         b,
         t,
         b.id === nearestGrappleId,
         activeTether && activeTether.bodyId === b.id ? activeTether : null,
+        state.tutorialAssistActive && b.id === nearestGrappleId,
       );
     }
 
     // Solar Bumpers
-    for (const bp of sector.bumpers) {
+    for (const bp of orbit.bumpers) {
       ctx.save();
       ctx.translate(bp.x, bp.y);
-      const scale = 1 + bp.flash * 0.22;
-      ctx.scale(scale, scale);
+      const sc = 1 + bp.flash * 0.22;
+      ctx.scale(sc, sc);
       if (bp.flash > 0) {
         ctx.fillStyle = `rgba(251, 191, 36, ${bp.flash * 0.45})`;
         ctx.beginPath();
@@ -454,7 +568,7 @@ export function createRenderer() {
     }
 
     // Asteroid Mines
-    for (const m of sector.mines) {
+    for (const m of orbit.mines) {
       if (!m.alive) continue;
       ctx.save();
       ctx.translate(m.x, m.y);
@@ -483,8 +597,8 @@ export function createRenderer() {
       ctx.restore();
     }
 
-    // Crystals & Resonance Keys
-    for (const c of sector.crystals) {
+    // Crystals & Key Prisms
+    for (const c of orbit.crystals) {
       if (!c.alive) continue;
       ctx.save();
       ctx.translate(c.x, c.y);
@@ -538,28 +652,62 @@ export function createRenderer() {
       ctx.restore();
     }
 
-    // Launch Pad Beacon
-    drawLaunchPad(ctx, sector.launch, state.phase === "aim", t);
+    // Launch Pad
+    drawLaunchPad(ctx, orbit.launch, state.phase === "aim", ship.color, t);
 
-    // Live Aiming Trajectory & Tension Ring
-    if (state.aim && state.aim.pred) {
-      drawAimOverlay(ctx, sector.launch, state.aim, t);
+    // Diegetic Callouts (only before first drag on new-mechanic orbits)
+    if (
+      state.phase === "aim" &&
+      !state.aim &&
+      state.shots === 0 &&
+      orbit.callouts &&
+      orbit.callouts.length > 0
+    ) {
+      drawDiegeticCallouts(ctx, orbit.callouts);
     }
 
-    // Active Flight: Tether Beam, Trails, Probes
+    // Interactive Animated Ghost Thumb Tutorial on Orbit 1 ("First Curve")!
+    if (
+      state.phase === "aim" &&
+      !state.aim &&
+      orbit.tutorial === "pull" &&
+      state.shots === 0
+    ) {
+      drawPullGhostTutorial(ctx, orbit, state.shipId, t);
+    }
+
+    // Aiming Trajectory Preview
+    if (state.aim && state.aim.pred) {
+      drawAimOverlay(ctx, orbit.launch, state.aim);
+    }
+
+    // Active Flight OR Docked Probe
     if (state.flight) {
-      drawFlight(ctx, sector, state.flight, ownedRelics, t);
+      drawFlight(ctx, orbit, state.flight, ship, t);
     } else if (state.phase === "aim") {
-      // Docked probe resting on Launch Pad
       drawProbeSprite(
         ctx,
-        sector.launch.x,
-        sector.launch.y,
+        orbit.launch.x,
+        orbit.launch.y,
         0,
         -1,
         false,
-        hasRelic(ownedRelics, "aegis_hull") && !sector.aegisUsed,
+        ship.traits.aegisShield && !orbit.aegisUsed,
+        ship.color,
       );
+    }
+
+    // Slow-Mo Grapple Tutorial Pill on Orbit 2 ("Orbit Whip")
+    if (state.tutorialAssistActive && state.flight && state.flight.probes[0]) {
+      const tethered = Boolean(state.flight.probes[0].tether);
+      const readyToRelease = Boolean(state.flight.grappleExit && state.flight.grappleExit.hitGate);
+      const pillText = !tethered
+        ? "HOLD THUMB NOW → ORBIT PLANET"
+        : readyToRelease
+          ? "RELEASE NOW → WHIP INTO GATE!"
+          : "KEEP HOLDING · AIM GOLD ARC AT GATE";
+      const pillCol = readyToRelease ? "#fde047" : "#5eead4";
+      drawCenterPill(ctx, 182, pillText, pillCol);
     }
 
     // VFX: Rings, Particles, Floating Popups
@@ -598,16 +746,130 @@ export function createRenderer() {
     ctx.restore();
   }
 
-  function drawWarpGate(ctx, gate, unlocked, aimHitGate, t) {
+  function drawCenterPill(ctx, y, text, borderCol) {
+    ctx.save();
+    ctx.font = `800 12px ${MONO}`;
+    const w = Math.min(356, ctx.measureText(text).width + 34);
+    const x = (WORLD_W - w) * 0.5;
+    roundRect(ctx, x, y - 18, w, 36, 18);
+    ctx.fillStyle = "rgba(7, 11, 24, 0.92)";
+    ctx.fill();
+    ctx.strokeStyle = borderCol;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = borderCol;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, WORLD_W * 0.5, y);
+    ctx.restore();
+  }
+
+  function drawDiegeticCallouts(ctx, callouts) {
+    ctx.save();
+    ctx.font = `700 10.5px ${MONO}`;
+    for (const c of callouts) {
+      const dir = c.side === "left" ? -1 : 1;
+      const anchorX = c.x + dir * 32;
+      const anchorY = c.y - 24;
+      const tw = ctx.measureText(c.text).width + 18;
+      let bx = dir > 0 ? anchorX + 10 : anchorX - 10 - tw;
+      bx = Math.max(14, Math.min(WORLD_W - 14 - tw, bx));
+      const by = Math.max(58, Math.min(WORLD_H - 120, anchorY - 12));
+
+      ctx.strokeStyle = c.color;
+      ctx.globalAlpha = 0.65;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(c.x + dir * 18, c.y - 10);
+      ctx.lineTo(dir > 0 ? bx : bx + tw, by + 12);
+      ctx.stroke();
+
+      ctx.globalAlpha = 0.94;
+      roundRect(ctx, bx, by, tw, 24, 8);
+      ctx.fillStyle = "rgba(8, 13, 28, 0.88)";
+      ctx.fill();
+      ctx.strokeStyle = c.color;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.fillStyle = c.color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(c.text, bx + tw * 0.5, by + 12.5);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Animated Ghost Thumb showing the exact Pull-Back Slingshot gesture on Orbit 1.
+   */
+  function drawPullGhostTutorial(ctx, orbit, shipId, t) {
+    const cycle = (t * 0.42) % 1;
+    // Smooth ease pull down, hold briefly, fade out
+    const pullPhase = cycle < 0.55 ? cycle / 0.55 : cycle < 0.82 ? 1 : 1 - (cycle - 0.82) / 0.18;
+    const ease = 1 - Math.pow(1 - Math.max(0, Math.min(1, pullPhase)), 2.5);
+    const alpha = cycle > 0.82 ? Math.max(0, 1 - (cycle - 0.82) / 0.18) : 1;
+
+    const sx = 264;
+    const sy = 434;
+    const targetPullDx = 48;
+    const targetPullDy = -84;
+    const cx = sx - targetPullDx * ease;
+    const cy = sy - targetPullDy * ease;
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+
+    // Preview the gently curving demo trajectory while ghost pulls!
+    const vel = pullToVelocity(targetPullDx * ease, targetPullDy * ease, shipId);
+    if (vel) {
+      const pred = predictTrajectory(orbit, orbit.launch.x, orbit.launch.y, vel.vx, vel.vy, shipId, 46);
+      for (let i = 0; i < pred.points.length; i++) {
+        const pt = pred.points[i];
+        const f = 1 - i / pred.points.length;
+        ctx.fillStyle = pred.hitGate
+          ? `rgba(253, 224, 71, ${f * 0.55})`
+          : `rgba(186, 230, 253, ${f * 0.42})`;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 1.5 + f * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Dashed pull vector from ghost start to ghost thumb
+    ctx.strokeStyle = "rgba(253, 224, 71, 0.55)";
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(cx, cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Translucent thumb circle
+    ctx.fillStyle = "rgba(253, 224, 71, 0.22)";
+    ctx.strokeStyle = "#fde047";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Compact label pill below
+    drawCenterPill(ctx, 560, "DRAG DOWN TO AIM · RELEASE TO SLING", "#fde047");
+    ctx.restore();
+  }
+
+  function drawWarpGate(ctx, gate, unlocked, highlight, t) {
     ctx.save();
     ctx.translate(gate.x, gate.y);
     const pulse = Math.sin(gate.pulse) * 2.2;
-    const boost = aimHitGate && unlocked ? 1.15 : 1;
+    const boost = highlight && unlocked ? 1.15 : 1;
     const r = (gate.r + pulse) * boost;
 
     if (unlocked) {
       const halo = ctx.createRadialGradient(0, 0, 4, 0, 0, r + 26);
-      halo.addColorStop(0, "rgba(253, 224, 71, 0.45)");
+      halo.addColorStop(0, "rgba(253, 224, 71, 0.48)");
       halo.addColorStop(0.55, "rgba(56, 189, 248, 0.16)");
       halo.addColorStop(1, "transparent");
       ctx.fillStyle = halo;
@@ -615,11 +877,10 @@ export function createRenderer() {
       ctx.arc(0, 0, r + 26, 0, Math.PI * 2);
       ctx.fill();
 
-      // Rotating outer astrolabe arcs
       ctx.save();
       ctx.rotate(t * 0.9);
-      ctx.strokeStyle = aimHitGate ? "#fef08a" : "#fbbf24";
-      ctx.lineWidth = aimHitGate ? 3.2 : 2.4;
+      ctx.strokeStyle = highlight ? "#fef08a" : "#fbbf24";
+      ctx.lineWidth = highlight ? 3.2 : 2.4;
       ctx.beginPath();
       ctx.arc(0, 0, r + 6, 0, Math.PI * 1.35);
       ctx.stroke();
@@ -628,8 +889,7 @@ export function createRenderer() {
       ctx.stroke();
       ctx.restore();
 
-      // Main ring & swirling core
-      ctx.fillStyle = "rgba(251, 191, 36, 0.2)";
+      ctx.fillStyle = "rgba(251, 191, 36, 0.22)";
       ctx.strokeStyle = "#fde047";
       ctx.lineWidth = 2.6;
       ctx.beginPath();
@@ -638,15 +898,14 @@ export function createRenderer() {
       ctx.stroke();
 
       ctx.rotate(-t * 2.1);
-      ctx.strokeStyle = "rgba(186, 230, 253, 0.7)";
+      ctx.strokeStyle = "rgba(186, 230, 253, 0.72)";
       ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.arc(0, 0, r * 0.56, 0, Math.PI * 1.25);
       ctx.stroke();
     } else {
-      // Locked gate
-      ctx.fillStyle = "rgba(100, 116, 139, 0.14)";
-      ctx.strokeStyle = "rgba(167, 139, 250, 0.55)";
+      ctx.fillStyle = "rgba(100, 116, 139, 0.16)";
+      ctx.strokeStyle = "rgba(167, 139, 250, 0.58)";
       ctx.setLineDash([6, 5]);
       ctx.lineWidth = 2.2;
       ctx.beginPath();
@@ -654,10 +913,8 @@ export function createRenderer() {
       ctx.fill();
       ctx.stroke();
       ctx.setLineDash([]);
-
-      // Small lock diamond inside
-      ctx.fillStyle = "rgba(253, 224, 71, 0.75)";
-      ctx.font = `700 12px ${MONO}`;
+      ctx.fillStyle = "rgba(253, 224, 71, 0.8)";
+      ctx.font = `700 10.5px ${MONO}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("LOCKED", 0, 0);
@@ -665,32 +922,30 @@ export function createRenderer() {
     ctx.restore();
   }
 
-  function drawBody(ctx, b, t, isGrappleCandidate, activeTether) {
+  function drawBody(ctx, b, t, isGrappleCandidate, activeTether, pulseTutorial) {
     const theme = planetTheme(b.kind);
     ctx.save();
     ctx.translate(b.x, b.y);
 
-    // Gravity / Anti-gravity field lines
     if (b.kind === "repulsor") {
       const wave = (t * 0.75) % 1;
-      ctx.strokeStyle = `rgba(253, 224, 71, ${(1 - wave) * 0.32})`;
+      ctx.strokeStyle = `rgba(253, 224, 71, ${(1 - wave) * 0.34})`;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.arc(0, 0, b.r + 8 + wave * 54, 0, Math.PI * 2);
       ctx.stroke();
       const wave2 = (t * 0.75 + 0.5) % 1;
-      ctx.strokeStyle = `rgba(253, 224, 71, ${(1 - wave2) * 0.32})`;
+      ctx.strokeStyle = `rgba(253, 224, 71, ${(1 - wave2) * 0.34})`;
       ctx.beginPath();
       ctx.arc(0, 0, b.r + 8 + wave2 * 54, 0, Math.PI * 2);
       ctx.stroke();
     } else {
-      // Subtle Roche graze ring
       ctx.strokeStyle =
         b.grazeFlash > 0
           ? `rgba(251, 191, 36, ${0.4 + b.grazeFlash * 0.6})`
           : b.kind === "singularity"
-            ? "rgba(249, 115, 22, 0.34)"
-            : "rgba(148, 163, 184, 0.16)";
+            ? "rgba(249, 115, 22, 0.36)"
+            : "rgba(148, 163, 184, 0.18)";
       ctx.setLineDash([4, 5]);
       ctx.lineWidth = b.grazeFlash > 0 ? 2.2 : 1.2;
       ctx.beginPath();
@@ -699,22 +954,20 @@ export function createRenderer() {
       ctx.setLineDash([]);
     }
 
-    // Grapple lock-on reticle (shows player which planet Hold will tether to!)
     if (isGrappleCandidate || activeTether) {
       ctx.save();
-      ctx.rotate(t * (activeTether ? 2.4 : 0.9));
-      ctx.strokeStyle = activeTether ? "#2dd4bf" : "rgba(45, 212, 191, 0.58)";
-      ctx.lineWidth = activeTether ? 2.6 : 1.6;
-      const rr = b.r + 12;
+      ctx.rotate(t * (activeTether ? 2.4 : 1.1));
+      ctx.strokeStyle = activeTether || pulseTutorial ? "#2dd4bf" : "rgba(45, 212, 191, 0.62)";
+      ctx.lineWidth = activeTether || pulseTutorial ? 2.8 : 1.7;
+      const rr = b.r + 12 + (pulseTutorial ? Math.sin(t * 8) * 3 : 0);
       for (let i = 0; i < 4; i++) {
         ctx.rotate(Math.PI * 0.5);
         ctx.beginPath();
-        ctx.arc(0, 0, rr, -0.28, 0.28);
+        ctx.arc(0, 0, rr, -0.32, 0.32);
         ctx.stroke();
       }
       ctx.restore();
 
-      // Active tether charge ring around planet
       if (activeTether && activeTether.charge > 0.02) {
         ctx.strokeStyle = activeTether.charge > 0.7 ? "#fde047" : "#5eead4";
         ctx.lineWidth = 3.5;
@@ -731,7 +984,7 @@ export function createRenderer() {
       }
     }
 
-    // Back half of planetary ring
+    // Back half of ring
     if (b.ring) {
       ctx.save();
       ctx.rotate(b.ringTilt);
@@ -743,7 +996,6 @@ export function createRenderer() {
       ctx.restore();
     }
 
-    // Atmospheric bloom
     const glow = ctx.createRadialGradient(0, 0, b.r * 0.5, 0, 0, b.r + 28);
     glow.addColorStop(0, theme.glow);
     glow.addColorStop(1, "transparent");
@@ -753,7 +1005,6 @@ export function createRenderer() {
     ctx.fill();
 
     if (b.kind === "singularity") {
-      // Accretion swirl disk
       ctx.save();
       ctx.rotate(t * 1.9);
       const acc = ctx.createRadialGradient(0, 0, b.r * 0.72, 0, 0, b.r + 18);
@@ -766,7 +1017,6 @@ export function createRenderer() {
       ctx.fill();
       ctx.restore();
 
-      // Event horizon core
       ctx.fillStyle = "#04030a";
       ctx.strokeStyle = "#fb923c";
       ctx.lineWidth = 2;
@@ -775,15 +1025,7 @@ export function createRenderer() {
       ctx.fill();
       ctx.stroke();
     } else {
-      // Shaded 3D sphere
-      const sphere = ctx.createRadialGradient(
-        -b.r * 0.35,
-        -b.r * 0.35,
-        b.r * 0.1,
-        0,
-        0,
-        b.r,
-      );
+      const sphere = ctx.createRadialGradient(-b.r * 0.35, -b.r * 0.35, b.r * 0.1, 0, 0, b.r);
       sphere.addColorStop(0, theme.rim);
       sphere.addColorStop(0.32, theme.base);
       sphere.addColorStop(1, theme.deep);
@@ -792,7 +1034,6 @@ export function createRenderer() {
       ctx.arc(0, 0, b.r, 0, Math.PI * 2);
       ctx.fill();
 
-      // Subtle clipped latitude bands for tactile richness
       ctx.save();
       ctx.beginPath();
       ctx.arc(0, 0, b.r, 0, Math.PI * 2);
@@ -803,8 +1044,7 @@ export function createRenderer() {
       ctx.restore();
 
       if (b.kind === "repulsor") {
-        // Plus / Push icon glint in center of Magnetar
-        ctx.strokeStyle = "rgba(255, 251, 235, 0.9)";
+        ctx.strokeStyle = "rgba(255, 251, 235, 0.92)";
         ctx.lineWidth = 2.4;
         ctx.beginPath();
         ctx.moveTo(-7, 0);
@@ -815,7 +1055,6 @@ export function createRenderer() {
       }
     }
 
-    // Front half of planetary ring
     if (b.ring) {
       ctx.save();
       ctx.rotate(b.ringTilt);
@@ -826,21 +1065,21 @@ export function createRenderer() {
       ctx.stroke();
       ctx.restore();
     }
-
     ctx.restore();
   }
 
-  function drawLaunchPad(ctx, launch, ready, t) {
+  function drawLaunchPad(ctx, launch, ready, color, t) {
     ctx.save();
     ctx.translate(launch.x, launch.y);
     const pulse = ready ? 0.5 + 0.5 * Math.sin(t * 3.4) : 0.2;
-    ctx.strokeStyle = `rgba(251, 191, 36, ${0.22 + pulse * 0.28})`;
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.22 + pulse * 0.3;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
     ctx.arc(0, 0, 19 + pulse * 3, 0, Math.PI * 2);
     ctx.stroke();
-
-    ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = "#94a3b8";
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.arc(0, 0, 12, 0, Math.PI * 2);
@@ -848,12 +1087,10 @@ export function createRenderer() {
     ctx.restore();
   }
 
-  function drawAimOverlay(ctx, launch, aim, t) {
+  function drawAimOverlay(ctx, launch, aim) {
     const { pred, power, pullDx, pullDy, startX, startY, curX, curY } = aim;
-
-    // Subtle relative thumb anchor line (never obscures the probe)
     ctx.save();
-    ctx.strokeStyle = "rgba(148, 163, 184, 0.24)";
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.26)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(startX, startY, 10, 0, Math.PI * 2);
@@ -865,7 +1102,6 @@ export function createRenderer() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Tension power ring around Launch Pad
     const powerCol = pred.hitGate ? "#fde047" : power > 0.8 ? "#fb923c" : "#38bdf8";
     ctx.strokeStyle = powerCol;
     ctx.lineWidth = 3;
@@ -874,7 +1110,6 @@ export function createRenderer() {
     ctx.arc(launch.x, launch.y, 25, -Math.PI * 0.5, -Math.PI * 0.5 + Math.PI * 2 * power);
     ctx.stroke();
 
-    // Small pull-back vector stem behind probe
     const mag = Math.hypot(pullDx, pullDy) || 1;
     const stem = Math.min(34, mag * 0.26);
     ctx.strokeStyle = "rgba(251, 191, 36, 0.55)";
@@ -884,21 +1119,19 @@ export function createRenderer() {
     ctx.lineTo(launch.x - (pullDx / mag) * stem, launch.y - (pullDy / mag) * stem);
     ctx.stroke();
 
-    // Live RK4 bending dotted trajectory preview
     const pts = pred.points;
     for (let i = 0; i < pts.length; i++) {
       const pt = pts[i];
       const frac = 1 - i / pts.length;
       const rad = 1.6 + frac * 2.5;
       ctx.fillStyle = pred.hitGate
-        ? `rgba(253, 224, 71, ${0.18 + frac * 0.82})`
+        ? `rgba(253, 224, 71, ${0.2 + frac * 0.8})`
         : `rgba(186, 230, 253, ${0.14 + frac * 0.78})`;
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, rad, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Power readout chip beside launch pad
     ctx.fillStyle = powerCol;
     ctx.font = `700 11px ${MONO}`;
     ctx.textAlign = "center";
@@ -906,12 +1139,12 @@ export function createRenderer() {
     ctx.restore();
   }
 
-  function drawFlight(ctx, sector, flight, ownedRelics, t) {
+  function drawFlight(ctx, orbit, flight, ship, t) {
     const main = flight.probes[0];
 
-    // Grapple tether beam & tangent exit vector
+    // Live Curved RK4 Exit Trajectory during Orbit Grapple!
     if (main && main.alive && main.tether) {
-      const body = sector.bodies.find((b) => b.id === main.tether.bodyId);
+      const body = orbit.bodies.find((b) => b.id === main.tether.bodyId);
       if (body) {
         ctx.save();
         ctx.strokeStyle = "#2dd4bf";
@@ -924,33 +1157,25 @@ export function createRenderer() {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Tangent whip release arrow showing exact exit direction!
-        const spd = Math.hypot(main.vx, main.vy) || 1;
-        const ux = main.vx / spd;
-        const uy = main.vy / spd;
-        const arrowLen = 36 + main.tether.charge * 34;
-        const ex = main.x + ux * arrowLen;
-        const ey = main.y + uy * arrowLen;
-        ctx.strokeStyle = main.tether.charge > 0.65 ? "#fde047" : "#5eead4";
-        ctx.lineWidth = 2.6;
-        ctx.beginPath();
-        ctx.moveTo(main.x, main.y);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
-        // Arrowhead
-        const ang = Math.atan2(uy, ux);
-        ctx.beginPath();
-        ctx.moveTo(ex, ey);
-        ctx.lineTo(ex - Math.cos(ang - 0.5) * 9, ey - Math.sin(ang - 0.5) * 9);
-        ctx.moveTo(ex, ey);
-        ctx.lineTo(ex - Math.cos(ang + 0.5) * 9, ey - Math.sin(ang + 0.5) * 9);
-        ctx.stroke();
+        if (flight.grappleExit && flight.grappleExit.points.length > 0) {
+          const pts = flight.grappleExit.points;
+          const hit = flight.grappleExit.hitGate;
+          for (let i = 0; i < pts.length; i++) {
+            const pt = pts[i];
+            const frac = 1 - i / pts.length;
+            ctx.fillStyle = hit
+              ? `rgba(253, 224, 71, ${0.25 + frac * 0.75})`
+              : `rgba(94, 234, 212, ${0.18 + frac * 0.72})`;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 1.5 + frac * 2.4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         ctx.restore();
       }
     }
 
-    // Draw probe trails & sprites
-    const aegisActive = hasRelic(ownedRelics, "aegis_hull") && !sector.aegisUsed;
+    const aegisActive = ship.traits.aegisShield && !orbit.aegisUsed;
     for (const probe of flight.probes) {
       if (!probe.alive && probe.trail.length < 2) continue;
       const tr = probe.trail;
@@ -977,12 +1202,13 @@ export function createRenderer() {
           probe.vy / spd,
           probe.isTwin,
           !probe.isTwin && aegisActive,
+          ship.color,
         );
       }
     }
   }
 
-  function drawProbeSprite(ctx, x, y, ux, uy, isTwin, hasAegis) {
+  function drawProbeSprite(ctx, x, y, ux, uy, isTwin, hasAegis, color = "#fef08a") {
     ctx.save();
     ctx.translate(x, y);
     const r = isTwin ? PROBE_R * 0.72 : PROBE_R;
@@ -996,17 +1222,17 @@ export function createRenderer() {
     ctx.fill();
 
     if (hasAegis) {
-      ctx.strokeStyle = "rgba(96, 165, 250, 0.82)";
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = "rgba(96, 165, 250, 0.86)";
+      ctx.lineWidth = 1.7;
       ctx.beginPath();
       ctx.arc(0, 0, r + 5, 0, Math.PI * 2);
       ctx.stroke();
     }
 
     ctx.rotate(Math.atan2(uy, ux));
-    ctx.fillStyle = isTwin ? "#e0f2fe" : "#fef08a";
+    ctx.fillStyle = isTwin ? "#e0f2fe" : color;
     ctx.beginPath();
-    ctx.moveTo(r + 3, 0);
+    ctx.moveTo(r + 3.5, 0);
     ctx.lineTo(-r, -r * 0.78);
     ctx.lineTo(-r * 0.5, 0);
     ctx.lineTo(-r, r * 0.78);
@@ -1015,128 +1241,18 @@ export function createRenderer() {
     ctx.restore();
   }
 
-  // --- HUD & Overlays (in world coordinates) ---------------------------------
-
-  function drawInGameChrome(ctx, run, muted, t) {
-    // Sector Name & subtle hint banner at top
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(226, 232, 240, 0.85)";
-    ctx.font = `700 13px ${FONT}`;
-    const tag = run.mode === "daily" ? "DAILY · " : "";
-    ctx.fillText(`${tag}SECTOR ${run.sectorNum} — ${run.sector.name.toUpperCase()}`, WORLD_W * 0.5, 24);
-
-    // Hint or active status subtitle
-    let sub = "";
-    let subCol = "rgba(148, 163, 184, 0.85)";
-    const keysLeft = remainingKeys(run.sector);
-    if (run.phase === "flight" && run.flight && run.flight.probes[0].tether) {
-      sub = "ORBIT LOCKED — RELEASE TO WHIP!";
-      subCol = "#5eead4";
-    } else if (run.phase === "flight" && run.flight && run.flight.nearestGrappleId) {
-      sub = "HOLD ANYWHERE TO GRAPPLE ORBIT";
-      subCol = "#2dd4bf";
-    } else if (keysLeft > 0) {
-      sub = `${keysLeft} KEY PRISM${keysLeft > 1 ? "S" : ""} REMAINING`;
-      subCol = "#fde047";
-    } else if (run.sector.hint && run.shotsInSector === 0) {
-      sub = run.sector.hint;
-    }
-
-    if (sub) {
-      ctx.fillStyle = subCol;
-      ctx.font = `500 11.5px ${FONT}`;
-      ctx.fillText(sub, WORLD_W * 0.5, 42);
-    }
-
-    // Bottom thumb-bar: Reserve Probes (left) + Relics + Action Button (right)
-    const barY = 682;
-    ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(148, 163, 184, 0.75)";
-    ctx.font = `700 10px ${MONO}`;
-    ctx.fillText("PROBES", 20, 668);
-
-    for (let i = 0; i < run.maxProbes; i++) {
-      const px = 26 + i * 19;
-      const py = barY + 2;
-      const active = i < run.probes;
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.fillStyle = active ? "#fbbf24" : "rgba(148, 163, 184, 0.2)";
-      ctx.strokeStyle = active ? "#fef08a" : "rgba(148, 163, 184, 0.35)";
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.moveTo(0, -7);
-      ctx.lineTo(5.5, 0);
-      ctx.lineTo(0, 7);
-      ctx.lineTo(-5.5, 0);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Owned Relics badges next to probes
-    if (run.relics.length > 0) {
-      const startX = 132;
-      const maxShow = Math.min(run.relics.length, 6);
-      for (let i = 0; i < maxShow; i++) {
-        const rel = RELIC_BY_ID[run.relics[i]];
-        if (!rel) continue;
-        const rx = startX + i * 24;
-        const ry = barY;
-        ctx.fillStyle = "rgba(30, 41, 59, 0.85)";
-        ctx.strokeStyle = rel.color;
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.arc(rx, ry, 10, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = rel.color;
-        ctx.font = `700 11px ${FONT}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(rel.glyph, rx, ry + 0.5);
-      }
-      if (run.relics.length > 6) {
-        ctx.fillStyle = "#94a3b8";
-        ctx.font = `700 10px ${MONO}`;
-        ctx.textAlign = "left";
-        ctx.fillText(`+${run.relics.length - 6}`, startX + 6 * 24 - 6, barY + 1);
-      }
-    }
-
-    // Right-side thumb button: RECALL while flying, Mute while aiming
-    const rects = uiRects("play", run, false);
-    if (run.phase === "flight" && rects.recall) {
-      const r = rects.recall;
-      roundRect(ctx, r.x, r.y, r.w, r.h, 14);
-      ctx.fillStyle = "rgba(30, 41, 59, 0.85)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(248, 113, 113, 0.55)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.fillStyle = "#fca5a5";
-      ctx.font = `700 12px ${FONT}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("↻ RECALL", r.x + r.w * 0.5, r.y + r.h * 0.5);
-    } else if (rects.mute) {
-      drawMuteButton(ctx, rects.mute, muted);
-    }
-    ctx.restore();
-  }
+  // --- Shared Button Primitives ----------------------------------------------
 
   function drawMuteButton(ctx, r, muted) {
     ctx.save();
     roundRect(ctx, r.x, r.y, r.w, r.h, 14);
-    ctx.fillStyle = "rgba(30, 41, 59, 0.78)";
+    ctx.fillStyle = "rgba(18, 25, 44, 0.84)";
     ctx.fill();
     ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
     ctx.lineWidth = 1.3;
     ctx.stroke();
     ctx.fillStyle = muted ? "#64748b" : "#e2e8f0";
-    ctx.font = `700 14px ${FONT}`;
+    ctx.font = `700 13px ${FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(muted ? "SFX ×" : "SFX ♪", r.x + r.w * 0.5, r.y + r.h * 0.5);
@@ -1153,15 +1269,15 @@ export function createRenderer() {
       ctx.fillStyle = g;
       ctx.fill();
     } else if (style === "secondary") {
-      ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+      ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
       ctx.fill();
-      ctx.strokeStyle = "rgba(56, 189, 248, 0.6)";
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.62)";
       ctx.lineWidth = 1.8;
       ctx.stroke();
     } else {
-      ctx.fillStyle = "rgba(30, 41, 59, 0.7)";
+      ctx.fillStyle = "rgba(24, 33, 54, 0.82)";
       ctx.fill();
-      ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
       ctx.lineWidth = 1.3;
       ctx.stroke();
     }
@@ -1169,38 +1285,38 @@ export function createRenderer() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = style === "primary" ? "#0b1120" : "#f1f5f9";
-    ctx.font = `800 16px ${FONT}`;
-    ctx.fillText(label, r.x + r.w * 0.5, r.y + r.h * (sublabel ? 0.39 : 0.51));
+    ctx.font = `800 15.5px ${FONT}`;
+    ctx.fillText(label, r.x + r.w * 0.5, r.y + r.h * (sublabel ? 0.38 : 0.51));
     if (sublabel) {
       ctx.fillStyle = style === "primary" ? "rgba(11, 17, 32, 0.72)" : "#94a3b8";
-      ctx.font = `600 11px ${MONO}`;
+      ctx.font = `600 10.5px ${MONO}`;
       ctx.fillText(sublabel, r.x + r.w * 0.5, r.y + r.h * 0.72);
     }
     ctx.restore();
   }
 
-  function drawTitleOverlay(ctx, bestScore, dailyLabel, savedRun, muted, t) {
+  // --- Screens: Title, Constellation Star Chart, In-Game Chrome, Clear -------
+
+  function drawTitleOverlay(ctx, profile, dailyLabel, muted, t) {
     ctx.save();
-    // Soft vignette behind text
     const vig = ctx.createLinearGradient(0, 0, 0, WORLD_H);
     vig.addColorStop(0, "rgba(5, 8, 20, 0.55)");
     vig.addColorStop(0.45, "rgba(5, 8, 20, 0.35)");
-    vig.addColorStop(1, "rgba(5, 8, 20, 0.88)");
+    vig.addColorStop(1, "rgba(5, 8, 20, 0.90)");
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-    // Soft dark halo behind title block so animated demo stays readable
-    const titleHalo = ctx.createRadialGradient(WORLD_W * 0.5, 195, 20, WORLD_W * 0.5, 195, 190);
-    titleHalo.addColorStop(0, "rgba(5, 8, 20, 0.82)");
-    titleHalo.addColorStop(0.65, "rgba(5, 8, 20, 0.45)");
-    titleHalo.addColorStop(1, "transparent");
-    ctx.fillStyle = titleHalo;
+    const halo = ctx.createRadialGradient(WORLD_W * 0.5, 195, 20, WORLD_W * 0.5, 195, 195);
+    halo.addColorStop(0, "rgba(5, 8, 20, 0.84)");
+    halo.addColorStop(0.65, "rgba(5, 8, 20, 0.45)");
+    halo.addColorStop(1, "transparent");
+    ctx.fillStyle = halo;
     ctx.fillRect(0, 20, WORLD_W, 340);
 
-    // Emblem
+    // Animated Emblem
     ctx.save();
     ctx.translate(WORLD_W * 0.5, 134);
-    ctx.strokeStyle = "rgba(251, 191, 36, 0.75)";
+    ctx.strokeStyle = "rgba(251, 191, 36, 0.78)";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.ellipse(0, 0, 44, 15, -0.35, 0, Math.PI * 2);
@@ -1213,7 +1329,6 @@ export function createRenderer() {
     ctx.beginPath();
     ctx.arc(0, 0, 16, 0, Math.PI * 2);
     ctx.fill();
-    // Orbiting mini-probe dot
     const oa = t * 1.9;
     const ex = Math.cos(oa) * 44;
     const ey = Math.sin(oa) * 15;
@@ -1225,7 +1340,6 @@ export function createRenderer() {
     ctx.fill();
     ctx.restore();
 
-    // Title
     ctx.textAlign = "center";
     ctx.fillStyle = "#f8fafc";
     ctx.font = `800 34px ${FONT}`;
@@ -1233,250 +1347,514 @@ export function createRenderer() {
 
     ctx.fillStyle = "#cbd5e1";
     ctx.font = `500 13.5px ${FONT}`;
-    ctx.fillText("Pull to sling · Hold in flight to grapple orbit", WORLD_W * 0.5, 234);
+    ctx.fillText("Pull to sling · Hold in flight to orbit", WORLD_W * 0.5, 234);
     ctx.fillStyle = "#94a3b8";
-    ctx.fillText("Twelve sectors to the Singularity", WORLD_W * 0.5, 254);
+    ctx.fillText("24 handcrafted orbits across 4 constellations", WORLD_W * 0.5, 254);
 
-    if (bestScore > 0) {
-      roundRect(ctx, 118, 280, 164, 30, 15);
-      ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+    const stars = totalStars(profile);
+    if (stars > 0) {
+      roundRect(ctx, 114, 280, 172, 30, 15);
+      ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
       ctx.fill();
-      ctx.strokeStyle = "rgba(251, 191, 36, 0.35)";
+      ctx.strokeStyle = "rgba(251, 191, 36, 0.38)";
       ctx.lineWidth = 1.2;
       ctx.stroke();
       ctx.fillStyle = "#fde047";
       ctx.font = `700 12px ${MONO}`;
-      ctx.fillText(`BEST ${bestScore.toLocaleString()}`, WORLD_W * 0.5, 299);
+      ctx.fillText(`★ ${stars} / ${ORBIT_SPECS.length * 3} STARS`, WORLD_W * 0.5, 299);
     }
 
-    const rects = uiRects("title", null, Boolean(savedRun));
-    if (savedRun && rects.resume) {
+    const rects = uiRects("title", null, profile);
+    if (stars > 0 || profile.seenPullTutorial) {
+      const nextSpec = ORBIT_BY_ID[nextPlayableOrbitId(profile)];
       drawButton(
         ctx,
-        rects.resume,
-        `RESUME SECTOR ${savedRun.sectorNum}`,
-        `${savedRun.score.toLocaleString()} PTS · ${savedRun.probes} PROBES`,
+        rects.primary,
+        `CONTINUE · ${nextSpec.name.toUpperCase()}`,
+        `CHAPTER ${nextSpec.chapter + 1} · ORBIT ${nextSpec.index}`,
         "primary",
       );
-      drawButton(ctx, rects.start, "NEW RUN", "FRESH COSMIC SEED", "secondary");
-      drawButton(ctx, rects.daily, "DAILY ORBIT", dailyLabel, "ghost");
+      drawButton(
+        ctx,
+        rects.chart,
+        "STAR CHART & SHIPS",
+        `${stars} / 72 ★ COLLECTED`,
+        "secondary",
+      );
+      drawButton(ctx, rects.daily, "DAILY GAUNTLET", `5 SECTORS · ${dailyLabel}`, "ghost");
     } else {
-      drawButton(ctx, rects.start, "LAUNCH RUN", "TWELVE SECTORS + ENDLESS", "primary");
-      drawButton(ctx, rects.daily, "DAILY ORBIT", `SEED ${dailyLabel}`, "secondary");
+      drawButton(ctx, rects.primary, "START EXPEDITION", "INTERACTIVE ORBITAL GUIDE", "primary");
+      drawButton(ctx, rects.chart, "STAR CHART", "4 CONSTELLATIONS · 4 SHIPS", "secondary");
     }
     drawMuteButton(ctx, rects.mute, muted);
     ctx.restore();
   }
 
-  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
-    const words = text.split(" ");
-    let line = "";
-    let cy = y;
-    for (let i = 0; i < words.length; i++) {
-      const test = line ? `${line} ${words[i]}` : words[i];
-      if (ctx.measureText(test).width > maxWidth && line) {
-        ctx.fillText(line, x, cy);
-        line = words[i];
-        cy += lineHeight;
-      } else {
-        line = test;
-      }
-    }
-    if (line) ctx.fillText(line, x, cy);
-  }
+  function drawChartScreen(ctx, profile, chartChapter, dailyLabel, muted, t) {
+    const ch = CHAPTERS[chartChapter] || CHAPTERS[0];
+    const rects = uiRects("chart", null, profile, chartChapter);
+    const starsTotal = totalStars(profile);
+    const chUnlocked = isChapterUnlocked(profile, chartChapter);
+    const nextId = nextPlayableOrbitId(profile);
 
-  function drawDraftOverlay(ctx, run) {
     ctx.save();
-    ctx.fillStyle = "rgba(5, 8, 20, 0.88)";
-    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-    const sum = run.lastClearSummary;
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#fde047";
-    ctx.font = `800 12px ${MONO}`;
-    ctx.fillText(`SECTOR ${run.sectorNum} CLEARED`, WORLD_W * 0.5, 62);
+    // 1. Chapter Tabs at top
+    for (const tab of rects.tabs) {
+      const c = CHAPTERS[tab.chapter];
+      const active = tab.chapter === chartChapter;
+      const unlocked = isChapterUnlocked(profile, tab.chapter);
+      roundRect(ctx, tab.x, tab.y, tab.w, tab.h, 12);
+      ctx.fillStyle = active ? "rgba(24, 34, 58, 0.96)" : "rgba(12, 18, 34, 0.72)";
+      ctx.fill();
+      ctx.strokeStyle = active ? c.accent : "rgba(148, 163, 184, 0.22)";
+      ctx.lineWidth = active ? 2 : 1.1;
+      ctx.stroke();
 
-    ctx.fillStyle = "#f8fafc";
-    ctx.font = `800 26px ${FONT}`;
-    ctx.fillText(sum ? sum.sectorName : "Warp Complete", WORLD_W * 0.5, 96);
+      ctx.textAlign = "center";
+      ctx.fillStyle = unlocked ? (active ? "#f8fafc" : "#cbd5e1") : "#64748b";
+      ctx.font = `800 9.8px ${FONT}`;
+      ctx.fillText(c.name.toUpperCase(), tab.x + tab.w * 0.5, tab.y + 22);
 
-    // Bonus breakdown pills
-    if (sum) {
-      const parts = [`+${sum.baseBonus} WARP`];
-      if (sum.ace) parts.push(`ACE +${sum.aceBonus}`);
-      if (sum.allCleared) parts.push(`ALL CRYSTALS +${sum.perfectBonus}`);
-      if (sum.probesGained > 0) parts.push(`+${sum.probesGained} PROBE`);
-      ctx.fillStyle = "#5eead4";
-      ctx.font = `700 11.5px ${MONO}`;
-      ctx.fillText(parts.join(" · "), WORLD_W * 0.5, 126);
+      ctx.font = `700 10px ${MONO}`;
+      ctx.fillStyle = unlocked ? "#fbbf24" : "#64748b";
+      const sub = unlocked ? `★ ${chapterStars(profile, tab.chapter)}/18` : `🔒 ${c.starsToUnlock}★`;
+      ctx.fillText(sub, tab.x + tab.w * 0.5, tab.y + 40);
     }
 
-    ctx.fillStyle = "#cbd5e1";
-    ctx.font = `600 14px ${FONT}`;
-    ctx.fillText("INSTALL ONE ORBITAL RELIC", WORLD_W * 0.5, 224);
+    // Chapter Header Banner
+    ctx.textAlign = "center";
+    ctx.fillStyle = ch.accent;
+    ctx.font = `700 11px ${MONO}`;
+    ctx.fillText(`CONSTELLATION ${ch.num} · ${ch.subtitle.toUpperCase()}`, WORLD_W * 0.5, 92);
 
-    const rects = uiRects("play", run, false);
-    for (const card of rects.cards || []) {
-      const rel = RELIC_BY_ID[card.id];
-      if (!rel) continue;
-      roundRect(ctx, card.x, card.y, card.w, card.h, 18);
-      ctx.fillStyle = "rgba(18, 25, 44, 0.96)";
-      ctx.fill();
-      ctx.strokeStyle = rel.color;
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-
-      // Relic glyph badge
-      const bx = card.x + 42;
-      const by = card.y + card.h * 0.5;
-      ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+    // 2. Constellation Star Map (y = 100..475)
+    const nodes = rects.nodes;
+    // Draw constellation connecting lines
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const a = nodes[i];
+      const b = nodes[i + 1];
+      const aClear = Boolean(profile.orbits[a.id]?.clear);
+      const bUnlocked = isOrbitUnlocked(profile, b.id);
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(bx, by, 24, 0, Math.PI * 2);
+      ctx.moveTo(a.cx, a.cy);
+      ctx.lineTo(b.cx, b.cy);
+      if (aClear) {
+        ctx.strokeStyle = "rgba(251, 191, 36, 0.72)";
+        ctx.lineWidth = 2.4;
+      } else if (bUnlocked) {
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+        ctx.setLineDash([4, 5]);
+        ctx.lineWidth = 1.6;
+      } else {
+        ctx.strokeStyle = "rgba(71, 85, 105, 0.28)";
+        ctx.setLineDash([3, 6]);
+        ctx.lineWidth = 1.2;
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw star nodes
+    for (const n of nodes) {
+      const spec = ORBIT_BY_ID[n.id];
+      const rec = profile.orbits[n.id];
+      const unlocked = isOrbitUnlocked(profile, n.id);
+      const isNext = n.id === nextId;
+
+      ctx.save();
+      ctx.translate(n.cx, n.cy);
+
+      if (isNext && unlocked) {
+        const pulse = 0.5 + 0.5 * Math.sin(t * 4);
+        ctx.strokeStyle = `rgba(253, 224, 71, ${0.3 + pulse * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 23 + pulse * 5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (rec?.clear) {
+        const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 26);
+        g.addColorStop(0, "rgba(253, 224, 71, 0.55)");
+        g.addColorStop(1, "transparent");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, 26, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = rec?.clear
+        ? "#fbbf24"
+        : unlocked
+          ? "#1e293b"
+          : "rgba(15, 23, 42, 0.75)";
+      ctx.strokeStyle = rec?.clear
+        ? "#fef08a"
+        : unlocked
+          ? ch.accent
+          : "rgba(100, 116, 139, 0.45)";
+      ctx.lineWidth = unlocked ? 2.2 : 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, 17, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = rel.color;
-      ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      ctx.fillStyle = rel.color;
-      ctx.font = `700 22px ${FONT}`;
+      ctx.fillStyle = rec?.clear ? "#0b1120" : unlocked ? "#f8fafc" : "#64748b";
+      ctx.font = `800 13px ${MONO}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(rel.glyph, bx, by + 1);
+      ctx.fillText(unlocked ? `${spec.index}` : "·", 0, 0.5);
 
-      // Relic Name & wrapped Description
-      ctx.textAlign = "left";
+      // Orbit Name below node
       ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = "#f8fafc";
-      ctx.font = `800 16px ${FONT}`;
-      ctx.fillText(rel.name, card.x + 80, card.y + 34);
+      ctx.fillStyle = unlocked ? "#e2e8f0" : "#64748b";
+      ctx.font = `700 10.5px ${FONT}`;
+      ctx.fillText(spec.name, 0, 31);
 
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = `500 12.5px ${FONT}`;
-      drawWrappedText(ctx, rel.short, card.x + 80, card.y + 54, card.w - 96, 16);
+      // 3 miniature stars
+      if (unlocked) {
+        const sCount = rec ? rec.stars : 0;
+        drawStarIcon(ctx, -12, 42, 5, sCount >= 1);
+        drawStarIcon(ctx, 0, 42, 5, sCount >= 2);
+        drawStarIcon(ctx, 12, 42, 5, sCount >= 3);
+      }
+      ctx.restore();
     }
 
-    ctx.fillStyle = "rgba(148, 163, 184, 0.7)";
-    ctx.font = `600 11px ${MONO}`;
+    if (!chUnlocked) {
+      drawCenterPill(
+        ctx,
+        280,
+        `EARN ${ch.starsToUnlock} ★ (OR CLEAR CH. ${ch.num - 1}) TO UNLOCK`,
+        ch.accent,
+      );
+    }
+
+    // 3. Ship Hangar Strip (y = 492..634)
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.16)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(16, 492);
+    ctx.lineTo(WORLD_W - 16, 492);
+    ctx.stroke();
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = `700 10.5px ${MONO}`;
+    ctx.fillText("PROBE HANGAR", 18, 511);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#fbbf24";
+    ctx.fillText(`★ ${starsTotal} / 72`, WORLD_W - 18, 511);
+
+    for (const sRect of rects.ships) {
+      const s = getShip(sRect.id);
+      const unlocked = isShipUnlocked(s.id, starsTotal);
+      const active = profile.selectedShip === s.id;
+      roundRect(ctx, sRect.x, sRect.y, sRect.w, sRect.h, 14);
+      ctx.fillStyle = active ? "rgba(25, 36, 62, 0.96)" : "rgba(14, 20, 36, 0.78)";
+      ctx.fill();
+      ctx.strokeStyle = active
+        ? s.color
+        : unlocked
+          ? "rgba(148, 163, 184, 0.28)"
+          : "rgba(71, 85, 105, 0.25)";
+      ctx.lineWidth = active ? 2 : 1.1;
+      ctx.stroke();
+
+      // Mini probe icon
+      drawProbeSprite(
+        ctx,
+        sRect.x + sRect.w * 0.5,
+        sRect.y + 26,
+        0,
+        -1,
+        false,
+        s.traits.aegisShield,
+        unlocked ? s.color : "#475569",
+      );
+
+      ctx.textAlign = "center";
+      ctx.fillStyle = unlocked ? "#f8fafc" : "#64748b";
+      ctx.font = `700 11.5px ${FONT}`;
+      ctx.fillText(s.name, sRect.x + sRect.w * 0.5, sRect.y + 54);
+
+      ctx.font = `700 9.5px ${MONO}`;
+      ctx.fillStyle = active ? s.color : unlocked ? "#94a3b8" : "#64748b";
+      ctx.fillText(
+        active ? "ACTIVE" : unlocked ? "SELECT" : `🔒 ${s.starsRequired}★`,
+        sRect.x + sRect.w * 0.5,
+        sRect.y + 70,
+      );
+    }
+
+    // Selected ship perk line
+    const curShip = getShip(profile.selectedShip);
     ctx.textAlign = "center";
-    ctx.fillText(
-      `NEXT: SECTOR ${run.sectorNum + 1}${run.sectorNum + 1 > FINAL_SECTOR ? " (ENDLESS)" : ` OF ${FINAL_SECTOR}`}`,
-      WORLD_W * 0.5,
-      628,
-    );
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = `500 11.5px ${FONT}`;
+    ctx.fillText(`${curShip.name}: ${curShip.perk}`, WORLD_W * 0.5, 626);
+
+    // 4. Bottom Row: Daily Gauntlet + Mute
+    drawButton(ctx, rects.daily, "DAILY GAUNTLET", `5 SECTORS · ${dailyLabel}`, "secondary");
+    drawMuteButton(ctx, rects.mute, muted);
     ctx.restore();
   }
 
-  function drawEndOverlay(ctx, run, bestScore, isNewBest, dailyLabel) {
-    const isVictory = run.phase === "victory";
+  function drawInGameChrome(ctx, session, muted) {
+    const orbit = session.orbit;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(241, 245, 249, 0.9)";
+    ctx.font = `700 13px ${FONT}`;
+    const title =
+      session.mode === "daily"
+        ? `DAILY GAUNTLET · SECTOR ${session.dailyStage} / ${DAILY_STAGES}`
+        : `${orbit.chapterName.toUpperCase()} ${orbit.index} — ${orbit.name.toUpperCase()}`;
+    ctx.fillText(title, WORLD_W * 0.5, 24);
+
+    // Sub-status line
+    let sub = "";
+    let subCol = "rgba(148, 163, 184, 0.88)";
+    const keysLeft = remainingKeys(orbit);
+    const leftCrystals = orbit.crystals.filter((c) => c.alive).length;
+    if (session.phase === "flight" && session.flight && session.flight.probes[0].tether) {
+      sub = "ORBIT LOCKED · RELEASE WHEN ARC HITS GATE";
+      subCol = "#5eead4";
+    } else if (session.phase === "flight" && session.flight && session.flight.nearestGrappleId) {
+      sub = "HOLD ANYWHERE TO GRAPPLE ORBIT";
+      subCol = "#2dd4bf";
+    } else if (keysLeft > 0) {
+      sub = `${keysLeft} KEY PRISM${keysLeft > 1 ? "S" : ""} LOCKING GATE`;
+      subCol = "#fde047";
+    } else if (session.mode === "campaign") {
+      sub = `SHOT ${session.shots} · PAR ${orbit.par} · CRYSTALS ${orbit.totalCrystals - leftCrystals}/${orbit.totalCrystals}`;
+    } else {
+      sub = `PROBES ${session.probes}/${session.maxProbes} · SCORE ${session.score.toLocaleString()}`;
+    }
+    ctx.fillStyle = subCol;
+    ctx.font = `600 11px ${MONO}`;
+    ctx.fillText(sub, WORLD_W * 0.5, 42);
+
+    // Bottom thumb controls
+    const rects = uiRects("play", session, null);
+    if (session.phase === "flight" && rects.recall) {
+      const r = rects.recall;
+      roundRect(ctx, r.x, r.y, r.w, r.h, 14);
+      ctx.fillStyle = "rgba(30, 41, 59, 0.86)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(248, 113, 113, 0.58)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = "#fca5a5";
+      ctx.font = `700 12px ${FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("↻ RECALL", r.x + r.w * 0.5, r.y + r.h * 0.5);
+    } else {
+      if (rects.chartBtn) {
+        roundRect(ctx, rects.chartBtn.x, rects.chartBtn.y, rects.chartBtn.w, rects.chartBtn.h, 14);
+        ctx.fillStyle = "rgba(18, 25, 44, 0.84)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = `700 12px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("✦ CHART", rects.chartBtn.x + rects.chartBtn.w * 0.5, rects.chartBtn.y + rects.chartBtn.h * 0.5);
+      }
+      if (rects.restartBtn) {
+        roundRect(
+          ctx,
+          rects.restartBtn.x,
+          rects.restartBtn.y,
+          rects.restartBtn.w,
+          rects.restartBtn.h,
+          14,
+        );
+        ctx.fillStyle = "rgba(18, 25, 44, 0.84)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = `700 12px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(
+          "↻ RESET",
+          rects.restartBtn.x + rects.restartBtn.w * 0.5,
+          rects.restartBtn.y + rects.restartBtn.h * 0.5,
+        );
+      }
+      if (session.mode === "daily") {
+        // Daily probe pips on bottom-left
+        for (let i = 0; i < session.maxProbes; i++) {
+          const px = 132 + i * 20;
+          const py = 681;
+          ctx.fillStyle = i < session.probes ? "#fbbf24" : "rgba(148, 163, 184, 0.22)";
+          ctx.beginPath();
+          ctx.moveTo(px, py - 7);
+          ctx.lineTo(px + 5.5, py);
+          ctx.lineTo(px, py + 7);
+          ctx.lineTo(px - 5.5, py);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+      if (rects.mute) drawMuteButton(ctx, rects.mute, muted);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Sleek bottom celebration sheet on Orbit Clear — zero powerup cards!
+   */
+  function drawClearSheet(ctx, session) {
+    const res = session.clearResult;
+    if (!res) return;
+    ctx.save();
+
+    // Gentle dim only over lower half so the cleared orbit remains visible!
+    const grad = ctx.createLinearGradient(0, 260, 0, WORLD_H);
+    grad.addColorStop(0, "rgba(5, 8, 20, 0)");
+    grad.addColorStop(0.28, "rgba(5, 8, 20, 0.84)");
+    grad.addColorStop(1, "rgba(5, 8, 20, 0.96)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 260, WORLD_W, WORLD_H - 260);
+
+    roundRect(ctx, 20, 326, WORLD_W - 40, 356, 24);
+    ctx.fillStyle = "rgba(15, 22, 40, 0.96)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(251, 191, 36, 0.45)";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#fde047";
+    ctx.font = `800 11.5px ${MONO}`;
+    ctx.fillText(
+      res.starsThisAttempt === 3 ? "PERFECT ORBIT" : "ORBIT CLEARED",
+      WORLD_W * 0.5,
+      356,
+    );
+
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = `800 24px ${FONT}`;
+    ctx.fillText(session.orbit.name, WORLD_W * 0.5, 386);
+
+    // 3 Mastery Stars with explicit criteria labels
+    const criteria = [
+      { ok: true, label: "WARPED" },
+      { ok: res.parMet, label: `PAR ${res.par} (${res.shots})` },
+      { ok: res.allCrystals, label: "ALL CRYSTALS" },
+    ];
+    for (let i = 0; i < 3; i++) {
+      const sx = 96 + i * 104;
+      const sy = 430;
+      drawStarIcon(ctx, sx, sy, 18, criteria[i].ok);
+      ctx.fillStyle = criteria[i].ok ? "#fde047" : "#64748b";
+      ctx.font = `700 10px ${MONO}`;
+      ctx.fillText(criteria[i].label, sx, sy + 30);
+    }
+
+    // Unlock celebration banner if a Ship or Chapter unlocked!
+    if (res.newlyUnlockedShips.length > 0 || res.newlyUnlockedChapters.length > 0) {
+      const msg =
+        res.newlyUnlockedShips.length > 0
+          ? `NEW SHIP UNLOCKED: ${getShip(res.newlyUnlockedShips[0]).name.toUpperCase()}!`
+          : `NEW CONSTELLATION: ${res.newlyUnlockedChapters[0].toUpperCase()}!`;
+      roundRect(ctx, 42, 480, 316, 34, 10);
+      ctx.fillStyle = "rgba(45, 212, 191, 0.16)";
+      ctx.fill();
+      ctx.strokeStyle = "#2dd4bf";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.fillStyle = "#5eead4";
+      ctx.font = `800 11.5px ${MONO}`;
+      ctx.fillText(msg, WORLD_W * 0.5, 501);
+    } else {
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = `700 12px ${MONO}`;
+      ctx.fillText(`SCORE ${res.score.toLocaleString()}`, WORLD_W * 0.5, 502);
+    }
+
+    const rects = uiRects("play", session, null);
+    if (rects.next) {
+      const nextSpec = ORBIT_BY_ID[res.nextOrbitId];
+      drawButton(
+        ctx,
+        rects.next,
+        "NEXT ORBIT →",
+        nextSpec ? `${nextSpec.name.toUpperCase()}` : "",
+        "primary",
+      );
+    }
+    drawButton(ctx, rects.replay, "↻ REPLAY", res.starsThisAttempt < 3 ? "CHASE 3 ★" : "", "secondary");
+    drawButton(ctx, rects.chart, "✦ CHART", "CONSTELLATIONS", "ghost");
+    ctx.restore();
+  }
+
+  function drawDailyEndOverlay(ctx, session, profile) {
+    const won = session.phase === "daily_won";
     ctx.save();
     ctx.fillStyle = "rgba(5, 8, 20, 0.88)";
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
     ctx.textAlign = "center";
-    ctx.fillStyle = isVictory ? "#fde047" : "#f87171";
+    ctx.fillStyle = won ? "#fde047" : "#f87171";
     ctx.font = `800 12px ${MONO}`;
-    ctx.fillText(
-      isVictory ? "SINGULARITY CONQUERED" : "ALL PROBES LOST",
-      WORLD_W * 0.5,
-      78,
-    );
+    ctx.fillText(won ? "DAILY GAUNTLET COMPLETE" : "PROBES DEPLETED", WORLD_W * 0.5, 112);
 
     ctx.fillStyle = "#f8fafc";
-    ctx.font = `800 30px ${FONT}`;
-    ctx.fillText(isVictory ? "PERIHELION REACHED" : `SECTOR ${run.sectorNum}`, WORLD_W * 0.5, 116);
+    ctx.font = `800 28px ${FONT}`;
+    ctx.fillText(`DAILY · ${session.dailyLabel}`, WORLD_W * 0.5, 150);
 
-    // Big Score Card
-    roundRect(ctx, 32, 146, 336, 286, 20);
+    roundRect(ctx, 36, 184, 328, 240, 20);
     ctx.fillStyle = "rgba(18, 25, 44, 0.94)";
     ctx.fill();
-    ctx.strokeStyle = isVictory ? "rgba(251, 191, 36, 0.55)" : "rgba(148, 163, 184, 0.22)";
+    ctx.strokeStyle = won ? "rgba(251, 191, 36, 0.55)" : "rgba(148, 163, 184, 0.25)";
     ctx.lineWidth = 1.6;
     ctx.stroke();
 
     ctx.fillStyle = "#94a3b8";
     ctx.font = `700 11px ${MONO}`;
-    ctx.fillText(isNewBest ? "NEW HIGH SCORE!" : "FINAL SCORE", WORLD_W * 0.5, 178);
+    ctx.fillText("DAILY SCORE", WORLD_W * 0.5, 224);
 
-    ctx.fillStyle = isNewBest ? "#fde047" : "#f8fafc";
-    ctx.font = `800 42px ${FONT}`;
-    ctx.fillText(run.score.toLocaleString(), WORLD_W * 0.5, 224);
+    ctx.fillStyle = "#fde047";
+    ctx.font = `800 44px ${FONT}`;
+    ctx.fillText(session.score.toLocaleString(), WORLD_W * 0.5, 276);
 
-    // 2x2 Stats Grid
-    const stats = [
-      ["SECTOR", `${run.sectorNum}`],
-      ["BEST SCORE", bestScore.toLocaleString()],
-      ["CRYSTALS", `${run.crystalsTotal}`],
-      ["GRAZES / MAX CHAIN", `${run.grazesTotal} / ×${Math.max(1, run.bestChain)}`],
-    ];
-    for (let i = 0; i < stats.length; i++) {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const sx = 54 + col * 164;
-      const sy = 264 + row * 62;
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#64748b";
-      ctx.font = `700 10px ${MONO}`;
-      ctx.fillText(stats[i][0], sx, sy);
-      ctx.fillStyle = "#e2e8f0";
-      ctx.font = `700 17px ${FONT}`;
-      ctx.fillText(stats[i][1], sx, sy + 22);
-    }
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = `600 13px ${MONO}`;
+    ctx.fillText(
+      `SECTORS CLEARED: ${won ? DAILY_STAGES : session.dailyStage - 1} / ${DAILY_STAGES}`,
+      WORLD_W * 0.5,
+      334,
+    );
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText(`BEST DAILY: ${profile.bestDailyScore.toLocaleString()}`, WORLD_W * 0.5, 368);
 
-    // Relic strip inside end card
-    if (run.relics.length > 0) {
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#64748b";
-      ctx.font = `700 10px ${MONO}`;
-      ctx.fillText("RELICS", 54, 386);
-      const maxR = Math.min(run.relics.length, 10);
-      for (let i = 0; i < maxR; i++) {
-        const rel = RELIC_BY_ID[run.relics[i]];
-        if (!rel) continue;
-        const rx = 64 + i * 28;
-        const ry = 408;
-        ctx.fillStyle = "rgba(30, 41, 59, 0.9)";
-        ctx.strokeStyle = rel.color;
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.arc(rx, ry, 11, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = rel.color;
-        ctx.font = `700 11px ${FONT}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(rel.glyph, rx, ry + 0.5);
-      }
-    }
-
-    const rects = uiRects("play", run, false);
-    if (isVictory) {
-      drawButton(ctx, rects.primary, "ENTER ENDLESS →", "KEEP YOUR RELICS & CLIMB", "primary");
-      drawButton(ctx, rects.secondary, "NEW RUN", "START AT SECTOR 1", "secondary");
-    } else {
-      drawButton(
-        ctx,
-        rects.primary,
-        run.mode === "daily" ? "RETRY DAILY ORBIT" : "LAUNCH AGAIN",
-        run.mode === "daily" ? dailyLabel : "NEW COSMIC SEED",
-        "primary",
-      );
-      drawButton(
-        ctx,
-        rects.secondary,
-        run.mode === "daily" ? "STANDARD RUN" : "DAILY ORBIT",
-        run.mode === "daily" ? "RANDOM SEED" : dailyLabel,
-        "secondary",
-      );
-    }
-    drawButton(ctx, rects.home, "TITLE SCREEN", "", "ghost");
+    const rects = uiRects("play", session, profile);
+    drawButton(ctx, rects.retryDaily, "RETRY DAILY", session.dailyLabel, "primary");
+    drawButton(ctx, rects.chart, "✦ STAR CHART", "BACK TO CONSTELLATIONS", "secondary");
     ctx.restore();
   }
 
   // --- Main Render Entry -----------------------------------------------------
 
-  function render(ctx, vp, viewState, t) {
-    drawBackdrop(ctx, vp.stageW, vp.stageH, t);
+  function render(ctx, vp, view, t) {
+    const chIdx =
+      view.scene === "chart"
+        ? view.chartChapter
+        : view.session
+          ? view.session.orbit.chapter
+          : 0;
+
+    drawBackdrop(ctx, vp.stageW, vp.stageH, chIdx, t);
 
     ctx.save();
     const sx = shake > 0.1 ? (Math.random() - 0.5) * shake * 2 : 0;
@@ -1484,47 +1862,46 @@ export function createRenderer() {
     ctx.translate(vp.ox + sx * vp.scale, vp.oy + sy * vp.scale);
     ctx.scale(vp.scale, vp.scale);
 
-    if (viewState.scene === "title") {
-      drawSectorWorld(ctx, viewState.demoSector, {
-        phase: "flight",
-        flight: viewState.demoFlight,
-        relics: [],
-      }, t);
-      drawTitleOverlay(
+    if (view.scene === "title") {
+      drawOrbitWorld(
         ctx,
-        viewState.bestScore,
-        viewState.dailyLabel,
-        viewState.savedRun,
-        viewState.muted,
+        view.demoOrbit,
+        { phase: "flight", flight: view.demoFlight, shipId: "solaris", shots: 1 },
         t,
       );
-    } else if (viewState.run) {
-      const run = viewState.run;
-      drawSectorWorld(
+      drawTitleOverlay(ctx, view.profile, view.dailyLabel, view.muted, t);
+    } else if (view.scene === "chart") {
+      drawChartScreen(ctx, view.profile, view.chartChapter, view.dailyLabel, view.muted, t);
+    } else if (view.session) {
+      const s = view.session;
+      drawOrbitWorld(
         ctx,
-        run.sector,
+        s.orbit,
         {
-          phase: run.phase,
-          flight: run.flight,
-          relics: run.relics,
-          aim: viewState.aim,
-          aimHitGate: Boolean(viewState.aim && viewState.aim.pred && viewState.aim.pred.hitGate),
+          phase: s.phase,
+          flight: s.flight,
+          shipId: s.shipId,
+          shots: s.shots,
+          lastTrail: s.lastTrail,
+          aim: view.aim,
+          aimHitGate: Boolean(view.aim && view.aim.pred && view.aim.pred.hitGate),
+          tutorialAssistActive: s.tutorialAssistActive,
         },
         t,
       );
 
-      if (run.phase === "aim" || run.phase === "flight") {
-        drawInGameChrome(ctx, run, viewState.muted, t);
-      } else if (run.phase === "draft") {
-        drawDraftOverlay(ctx, run);
-      } else if (run.phase === "victory" || run.phase === "over") {
-        drawEndOverlay(ctx, run, viewState.bestScore, viewState.isNewBest, viewState.dailyLabel);
+      if (s.phase === "aim" || s.phase === "flight") {
+        drawInGameChrome(ctx, s, view.muted);
+      } else if (s.phase === "clear") {
+        drawClearSheet(ctx, s);
+      } else if (s.phase === "daily_over" || s.phase === "daily_won") {
+        drawDailyEndOverlay(ctx, s, view.profile);
       }
     }
 
     if (flash > 0.01) {
       ctx.fillStyle = flashColor;
-      ctx.globalAlpha = flash * 0.25;
+      ctx.globalAlpha = flash * 0.24;
       ctx.fillRect(-40, -40, WORLD_W + 80, WORLD_H + 80);
       ctx.globalAlpha = 1;
     }

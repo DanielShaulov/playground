@@ -1,24 +1,21 @@
-# Perihelion — Build Plan
+# Perihelion — Architecture & Design
 
-An ambitious one-handed portrait orbital slingshot roguelike.
-Zero build step, vanilla ES modules, pure testable physics/run core, procedural Web Audio synthesis, Playwright phone verification.
+A one-handed portrait orbital slingshot across **24 handcrafted orbits** grouped into **4 Constellations** (*Helios*, *Pulsar*, *Harmonic*, *Singularity*), with **4 star-unlockable Probe Ships**, an interactive hands-on tutorial, and a **5-stage Daily Gauntlet**.
 
-## Milestones
+Zero build step, vanilla ES modules, pure testable physics/campaign core, procedural Web Audio synthesis, Playwright phone verification.
 
-- [x] **M0: Branch & Scaffold** — `perihelion` branch, `npm run new` registration in `games.js`, design doc.
-- [x] **M1: Pure Simulation Core** (`games/perihelion/core/`)
-  - `rng.js` — deterministic Mulberry32 PRNG + daily seed helper
-  - `relics.js` — 12 synergistic relics with helpers
-  - `sectors.js` — 12 curated/procedural sector archetypes + endless scaling (planets, repulsors, binaries, singularities, wormholes, keyed prism gates, bumpers, mines)
-  - `physics.js` — RK4 N-body gravity, orbit grapple tether + tangential overcharge, Perihelion Graze detection, trajectory prediction, wormholes, Twin Probe, Aegis bounce, Ricochet walls
-  - `run.js` — pure run state machine (title, play, draft, victory, over), scoring, save/resume serialization
-  - `tests/perihelion/core.test.mjs` — Node tests covering physics, relics, solvability across seeds, save roundtrip
-- [x] **M2: Audio & Visual Craft**
-  - `games/perihelion/audio.js` — Web Audio procedural synth (pentatonic crystal chimes, tension hum, grapple charge, whip release, graze shimmer, warp chord)
-  - `games/perihelion/render.js` — full-bleed starfield/nebula, shaded procedural planets & rings, black-hole accretion disks, wormhole swirls, bending dotted trajectory preview, comet plasma trails, shockwaves, floating popups, crisp canvas UI (title, draft cards, pause/recall, victory/game-over, relic bar)
-- [x] **M3: Playable Game Wiring**
-  - `games/perihelion/game.js` & `index.html` — shared engine/shell/storage integration, responsive scaling across portrait viewports, mute toggle, Daily Run & Standard Run, interactive title demo, clean `window.__perihelion` test hook
-- [x] **M4: Verification & Polish**
-  - `tests/perihelion/browser.test.mjs` — Playwright verification on iPhone 13 & iPhone SE viewports (gameplay, scoring, warp/draft, lose condition, best-score persistence, console cleanliness, visual screenshots)
-  - Run full repo `npm test` (Checkwiz + Ferment + Typecheck + Perihelion)
-  - Push branch and open PR for GitHub Pages preview
+## Core Modules
+
+- `games/perihelion/core/rng.js` — Deterministic Mulberry32 PRNG + Daily seed helper.
+- `games/perihelion/core/ships.js` — 4 Probe Chassis unlocked via Constellation Stars (`Solaris`, `Aegis`, `Tachyon`, `Gemini`).
+- `games/perihelion/core/campaign.js` — 24 handcrafted orbits across 4 themed chapters + deterministic 5-stage Daily Gauntlet generator.
+- `games/perihelion/core/physics.js` — RK4 N-body gravity, live trajectory preview, real-time curved Orbit Grapple exit-arc prediction, spacetime grid warping, and collision/graze resolution.
+- `games/perihelion/core/progress.js` — Pure Constellation progression (3 mastery stars per orbit: Clear, Par Shots, All Crystals), ship/chapter unlocks, interactive Orbit-2 slow-mo grapple tutorial assist, Daily Gauntlet state, and save sanitization (`SAVE_V = 2`).
+- `games/perihelion/audio.js` — Procedural Web Audio synthesizer (pentatonic crystal combos, tether lock/charge/whip sweeps, graze shimmer, star-ignite chords).
+- `games/perihelion/render.js` — Warped spacetime grid, living Constellation Star Chart, Probe Hangar, animated Ghost-Thumb & Slow-Mo Grapple tutorials, diegetic leader-line callouts, ghost previous-shot trace, live curved exit arc, and sleek 3-star Clear Sheet.
+- `games/perihelion/game.js` — Wires shared `engine.js`, `ui.js`, and `storage.js` (PR-isolated saves).
+
+## Tests
+
+- `npm run test:perihelion` — Pure Node tests (`tests/perihelion/core.test.mjs`).
+- `npm run test:perihelion:browser` — Headless Chromium portrait-phone verification on iPhone 13 & iPhone SE (`tests/perihelion/browser.test.mjs`).

@@ -1,8 +1,9 @@
 /**
  * Headless Chromium portrait-phone test suite for Perihelion.
- * Drives real pointer/touch interactions on iPhone 13 and iPhone SE viewports,
- * asserting gameplay, trajectory aim, scoring, warp -> relic draft, save/resume,
- * lose condition, best-score persistence, and zero console errors.
+ * Drives real pointer/touch flows on iPhone 13 and iPhone SE viewports:
+ * Title -> Orbit 1 Ghost-Thumb Tutorial -> Slingshot Clear -> 3-Star Sheet ->
+ * Orbit 2 Slow-Mo Grapple Tutorial -> Live Curved Exit Arc ->
+ * Constellation Star Chart & Ship Hangar -> Reload Persistence -> Daily Gauntlet.
  */
 
 import assert from "node:assert/strict";
@@ -92,7 +93,7 @@ async function run() {
   });
 
   try {
-    // --- 1. Full gameplay flow on iPhone 13 (390 x 844) ---
+    // --- 1. Full flow on iPhone 13 (390 x 844) ---
     const context = await browser.newContext({
       ...devices["iPhone 13"],
       hasTouch: true,
@@ -104,62 +105,53 @@ async function run() {
       if (msg.type() === "error") errors.push(`console.error: ${msg.text()}`);
     });
 
-    // Verify launcher tile opens Perihelion
     await page.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
     const tile = page.locator('a.tile[href="games/perihelion/index.html"]');
     await tile.waitFor({ state: "visible", timeout: 5000 });
     await tile.click();
     await page.waitForFunction(() => Boolean(window.__perihelion), { timeout: 5000 });
-    await page.waitForTimeout(350);
+    await page.waitForTimeout(300);
 
-    // Screenshot 1: Title screen
+    // 1. Title screen
     await page.screenshot({ path: path.join(SHOTS_DIR, "01-title.png") });
     let state = await page.evaluate(() => window.__perihelion.getState());
     assert.equal(state.scene, "title");
 
-    // Tap LAUNCH RUN
+    // 2. Tap START EXPEDITION -> enters Orbit 1 with animated Ghost Thumb tutorial
     const titleRects = await page.evaluate(() => window.__perihelion.uiRects());
-    await tapWorldRect(page, titleRects.start);
-    await page.waitForTimeout(150);
+    await tapWorldRect(page, titleRects.primary);
+    await page.waitForTimeout(450);
 
-    // Seed a known Sector 1 for deterministic aiming test
-    await page.evaluate(() => window.__perihelion.startSeed(42));
-    await page.waitForTimeout(120);
     state = await page.evaluate(() => window.__perihelion.getState());
     assert.equal(state.scene, "play");
-    assert.equal(state.run.phase, "aim");
-    assert.equal(state.run.sectorNum, 1);
+    assert.equal(state.session.orbit.id, "h1");
+    assert.equal(state.session.phase, "aim");
+    await page.screenshot({ path: path.join(SHOTS_DIR, "02-tutorial-pull.png") });
 
-    // Find a pull vector that threads Sector 1 straight into the Warp Gate
-    const winningPull = await page.evaluate(() => {
-      const { run } = window.__perihelion.getState();
-      return { sector: run.sector };
-    });
-
-    let bestPull = { dx: 68, dy: -118 };
+    // Compute clean 1-shot pull vector for Orbit 1
+    let winPull = { dx: 54, dy: -112 };
     for (let angle = -1.0; angle <= 1.0; angle += 0.08) {
-      for (let mag = 70; mag <= 140; mag += 15) {
+      for (let mag = 70; mag <= 145; mag += 15) {
         const dx = Math.sin(angle) * mag;
         const dy = -Math.cos(angle) * mag;
-        const vel = pullToVelocity(dx, dy, []);
+        const vel = pullToVelocity(dx, dy, "solaris");
         if (!vel) continue;
         const pred = predictTrajectory(
-          winningPull.sector,
-          winningPull.sector.launch.x,
-          winningPull.sector.launch.y,
+          state.session.orbit,
+          state.session.orbit.launch.x,
+          state.session.orbit.launch.y,
           vel.vx,
           vel.vy,
-          [],
+          "solaris",
         );
         if (pred.hitGate) {
-          bestPull = { dx, dy };
+          winPull = { dx, dy };
           break;
         }
       }
-      if (bestPull.dx !== 68 || bestPull.dy !== -118) break;
+      if (winPull.dx !== 54 || winPull.dy !== -112) break;
     }
 
-    // Perform real pointer drag to aim -> capture aim screenshot -> release to launch!
     const dragCoords = await page.evaluate(
       ({ dx, dy }) => {
         const c = document.querySelector("canvas");
@@ -173,93 +165,96 @@ async function run() {
           ey: box.top + end.y,
         };
       },
-      bestPull,
+      winPull,
     );
 
     await page.mouse.move(dragCoords.sx, dragCoords.sy);
     await page.mouse.down();
     await page.mouse.move(dragCoords.ex, dragCoords.ey, { steps: 8 });
-    await page.waitForTimeout(120);
-
-    // Screenshot 2: Live aiming with bending RK4 trajectory arc
-    await page.screenshot({ path: path.join(SHOTS_DIR, "02-aim.png") });
+    await page.waitForTimeout(80);
     await page.mouse.up();
 
-    // Wait for probe to fly and clear Sector 1 -> Relic Draft
+    // Wait for Orbit 1 clear -> sleek 3-Star Clear Sheet
     await page.waitForFunction(
       () => {
         const s = window.__perihelion.getState();
-        return s.run && s.run.phase === "draft";
+        return s.session && s.session.phase === "clear";
       },
       { timeout: 10000 },
     );
+    await page.waitForTimeout(160);
+    await page.screenshot({ path: path.join(SHOTS_DIR, "03-clear-sheet.png") });
 
     state = await page.evaluate(() => window.__perihelion.getState());
-    assert.equal(state.run.phase, "draft");
-    assert.ok(state.run.score > 400, `expected score > 400, got ${state.run.score}`);
-    assert.equal(state.run.draftChoices.length, 3);
+    assert.ok(state.profile.orbits.h1 && state.profile.orbits.h1.stars >= 2);
 
-    // Screenshot 3: Sector clear + Relic Draft cards
-    await page.screenshot({ path: path.join(SHOTS_DIR, "03-draft.png") });
-
-    // Tap first relic card -> advance to Sector 2
-    const draftRects = await page.evaluate(() => window.__perihelion.uiRects());
-    const chosenRelic = draftRects.cards[0].id;
-    await tapWorldRect(page, draftRects.cards[0]);
+    // 3. Tap NEXT ORBIT -> Orbit 2 ("Orbit Whip") interactive grapple tutorial
+    const clearRects = await page.evaluate(() => window.__perihelion.uiRects());
+    assert.ok(clearRects.next);
+    await tapWorldRect(page, clearRects.next);
     await page.waitForTimeout(150);
 
     state = await page.evaluate(() => window.__perihelion.getState());
-    assert.equal(state.run.sectorNum, 2);
-    assert.equal(state.run.phase, "aim");
-    assert.ok(state.run.relics.includes(chosenRelic));
-    const scoreAtSector2 = state.run.score;
+    assert.equal(state.session.orbit.id, "h2");
 
-    // Reload page and verify RESUME + best score persistence
-    await page.reload({ waitUntil: "networkidle" });
-    await page.waitForFunction(() => Boolean(window.__perihelion), { timeout: 5000 });
-    await page.waitForTimeout(180);
+    // Launch past the right side of the Ice Planet to trigger slow-mo grapple tutorial
+    await page.evaluate(() => window.__perihelion.launchDirect(165, -340));
+    await page.waitForFunction(
+      () => {
+        const s = window.__perihelion.getState();
+        return s.session && s.session.tutorialAssistActive;
+      },
+      { timeout: 6000 },
+    );
+    await page.screenshot({ path: path.join(SHOTS_DIR, "04-tutorial-grapple.png") });
 
-    const resumedRects = await page.evaluate(() => window.__perihelion.uiRects());
-    assert.ok(resumedRects.resume, "Resume button should appear for saved run");
-    await tapWorldRect(page, resumedRects.resume);
+    // Hold thumb anywhere -> locks Orbit Grapple and renders Live Curved Exit Trajectory!
+    const mid = await page.evaluate(() => {
+      const c = document.querySelector("canvas");
+      const box = c.getBoundingClientRect();
+      return { x: box.left + box.width * 0.5, y: box.top + box.height * 0.6 };
+    });
+    await page.mouse.move(mid.x, mid.y);
+    await page.mouse.down();
+    await page.waitForTimeout(550);
+    await page.screenshot({ path: path.join(SHOTS_DIR, "05-grapple-exit.png") });
+    await page.mouse.up();
     await page.waitForTimeout(150);
 
-    state = await page.evaluate(() => window.__perihelion.getState());
-    assert.equal(state.run.sectorNum, 2);
-    assert.equal(state.run.score, scoreAtSector2);
-    assert.ok(state.run.relics.includes(chosenRelic));
+    // 4. Open Constellation Star Chart & verify stars + Ship Hangar
+    await page.evaluate(() => window.__perihelion.openChart(0));
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: path.join(SHOTS_DIR, "06-star-chart.png") });
 
-    // Screenshot 4: Sector 2 live playfield with relic installed
-    await page.screenshot({ path: path.join(SHOTS_DIR, "04-sector2.png") });
-
-    // Drive lose condition by launching and tapping RECALL until 0 probes remain
-    let safety = 0;
-    while (safety++ < 10) {
-      state = await page.evaluate(() => window.__perihelion.getState());
-      if (state.run.phase === "over") break;
-      await page.evaluate(() => window.__perihelion.launchDirect(0, -240));
-      await page.waitForTimeout(80);
-      const flightRects = await page.evaluate(() => window.__perihelion.uiRects());
-      if (flightRects.recall) {
-        await tapWorldRect(page, flightRects.recall);
-        await page.waitForTimeout(100);
-      }
-    }
-
-    state = await page.evaluate(() => window.__perihelion.getState());
-    assert.equal(state.run.phase, "over");
-    assert.equal(state.run.probes, 0);
-    await page.screenshot({ path: path.join(SHOTS_DIR, "05-gameover.png") });
-
-    // Reload and verify best score persisted even after game over cleared saved run
+    // 5. Reload and verify persisted stars & unlocked Orbit 2 survive!
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForFunction(() => Boolean(window.__perihelion), { timeout: 5000 });
     const afterReload = await page.evaluate(() => window.__perihelion.getState());
-    assert.equal(afterReload.best, scoreAtSector2);
-    assert.deepEqual(errors, [], `unexpected console/page errors: ${errors.join("; ")}`);
+    assert.ok(afterReload.profile.orbits.h1 && afterReload.profile.orbits.h1.stars >= 2);
+    assert.equal(afterReload.profile.seenPullTutorial, true);
+
+    // 6. Test Daily Gauntlet lose condition
+    await page.evaluate(() => window.__perihelion.openDaily(4242));
+    await page.waitForTimeout(120);
+    for (let i = 0; i < 6; i++) {
+      const st = await page.evaluate(() => window.__perihelion.getState());
+      if (st.session.phase === "daily_over") break;
+      await page.evaluate(() => window.__perihelion.launchDirect(0, -240));
+      await page.waitForTimeout(70);
+      const r = await page.evaluate(() => window.__perihelion.uiRects());
+      if (r.recall) {
+        await tapWorldRect(page, r.recall);
+        await page.waitForTimeout(80);
+      }
+    }
+    const dailyEnd = await page.evaluate(() => window.__perihelion.getState());
+    assert.equal(dailyEnd.session.phase, "daily_over");
+    await page.screenshot({ path: path.join(SHOTS_DIR, "07-daily-over.png") });
+
+    assert.deepEqual(errors, [], `unexpected errors: ${errors.join("; ")}`);
     await context.close();
 
-    // --- 2. Compact viewport sanity check on iPhone SE (320 x 568) ---
+    // --- 2. Compact iPhone SE (320 x 568) Star Chart check ---
     const seCtx = await browser.newContext({
       viewport: { width: 320, height: 568 },
       deviceScaleFactor: 2,
@@ -271,8 +266,9 @@ async function run() {
     sePage.on("pageerror", (e) => seErrors.push(e.message));
     await sePage.goto(`${baseUrl}/games/perihelion/index.html`, { waitUntil: "networkidle" });
     await sePage.waitForFunction(() => Boolean(window.__perihelion), { timeout: 5000 });
+    await sePage.evaluate(() => window.__perihelion.openChart(0));
     await sePage.waitForTimeout(200);
-    await sePage.screenshot({ path: path.join(SHOTS_DIR, "06-iphone-se.png") });
+    await sePage.screenshot({ path: path.join(SHOTS_DIR, "08-iphone-se-chart.png") });
     assert.deepEqual(seErrors, []);
     await seCtx.close();
 
