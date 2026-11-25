@@ -87,6 +87,37 @@ test("Trajectory prediction matches actual RK4 flight path", () => {
   assert.ok(Math.hypot(p.x - expected.x, p.y - expected.y) < 1.5);
 });
 
+test("Solar Bumper ricochet matches trajectory prediction 1:1 after impact", () => {
+  const orbit = buildOrbit("p2"); // Ricochet Bell
+  const vel = pullToVelocity(51.49, -59.91, "solaris");
+  assert.ok(vel);
+  const pred = predictTrajectory(orbit, orbit.launch.x, orbit.launch.y, vel.vx, vel.vy, "solaris", 78);
+  assert.equal(pred.hitGate, true, "Ricochet Bell bumper bank should predict hitting Warp Gate");
+
+  // 1. Exact step-for-step match after bounce
+  const flight = createFlight(orbit, vel.vx, vel.vy, "solaris");
+  let bounced = false;
+  for (let i = 0; i < 78 && !flight.settled; i++) {
+    const evs = stepFlight(orbit, flight, 0.024, false, "solaris");
+    if (evs.some((e) => e.type === "bumper")) bounced = true;
+    if (bounced && !flight.settled && i < pred.points.length) {
+      const p = flight.probes[0];
+      const exp = pred.points[i];
+      const err = Math.hypot(p.x - exp.x, p.y - exp.y);
+      assert.ok(err < 2.0, `post-bumper step ${i} diverged by ${err.toFixed(2)}u`);
+    }
+  }
+  assert.ok(bounced, "probe should bounce off the Solar Bumper");
+  assert.equal(flight.outcome, "warp");
+
+  // 2. Real 60Hz frame rate (different dt from prediction) must also hit the Warp Gate!
+  const orbit60 = buildOrbit("p2");
+  const fl60 = createFlight(orbit60, vel.vx, vel.vy, "solaris");
+  for (let f = 0; f < 240 && !fl60.settled; f++) stepFlight(orbit60, fl60, 1 / 60, false, "solaris");
+  assert.equal(fl60.outcome, "warp", "60Hz live bumper ricochet must match prediction");
+  assert.equal(fl60.crystalsThisShot, 4);
+});
+
 test("Orbit 1 (First Curve) earns 3/3 stars with pure aim and unlocks Orbit 2", () => {
   const profile = createProfile();
   assert.equal(isOrbitUnlocked(profile, "h1"), true);

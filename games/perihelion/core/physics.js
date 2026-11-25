@@ -125,13 +125,99 @@ export function findGrappleTarget(orbit, probe, shipId = "solaris") {
 }
 
 /**
+ * Exact continuous swept-segment vs circle bumper bounce.
+ * Shared by both predictTrajectory and stepFlight so ricochet angles never
+ * depend on timestep penetration depth.
+ */
+function resolveBumperHit(prevX, prevY, x, y, vx, vy, bp, stepDt) {
+  const R = bp.r + PROBE_R;
+  const dx = x - prevX;
+  const dy = y - prevY;
+  const fx = prevX - bp.x;
+  const fy = prevY - bp.y;
+
+  // Already overlapping at start of substep? Push out along exact radial normal.
+  const startD = Math.hypot(fx, fy);
+  if (startD < R && startD > 0.0001) {
+    const nx = fx / startD;
+    const ny = fy / startD;
+    const vn = vx * nx + vy * ny;
+    let nvx = vx;
+    let nvy = vy;
+    if (vn < 0) {
+      nvx -= 2 * vn * nx;
+      nvy -= 2 * vn * ny;
+    }
+    const spd = Math.hypot(nvx, nvy);
+    if (spd < 350) {
+      const sc = 350 / (spd || 1);
+      nvx *= sc;
+      nvy *= sc;
+    }
+    return {
+      hit: true,
+      x: bp.x + nx * (R + 0.5) + nvx * stepDt * 0.5,
+      y: bp.y + ny * (R + 0.5) + nvy * stepDt * 0.5,
+      vx: nvx,
+      vy: nvy,
+    };
+  }
+
+  // Solve |f + t * d|^2 = R^2 for smallest t in [0, 1]
+  const a = dx * dx + dy * dy;
+  if (a < 1e-8) return { hit: false, x, y, vx, vy };
+  const b = 2 * (fx * dx + fy * dy);
+  const c = fx * fx + fy * fy - R * R;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return { hit: false, x, y, vx, vy };
+
+  const sqrtDisc = Math.sqrt(disc);
+  const t = (-b - sqrtDisc) / (2 * a);
+  if (t < 0 || t > 1) return { hit: false, x, y, vx, vy };
+
+  // Exact contact point on bumper circle surface
+  const cx = prevX + dx * t;
+  const cy = prevY + dy * t;
+  const cd = Math.hypot(cx - bp.x, cy - bp.y) || 1;
+  const nx = (cx - bp.x) / cd;
+  const ny = (cy - bp.y) / cd;
+
+  let nvx = vx;
+  let nvy = vy;
+  const vn = nvx * nx + nvy * ny;
+  if (vn < 0) {
+    nvx -= 2 * vn * nx;
+    nvy -= 2 * vn * ny;
+  }
+  const spd = Math.hypot(nvx, nvy);
+  if (spd < 350) {
+    const sc = 350 / (spd || 1);
+    nvx *= sc;
+    nvy *= sc;
+  }
+
+  // Advance remaining fraction of substep along post-bounce velocity
+  const remDt = (1 - t) * stepDt;
+  return {
+    hit: true,
+    x: bp.x + nx * (R + 0.25) + nvx * remDt,
+    y: bp.y + ny * (R + 0.25) + nvy * remDt,
+    vx: nvx,
+    vy: nvy,
+  };
+}
+
+/**
  * Predict an RK4 trajectory arc from (startX, startY) with velocity (vx, vy).
- * Works both for initial slingshot aiming AND live Orbit Grapple exit preview!
+ * Runs 4 substeps per dot with the same swept bumper collision as live flight
+ * so ricochets and gravity curves match 1:1.
  */
 export function predictTrajectory(orbit, startX, startY, vx, vy, shipId = "solaris", maxSteps = null) {
   const { traits } = getShip(shipId);
   const steps = maxSteps ?? traits.trajectorySteps;
-  const h = 0.024;
+  const dotDt = 0.024;
+  const substeps = 4;
+  const h = dotDt / substeps;
   const points = [];
   let x = startX;
   let y = startY;
@@ -144,97 +230,89 @@ export function predictTrajectory(orbit, startX, startY, vx, vy, shipId = "solar
   const lockedKeys = orbit.crystals.filter((c) => c.alive && c.isKey);
   const hitKeyIds = new Set();
 
-  for (let i = 0; i < steps; i++) {
-    const next = rk4Step(x, y, curVx, curVy, orbit.bodies, h);
-    x = next.x;
-    y = next.y;
-    curVx = next.vx;
-    curVy = next.vy;
-    if (whCooldown > 0) whCooldown -= h;
-
+  let stop = false;
+  for (let i = 0; i < steps && !stop; i++) {
     let breakHere = false;
 
-    // Track Key Prisms shattered along this predicted path
-    for (let k = 0; k < lockedKeys.length; k++) {
-      const key = lockedKeys[k];
-      if (!hitKeyIds.has(key.id) && Math.hypot(x - key.x, y - key.y) <= key.r + PROBE_R + 3) {
-        hitKeyIds.add(key.id);
-      }
-    }
+    for (let s = 0; s < substeps && !stop; s++) {
+      const prevX = x;
+      const prevY = y;
+      const next = rk4Step(x, y, curVx, curVy, orbit.bodies, h);
+      x = next.x;
+      y = next.y;
+      curVx = next.vx;
+      curVy = next.vy;
+      if (whCooldown > 0) whCooldown -= h;
 
-    // Preview bumper ricochets cleanly too!
-    for (const bp of orbit.bumpers) {
-      const dx = x - bp.x;
-      const dy = y - bp.y;
-      const d = Math.hypot(dx, dy);
-      if (d < bp.r + PROBE_R && d > 0.001) {
-        const nx = dx / d;
-        const ny = dy / d;
-        x = bp.x + nx * (bp.r + PROBE_R + 1);
-        y = bp.y + ny * (bp.r + PROBE_R + 1);
-        const vn = curVx * nx + curVy * ny;
-        if (vn < 0) {
-          curVx -= 2 * vn * nx;
-          curVy -= 2 * vn * ny;
-        }
-        const spd = Math.hypot(curVx, curVy);
-        if (spd < 350) {
-          const s = 350 / (spd || 1);
-          curVx *= s;
-          curVy *= s;
+      // Track Key Prisms shattered along this predicted path
+      for (let k = 0; k < lockedKeys.length; k++) {
+        const key = lockedKeys[k];
+        if (!hitKeyIds.has(key.id) && Math.hypot(x - key.x, y - key.y) <= key.r + PROBE_R + 3) {
+          hitKeyIds.add(key.id);
         }
       }
-    }
 
-    // Wormhole preview
-    if (warpsLeft > 0 && whCooldown <= 0 && orbit.wormholes.length === 2) {
-      for (const w of orbit.wormholes) {
-        if (Math.hypot(x - w.x, y - w.y) <= w.r + PROBE_R * 0.6) {
-          const dst = orbit.wormholes.find((o) => o.id === w.target);
-          if (dst) {
-            const spd = Math.hypot(curVx, curVy) || 1;
-            x = dst.x + (curVx / spd) * (dst.r + 7);
-            y = dst.y + (curVy / spd) * (dst.r + 7);
-            warpsLeft--;
-            whCooldown = 0.28;
-            breakHere = true;
-            break;
+      // Exact swept bumper ricochet preview
+      for (const bp of orbit.bumpers) {
+        const res = resolveBumperHit(prevX, prevY, x, y, curVx, curVy, bp, h);
+        if (res.hit) {
+          x = res.x;
+          y = res.y;
+          curVx = res.vx;
+          curVy = res.vy;
+        }
+      }
+
+      // Wormhole preview
+      if (warpsLeft > 0 && whCooldown <= 0 && orbit.wormholes.length === 2) {
+        for (const w of orbit.wormholes) {
+          if (Math.hypot(x - w.x, y - w.y) <= w.r + PROBE_R * 0.6) {
+            const dst = orbit.wormholes.find((o) => o.id === w.target);
+            if (dst) {
+              const spd = Math.hypot(curVx, curVy) || 1;
+              x = dst.x + (curVx / spd) * (dst.r + 7);
+              y = dst.y + (curVy / spd) * (dst.r + 7);
+              warpsLeft--;
+              whCooldown = 0.28;
+              breakHere = true;
+              break;
+            }
           }
         }
+      }
+
+      // Gate check: slightly tighter than live flight (0.75 vs 0.9) so a golden arc always warps
+      const gateD = Math.hypot(x - orbit.gate.x, y - orbit.gate.y);
+      if (gateD <= orbit.gate.r + PROBE_R * 0.75) {
+        if (hitKeyIds.size >= lockedKeys.length) {
+          hitGate = true;
+          stop = true;
+          break;
+        } else {
+          const nx = (x - orbit.gate.x) / (gateD || 1);
+          const ny = (y - orbit.gate.y) / (gateD || 1);
+          x = orbit.gate.x + nx * (orbit.gate.r + PROBE_R + 2);
+          y = orbit.gate.y + ny * (orbit.gate.r + PROBE_R + 2);
+          const vn = curVx * nx + curVy * ny;
+          if (vn < 0) {
+            curVx -= 1.85 * vn * nx;
+            curVy -= 1.85 * vn * ny;
+          }
+        }
+      }
+
+      for (const b of orbit.bodies) {
+        if (Math.hypot(x - b.x, y - b.y) <= b.r + PROBE_R * 0.85) {
+          stop = true;
+          break;
+        }
+      }
+      if (x < -28 || x > WORLD_W + 28 || y < -28 || y > WORLD_H + 28) {
+        stop = true;
       }
     }
 
     points.push({ x, y, breakHere });
-
-    // Gate check: only counts as a warp hit if unlocked (or unlocked earlier along this very path!)
-    const gateD = Math.hypot(x - orbit.gate.x, y - orbit.gate.y);
-    if (gateD <= orbit.gate.r + PROBE_R) {
-      if (hitKeyIds.size >= lockedKeys.length) {
-        hitGate = true;
-        break;
-      } else {
-        // Preview honest bounce off the locked gate
-        const nx = (x - orbit.gate.x) / (gateD || 1);
-        const ny = (y - orbit.gate.y) / (gateD || 1);
-        x = orbit.gate.x + nx * (orbit.gate.r + PROBE_R + 2);
-        y = orbit.gate.y + ny * (orbit.gate.r + PROBE_R + 2);
-        const vn = curVx * nx + curVy * ny;
-        if (vn < 0) {
-          curVx -= 1.85 * vn * nx;
-          curVy -= 1.85 * vn * ny;
-        }
-      }
-    }
-
-    let crashed = false;
-    for (const b of orbit.bodies) {
-      if (Math.hypot(x - b.x, y - b.y) <= b.r + PROBE_R * 0.85) {
-        crashed = true;
-        break;
-      }
-    }
-    if (crashed) break;
-    if (x < -28 || x > WORLD_W + 28 || y < -28 || y > WORLD_H + 28) break;
   }
 
   const hitKey = lockedKeys.length > 0 && hitKeyIds.size > 0;
@@ -387,6 +465,9 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
       if (!probe.alive) continue;
       if (probe.whCooldown > 0) probe.whCooldown = Math.max(0, probe.whCooldown - h);
 
+      const prevX = probe.x;
+      const prevY = probe.y;
+
       if (probe.tether) {
         // Calm, deliberate angular sextant orbit around the grappled body.
         // Smoothly slows into a magnetic detent whenever the live exit arc hits the Warp Gate!
@@ -444,27 +525,14 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
         }
       }
 
-      // Solar Bumpers
+      // Solar Bumpers (exact swept ray-circle reflection matching predictTrajectory)
       for (const bp of orbit.bumpers) {
-        const dx = probe.x - bp.x;
-        const dy = probe.y - bp.y;
-        const d = Math.hypot(dx, dy);
-        if (d < bp.r + PROBE_R && d > 0.001) {
-          const nx = dx / d;
-          const ny = dy / d;
-          probe.x = bp.x + nx * (bp.r + PROBE_R + 1);
-          probe.y = bp.y + ny * (bp.r + PROBE_R + 1);
-          const vn = probe.vx * nx + probe.vy * ny;
-          if (vn < 0) {
-            probe.vx -= 2 * vn * nx;
-            probe.vy -= 2 * vn * ny;
-          }
-          const spd = Math.hypot(probe.vx, probe.vy);
-          if (spd < 350) {
-            const sc = 350 / (spd || 1);
-            probe.vx *= sc;
-            probe.vy *= sc;
-          }
+        const res = resolveBumperHit(prevX, prevY, probe.x, probe.y, probe.vx, probe.vy, bp, h);
+        if (res.hit) {
+          probe.x = res.x;
+          probe.y = res.y;
+          probe.vx = res.vx;
+          probe.vy = res.vy;
           bp.flash = 1;
           events.push({ type: "bumper", x: bp.x, y: bp.y, points: 75 });
         }
@@ -491,7 +559,7 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
 
       // Warp Gate
       const gateD = Math.hypot(probe.x - orbit.gate.x, probe.y - orbit.gate.y);
-      if (gateD <= orbit.gate.r + PROBE_R * 0.65) {
+      if (gateD <= orbit.gate.r + PROBE_R * 0.9) {
         if (isGateUnlocked(orbit)) {
           flight.settled = true;
           flight.outcome = "warp";

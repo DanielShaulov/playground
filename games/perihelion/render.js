@@ -547,7 +547,7 @@ export function createRenderer() {
       );
     }
 
-    // Solar Bumpers
+    // Solar Bumpers (circular resonance rim matching true circular bounce physics)
     for (const bp of orbit.bumpers) {
       ctx.save();
       ctx.translate(bp.x, bp.y);
@@ -559,20 +559,23 @@ export function createRenderer() {
         ctx.arc(0, 0, bp.r + 12, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.fillStyle = "#1c1917";
+      const g = ctx.createRadialGradient(-bp.r * 0.25, -bp.r * 0.25, 2, 0, 0, bp.r);
+      g.addColorStop(0, "#451a03");
+      g.addColorStop(1, "#1c1917");
+      ctx.fillStyle = g;
       ctx.strokeStyle = bp.flash > 0.1 ? "#ffffff" : "#fbbf24";
-      ctx.lineWidth = 2.6;
+      ctx.lineWidth = 2.8;
       ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = (Math.PI / 3) * i + t * 0.5;
-        const px = Math.cos(a) * bp.r;
-        const py = Math.sin(a) * bp.r;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
+      ctx.arc(0, 0, bp.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+
+      ctx.strokeStyle = "rgba(253, 224, 71, 0.45)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, bp.r * 0.62, 0, Math.PI * 2);
+      ctx.stroke();
+
       ctx.fillStyle = "#fde047";
       ctx.beginPath();
       ctx.arc(0, 0, 4.5, 0, Math.PI * 2);

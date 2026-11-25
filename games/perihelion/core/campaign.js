@@ -369,12 +369,12 @@ export const ORBIT_SPECS = [
         crystal("c4", 190, 198),
       ],
       bumpers: [
-        bumper("bp1", 316, 342, 18),
+        bumper("bp1", 304, 344, 22),
       ],
       mines: [],
       wormholes: [],
       callouts: [
-        { x: 316, y: 342, text: "SOLAR BUMPER", side: "left", color: "#fbbf24" },
+        { x: 304, y: 344, text: "SOLAR BUMPER", side: "left", color: "#fbbf24" },
       ],
     }),
   },
