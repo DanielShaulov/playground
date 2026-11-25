@@ -260,7 +260,7 @@ export function stepSession(session, profile, dt, holding = false) {
     !profile.seenGrappleTutorial
   ) {
     if (main.tether) {
-      tutorialSlow = 0.55;
+      tutorialSlow = 0.85;
       session.tutorialAssistActive = true;
     } else if (session.flight.nearestGrappleId) {
       tutorialSlow = 0.24;
@@ -268,11 +268,11 @@ export function stepSession(session, profile, dt, holding = false) {
     }
   }
 
-  const chronoSlow =
-    session.phase === "flight" && holding && main && main.tether && ship.traits.chronoGrapple;
+  const isTethered = Boolean(session.phase === "flight" && holding && main && main.tether);
+  const hazardScale = isTethered ? (ship.traits.chronoGrapple ? 0.15 : 0.35) : 1;
 
   const worldDt = dt * tutorialSlow;
-  updateOrbitMotion(session.orbit, worldDt, chronoSlow ? 0.35 : 1);
+  updateOrbitMotion(session.orbit, worldDt, hazardScale);
 
   if (session.phase !== "flight" || !session.flight) return [];
 

@@ -216,20 +216,18 @@ export function predictTrajectory(orbit, startX, startY, vx, vy, shipId = "solar
 
 /**
  * Compute exact release velocity if the player releases Orbit Grapple right now.
+ * Uses a steady, predictable tangent launch speed so the live curved exit arc
+ * matches the actual flight path 1:1 upon release.
  */
 export function grappleReleaseVelocity(probe) {
   if (!probe.tether) return { vx: probe.vx, vy: probe.vy, boosted: false };
-  const charge = probe.tether.charge;
-  if (charge <= 0.1) return { vx: probe.vx, vy: probe.vy, boosted: false };
-  const boost = 1 + (0.2 + charge * 0.34);
-  let vx = probe.vx * boost;
-  let vy = probe.vy * boost;
-  const spd = Math.hypot(vx, vy);
-  if (spd > 780) {
-    vx = (vx / spd) * 780;
-    vy = (vy / spd) * 780;
-  }
-  return { vx, vy, boosted: true };
+  const spd = Math.hypot(probe.vx, probe.vy) || 1;
+  const launchSpd = probe.tether.launchSpeed || 430;
+  return {
+    vx: (probe.vx / spd) * launchSpd,
+    vy: (probe.vy / spd) * launchSpd,
+    boosted: true,
+  };
 }
 
 /**
@@ -238,7 +236,7 @@ export function grappleReleaseVelocity(probe) {
 export function predictGrappleExit(orbit, probe, shipId = "solaris") {
   if (!probe || !probe.alive || !probe.tether) return null;
   const rel = grappleReleaseVelocity(probe);
-  return predictTrajectory(orbit, probe.x, probe.y, rel.vx, rel.vy, shipId, 44);
+  return predictTrajectory(orbit, probe.x, probe.y, rel.vx, rel.vy, shipId, 68);
 }
 
 /**
@@ -304,10 +302,11 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
   if (flight.settled) return events;
 
   const { traits } = getShip(shipId);
-  flight.elapsed += dt;
   const substeps = 4;
   const h = dt / substeps;
   const main = flight.probes[0];
+  // Don't burn flight timeout while calmly aiming an Orbit Grapple
+  if (!main.tether) flight.elapsed += dt;
 
   // Tether lock / release on main probe
   if (main.alive) {
@@ -316,10 +315,24 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
       if (target) {
         const dx = main.x - target.x;
         const dy = main.y - target.y;
-        const dist = Math.max(target.r + 22, Math.hypot(dx, dy));
+        const dist = Math.max(target.r + 24, Math.hypot(dx, dy));
+        const angle = Math.atan2(dy, dx);
         const cross = dx * main.vy - dy * main.vx;
         const dir = cross >= 0 ? 1 : -1;
-        main.tether = { bodyId: target.id, orbitR: dist, charge: 0, dir };
+        const vEsc = Math.sqrt((2 * Math.max(1e6, target.gm)) / Math.max(40, dist));
+        const launchSpeed = Math.max(460, Math.min(740, vEsc * 1.16));
+        main.tether = {
+          bodyId: target.id,
+          orbitR: dist,
+          angle,
+          dir,
+          launchSpeed,
+          charge: 0,
+          aimingGate: false,
+        };
+        // Immediately orient velocity along exact tangent so exit arc is smooth from frame 1
+        main.vx = -Math.sin(angle) * dir * launchSpeed;
+        main.vy = Math.cos(angle) * dir * launchSpeed;
         flight.usedGrapple = true;
         events.push({ type: "tether_lock", x: main.x, y: main.y, bodyId: target.id });
       }
@@ -328,13 +341,9 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
       const bodyId = main.tether.bodyId;
       const rel = grappleReleaseVelocity(main);
       main.tether = null;
-      if (rel.boosted) {
-        main.vx = rel.vx;
-        main.vy = rel.vy;
-        events.push({ type: "tether_release", x: main.x, y: main.y, charge, bodyId });
-      } else {
-        events.push({ type: "tether_cancel", x: main.x, y: main.y, bodyId });
-      }
+      main.vx = rel.vx;
+      main.vy = rel.vy;
+      events.push({ type: "tether_release", x: main.x, y: main.y, charge, bodyId });
     }
   }
 
@@ -345,44 +354,29 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
       if (!probe.alive) continue;
       if (probe.whCooldown > 0) probe.whCooldown = Math.max(0, probe.whCooldown - h);
 
-      const next = rk4Step(probe.x, probe.y, probe.vx, probe.vy, orbit.bodies, h);
-      probe.x = next.x;
-      probe.y = next.y;
-      probe.vx = next.vx;
-      probe.vy = next.vy;
-
-      // Active Orbit Grapple constraint + tangential slingshot acceleration
       if (probe.tether) {
+        // Calm, deliberate angular sextant orbit around the grappled body.
+        // Smoothly slows into a magnetic detent whenever the live exit arc hits the Warp Gate!
         const b = orbit.bodies.find((body) => body.id === probe.tether.bodyId);
         if (!b) {
           probe.tether = null;
         } else {
-          const dx = probe.x - b.x;
-          const dy = probe.y - b.y;
-          const d = Math.hypot(dx, dy) || 1;
-          const nx = dx / d;
-          const ny = dy / d;
-          const minSafeR = b.r + 20;
-          probe.tether.orbitR = Math.max(minSafeR, probe.tether.orbitR - 14 * h);
-
-          const vRad = probe.vx * nx + probe.vy * ny;
-          probe.vx -= nx * vRad * Math.min(1, 15 * h);
-          probe.vy -= ny * vRad * Math.min(1, 15 * h);
-
-          const err = d - probe.tether.orbitR;
-          probe.x -= nx * err * Math.min(1, 13 * h);
-          probe.y -= ny * err * Math.min(1, 13 * h);
-
-          const tx = -ny * probe.tether.dir;
-          const ty = nx * probe.tether.dir;
-          const vTan = probe.vx * tx + probe.vy * ty;
-          const targetV = 415 * (traits.grappleChargeMult > 1 ? 1.12 : 1);
-          if (vTan < targetV) {
-            probe.vx += tx * 300 * traits.grappleChargeMult * h;
-            probe.vy += ty * 300 * traits.grappleChargeMult * h;
-          }
-          probe.tether.charge = Math.min(1, probe.tether.charge + 1.05 * traits.grappleChargeMult * h);
+          const baseOmega = traits.chronoGrapple ? 0.95 : 1.32;
+          const omega = probe.tether.aimingGate ? baseOmega * 0.36 : baseOmega;
+          probe.tether.angle += probe.tether.dir * omega * h;
+          const a = probe.tether.angle;
+          probe.x = b.x + Math.cos(a) * probe.tether.orbitR;
+          probe.y = b.y + Math.sin(a) * probe.tether.orbitR;
+          probe.vx = -Math.sin(a) * probe.tether.dir * probe.tether.launchSpeed;
+          probe.vy = Math.cos(a) * probe.tether.dir * probe.tether.launchSpeed;
+          probe.tether.charge = Math.min(1, probe.tether.charge + 1.2 * h);
         }
+      } else {
+        const next = rk4Step(probe.x, probe.y, probe.vx, probe.vy, orbit.bodies, h);
+        probe.x = next.x;
+        probe.y = next.y;
+        probe.vx = next.vx;
+        probe.vy = next.vy;
       }
 
       // Aegis magnetic crystal wake
@@ -580,6 +574,11 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
   } else if (main.alive && main.tether) {
     flight.nearestGrappleId = main.tether.bodyId;
     flight.grappleExit = predictGrappleExit(orbit, main, shipId);
+    const nowHit = Boolean(flight.grappleExit && flight.grappleExit.hitGate);
+    if (nowHit && !main.tether.aimingGate) {
+      events.push({ type: "tether_gate_lock", x: orbit.gate.x, y: orbit.gate.y });
+    }
+    main.tether.aimingGate = nowHit;
   } else {
     flight.nearestGrappleId = null;
     flight.grappleExit = null;

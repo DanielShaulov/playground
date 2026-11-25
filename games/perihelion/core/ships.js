@@ -14,7 +14,7 @@ export const SHIPS = [
     accent: "#38bdf8",
     traits: {
       speedMult: 1.0,
-      trajectorySteps: 58,
+      trajectorySteps: 78,
       grappleRangeMult: 1.0,
       grappleChargeMult: 1.0,
       chronoGrapple: false,
@@ -22,7 +22,7 @@ export const SHIPS = [
       magneticWake: false,
       twinProbe: false,
     },
-    perk: "Crisp gravity arc & balanced orbit whip.",
+    perk: "Crisp long gravity arc & calm orbit whip.",
   },
   {
     id: "aegis",
@@ -33,7 +33,7 @@ export const SHIPS = [
     accent: "#a78bfa",
     traits: {
       speedMult: 0.98,
-      trajectorySteps: 58,
+      trajectorySteps: 78,
       grappleRangeMult: 1.12,
       grappleChargeMult: 1.0,
       chronoGrapple: false,
@@ -52,7 +52,7 @@ export const SHIPS = [
     accent: "#f472b6",
     traits: {
       speedMult: 1.18,
-      trajectorySteps: 92,
+      trajectorySteps: 108,
       grappleRangeMult: 1.25,
       grappleChargeMult: 1.38,
       chronoGrapple: true,
@@ -60,7 +60,7 @@ export const SHIPS = [
       magneticWake: false,
       twinProbe: false,
     },
-    perk: "+18% launch speed, long sight & slow-mo grapple.",
+    perk: "+18% launch speed, ultra-long sight & extra-slow orbit.",
   },
   {
     id: "gemini",
@@ -71,7 +71,7 @@ export const SHIPS = [
     accent: "#fde047",
     traits: {
       speedMult: 1.04,
-      trajectorySteps: 66,
+      trajectorySteps: 84,
       grappleRangeMult: 1.1,
       grappleChargeMult: 1.15,
       chronoGrapple: false,

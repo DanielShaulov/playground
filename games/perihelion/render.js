@@ -103,8 +103,9 @@ export function uiRects(scene, session, profile, chartChapter = 0) {
       tabs,
       nodes,
       ships,
-      daily: { x: 16, y: 646, w: 298, h: 56 },
-      mute: { x: 324, y: 646, w: 60, h: 56 },
+      launchNext: { x: 16, y: 646, w: 224, h: 56 },
+      daily: { x: 248, y: 646, w: 74, h: 56 },
+      mute: { x: 330, y: 646, w: 54, h: 56 },
     };
   }
 
@@ -810,28 +811,28 @@ export function createRenderer() {
     const ease = 1 - Math.pow(1 - Math.max(0, Math.min(1, pullPhase)), 2.5);
     const alpha = cycle > 0.82 ? Math.max(0, 1 - (cycle - 0.82) / 0.18) : 1;
 
-    const sx = 264;
-    const sy = 434;
-    const targetPullDx = 48;
-    const targetPullDy = -84;
+    const sx = 224;
+    const sy = 444;
+    const targetPullDx = -61.5;
+    const targetPullDy = -82.6;
     const cx = sx - targetPullDx * ease;
     const cy = sy - targetPullDy * ease;
 
     ctx.save();
-    ctx.globalAlpha = alpha * 0.85;
+    ctx.globalAlpha = alpha * 0.88;
 
-    // Preview the gently curving demo trajectory while ghost pulls!
+    // Preview the exact 5-crystal winning gravity curve as the ghost pulls!
     const vel = pullToVelocity(targetPullDx * ease, targetPullDy * ease, shipId);
     if (vel) {
-      const pred = predictTrajectory(orbit, orbit.launch.x, orbit.launch.y, vel.vx, vel.vy, shipId, 46);
+      const pred = predictTrajectory(orbit, orbit.launch.x, orbit.launch.y, vel.vx, vel.vy, shipId, 76);
       for (let i = 0; i < pred.points.length; i++) {
         const pt = pred.points[i];
         const f = 1 - i / pred.points.length;
         ctx.fillStyle = pred.hitGate
-          ? `rgba(253, 224, 71, ${f * 0.55})`
-          : `rgba(186, 230, 253, ${f * 0.42})`;
+          ? `rgba(253, 224, 71, ${0.18 + f * 0.65})`
+          : `rgba(186, 230, 253, ${0.14 + f * 0.45})`;
         ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 1.5 + f * 2, 0, Math.PI * 2);
+        ctx.arc(pt.x, pt.y, 1.5 + f * 2.1, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1596,8 +1597,16 @@ export function createRenderer() {
     ctx.font = `500 11.5px ${FONT}`;
     ctx.fillText(`${curShip.name}: ${curShip.perk}`, WORLD_W * 0.5, 626);
 
-    // 4. Bottom Row: Daily Gauntlet + Mute
-    drawButton(ctx, rects.daily, "DAILY GAUNTLET", `5 SECTORS · ${dailyLabel}`, "secondary");
+    // 4. Bottom Row: Primary LAUNCH NEXT + compact DAILY + Mute
+    const nextSpec = ORBIT_BY_ID[nextId];
+    drawButton(
+      ctx,
+      rects.launchNext,
+      "LAUNCH NEXT",
+      `${nextSpec.name.toUpperCase()} · ORBIT ${nextSpec.index}`,
+      "primary",
+    );
+    drawButton(ctx, rects.daily, "DAILY", "5 SEC", "secondary");
     drawMuteButton(ctx, rects.mute, muted);
     ctx.restore();
   }

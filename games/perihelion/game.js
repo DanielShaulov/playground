@@ -163,6 +163,9 @@ function triggerEventAudioAndHaptics(events) {
     } else if (ev.type === "tether_lock") {
       audio.playTetherLock();
       vibrate(8);
+    } else if (ev.type === "tether_gate_lock") {
+      audio.playGateNotch();
+      vibrate(6);
     } else if (ev.type === "tether_release") {
       audio.playTetherRelease(ev.charge);
       vibrate(14);
@@ -272,7 +275,10 @@ createInput(stage, {
           return;
         }
       }
-      if (rects.daily && hitRect(wp, rects.daily)) {
+      if (rects.launchNext && hitRect(wp, rects.launchNext)) {
+        audio.playDraft();
+        openOrbit(nextPlayableOrbitId(profile));
+      } else if (rects.daily && hitRect(wp, rects.daily)) {
         audio.playDraft();
         openDaily();
       } else if (rects.mute && hitRect(wp, rects.mute)) {

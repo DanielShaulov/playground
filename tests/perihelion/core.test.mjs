@@ -87,39 +87,31 @@ test("Trajectory prediction matches actual RK4 flight path", () => {
   assert.ok(Math.hypot(p.x - expected.x, p.y - expected.y) < 1.5);
 });
 
-test("Orbit 1 (First Curve) is solvable in 1 shot and earns stars + unlocks Orbit 2", () => {
+test("Orbit 1 (First Curve) earns 3/3 stars with pure aim and unlocks Orbit 2", () => {
   const profile = createProfile();
   assert.equal(isOrbitUnlocked(profile, "h1"), true);
   assert.equal(isOrbitUnlocked(profile, "h2"), false);
 
-  let cleared = false;
-  for (let angle = -1.0; angle <= 1.0 && !cleared; angle += 0.08) {
-    for (let mag = 60; mag <= 145 && !cleared; mag += 15) {
-      const s = createSession({ mode: "campaign", orbitId: "h1", shipId: "solaris" });
-      const vel = pullToVelocity(Math.sin(angle) * mag, -Math.cos(angle) * mag, "solaris");
-      launchSessionProbe(s, profile, vel.vx, vel.vy);
-      for (let f = 0; f < 300 && s.phase === "flight"; f++) {
-        stepSession(s, profile, 1 / 60, false);
-      }
-      if (s.phase === "clear") {
-        cleared = true;
-        assert.equal(s.clearResult.parMet, true);
-        assert.ok(s.clearResult.starsThisAttempt >= 2);
-      }
-    }
+  const s = createSession({ mode: "campaign", orbitId: "h1", shipId: "solaris" });
+  const vel = pullToVelocity(-61.5, -82.6, "solaris");
+  launchSessionProbe(s, profile, vel.vx, vel.vy);
+  for (let f = 0; f < 300 && s.phase === "flight"; f++) {
+    stepSession(s, profile, 1 / 60, false);
   }
-  assert.ok(cleared, "Orbit 1 should be cleanly solvable in 1 shot");
+  assert.equal(s.phase, "clear", "Orbit 1 should clear on the sculpted outer gravity curve");
+  assert.equal(s.clearResult.parMet, true);
+  assert.equal(s.clearResult.allCrystals, true, "Orbit 1 curve should sweep all 5 crystals");
+  assert.equal(s.clearResult.starsThisAttempt, 3);
   assert.equal(profile.seenPullTutorial, true);
   assert.equal(isOrbitUnlocked(profile, "h2"), true);
-  assert.ok(totalStars(profile) >= 2);
+  assert.equal(totalStars(profile), 3);
 });
 
-test("Orbit Grapple circularizes, predicts live curved exit trajectory, and activates Orbit-2 tutorial assist", () => {
+test("Orbit Grapple orbits calmly, engages golden gate detent, and releases WYSIWYG into Warp Gate", () => {
   const profile = createProfile();
   const s = createSession({ mode: "campaign", orbitId: "h2", shipId: "solaris" });
   launchSessionProbe(s, profile, 120, -340);
 
-  // Move probe into grapple zone beside the Ice Planet
   const b = s.orbit.bodies[0];
   const main = s.flight.probes[0];
   main.x = b.x + b.r + 48;
@@ -127,23 +119,36 @@ test("Orbit Grapple circularizes, predicts live curved exit trajectory, and acti
   main.vx = 0;
   main.vy = -270;
 
-  // Step without holding: tutorial assist should engage slow-mo on first run
+  // Tutorial assist slows time before grapple
   stepSession(s, profile, 1 / 60, false);
-  assert.ok(s.flight.nearestGrappleId === b.id);
+  assert.equal(s.flight.nearestGrappleId, b.id);
   stepSession(s, profile, 1 / 60, false);
   assert.equal(s.tutorialAssistActive, true);
 
-  // Now hold thumb: tether locks, circularizes, and predicts live exit curve
-  for (let i = 0; i < 45; i++) stepSession(s, profile, 1 / 60, true);
-  assert.ok(main.tether && main.tether.charge > 0.35);
-  assert.ok(s.flight.grappleExit && s.flight.grappleExit.points.length > 5);
-  const directExit = predictGrappleExit(s.orbit, main, "solaris");
-  assert.ok(directExit && directExit.points.length > 5);
+  // Hold thumb calmly until live curved exit arc locks onto the Warp Gate!
+  let hitNotch = false;
+  let notchFrames = 0;
+  for (let i = 0; i < 420; i++) {
+    stepSession(s, profile, 1 / 60, true);
+    if (s.flight && s.flight.grappleExit && s.flight.grappleExit.hitGate) {
+      hitNotch = true;
+      notchFrames++;
+      // Wait a couple frames inside the detent window, then release!
+      if (notchFrames >= 4) break;
+    }
+  }
+  assert.ok(hitNotch, "calm grapple orbit should sweep its curved exit arc onto the Warp Gate");
+  assert.ok(main.tether.aimingGate, "magnetic detent should be active on gate alignment");
 
-  // Release: emits tether_release and marks grapple tutorial seen
-  const evs = stepSession(s, profile, 1 / 60, false);
-  assert.ok(evs.some((e) => e.type === "tether_release"));
+  // Release now -> must fly along the exact predicted curve straight into the Warp Gate!
+  const relEvs = stepSession(s, profile, 1 / 60, false);
+  assert.ok(relEvs.some((e) => e.type === "tether_release"));
   assert.equal(profile.seenGrappleTutorial, true);
+
+  for (let f = 0; f < 240 && s.phase === "flight"; f++) {
+    stepSession(s, profile, 1 / 60, false);
+  }
+  assert.equal(s.phase, "clear", "releasing on the golden exit arc should hit the Warp Gate WYSIWYG!");
 });
 
 test("Ships unlock at star milestones and apply their flight traits", () => {

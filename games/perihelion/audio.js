@@ -129,6 +129,11 @@ export function createAudio(initialMuted = false) {
       tone(392, 0.14, { type: "sine", gain: 0.09, freqEnd: 523.25 });
     },
 
+    playGateNotch() {
+      tone(1174.66, 0.12, { type: "sine", gain: 0.085 });
+      tone(1760.0, 0.14, { type: "triangle", gain: 0.04, delay: 0.02 });
+    },
+
     playTetherRelease(charge = 0.5) {
       const top = 520 + charge * 560;
       tone(240, 0.22, { type: "triangle", gain: 0.13, freqEnd: top });
