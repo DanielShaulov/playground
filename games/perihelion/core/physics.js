@@ -699,3 +699,71 @@ export function stepFlight(orbit, flight, dt, holding, shipId = "solaris") {
 
   return events;
 }
+
+/**
+ * Fast deterministic solvability check for procedurally generated Daily sectors:
+ * verifies every Key Prism is cleanly reachable and the unlocked Warp Gate can
+ * be hit by at least 3 distinct pure-aim shots (without hitting mines).
+ */
+export function isOrbitSolvable(orbit, shipId = "solaris") {
+  const keys = orbit.crystals.filter((c) => c.alive && c.isKey);
+  const reachableKeys = new Set();
+  let gateShots = 0;
+
+  // Build an unlocked shallow clone for checking direct gate reachability
+  const unlockedOrbit = {
+    ...orbit,
+    crystals: orbit.crystals.map((c) => (c.isKey ? { ...c, alive: false } : c)),
+  };
+
+  for (let a = -1.15; a <= 1.15; a += 0.08) {
+    for (const mag of [72, 108, 142]) {
+      const vel = pullToVelocity(Math.sin(a) * mag, -Math.cos(a) * mag, shipId);
+      if (!vel) continue;
+
+      // Check mine-free key hits
+      if (keys.length > 0 && reachableKeys.size < keys.length) {
+        const predK = predictTrajectory(
+          orbit,
+          orbit.launch.x,
+          orbit.launch.y,
+          vel.vx,
+          vel.vy,
+          shipId,
+          78,
+        );
+        if (predK.hitKeyIds.length > 0) {
+          const hitMine = predK.points.some((pt) =>
+            orbit.mines.some((m) => m.alive && Math.hypot(pt.x - m.x, pt.y - m.y) <= m.r + PROBE_R),
+          );
+          if (!hitMine) {
+            for (const kid of predK.hitKeyIds) reachableKeys.add(kid);
+          }
+        }
+      }
+
+      // Check mine-free unlocked gate reachability
+      if (gateShots < 3) {
+        const predG = predictTrajectory(
+          unlockedOrbit,
+          orbit.launch.x,
+          orbit.launch.y,
+          vel.vx,
+          vel.vy,
+          shipId,
+          78,
+        );
+        if (predG.hitGate) {
+          const hitMine = predG.points.some((pt) =>
+            orbit.mines.some((m) => m.alive && Math.hypot(pt.x - m.x, pt.y - m.y) <= m.r + PROBE_R),
+          );
+          if (!hitMine) gateShots++;
+        }
+      }
+
+      if (gateShots >= 3 && reachableKeys.size >= keys.length) return true;
+    }
+  }
+
+  return gateShots >= 3 && reachableKeys.size >= keys.length;
+}

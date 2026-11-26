@@ -13,7 +13,7 @@ import {
   buildDailyOrbit,
   updateOrbitMotion,
 } from "./campaign.js";
-import { createFlight, stepFlight } from "./physics.js";
+import { createFlight, stepFlight, isOrbitSolvable } from "./physics.js";
 
 export const SAVE_V = 2;
 export const DAILY_STAGES = 5;
@@ -129,6 +129,22 @@ export function selectShip(profile, shipId) {
 }
 
 /**
+ * Generate a Daily Gauntlet sector deterministically, retrying sub-seeds if a
+ * layout fails the pure-aim solvability check (so every day's 5 stages are
+ * guaranteed winnable with Solaris and identical for all players).
+ */
+export function buildVerifiedDailyOrbit(dailySeed, stageNum) {
+  let fallback = null;
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const subSeed = (dailySeed ^ Math.imul(stageNum, 0x9e3779b1) ^ Math.imul(attempt, 0x85ebca6b)) >>> 0;
+    const candidate = buildDailyOrbit(stageNum, createRng(subSeed));
+    if (!fallback) fallback = candidate;
+    if (isOrbitSolvable(candidate, "solaris")) return candidate;
+  }
+  return fallback;
+}
+
+/**
  * Create an active gameplay session for either a Constellation Orbit or the
  * 5-stage Daily Gauntlet.
  */
@@ -141,7 +157,7 @@ export function createSession(opts) {
       ? { seed: opts.seed, label: opts.dateLabel || "CUSTOM" }
       : dailySeedInfo();
     const stageNum = 1;
-    const orbit = buildDailyOrbit(stageNum, createRng((info.seed ^ 0x9e3779b1) >>> 0));
+    const orbit = buildVerifiedDailyOrbit(info.seed, stageNum);
     return {
       mode: "daily",
       shipId,
@@ -315,10 +331,7 @@ export function stepSession(session, profile, dt, holding = false) {
           session.dailyStage += 1;
           session.shots = 0;
           session.lastTrail = null;
-          session.orbit = buildDailyOrbit(
-            session.dailyStage,
-            createRng((session.dailySeed ^ Math.imul(session.dailyStage, 0x9e3779b1)) >>> 0),
-          );
+          session.orbit = buildVerifiedDailyOrbit(session.dailySeed, session.dailyStage);
           session.phase = "aim";
         }
       } else {

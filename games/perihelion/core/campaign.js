@@ -903,15 +903,19 @@ export function buildDailyOrbit(stageNum, rng) {
         : ["gas", "ember", "repulsor", "singularity"];
 
   for (let i = 0; i < bodyCount; i++) {
-    for (let tries = 0; tries < 32; tries++) {
+    for (let tries = 0; tries < 36; tries++) {
       const kind = rng.pick(pool);
       const r = kind === "singularity" ? 25 : kind === "repulsor" ? 26 : rng.range(24, 36);
       const x = rng.range(72, WORLD_W - 72);
       const y = rng.range(210, 505);
+      const repulsorBlocksGate =
+        kind === "repulsor" &&
+        (Math.hypot(x - gate.x, y - gate.y) < r + 150 || (y < 300 && Math.abs(x - gate.x) < 70));
       const blocked =
+        repulsorBlocksGate ||
         Math.hypot(x - launch.x, y - launch.y) < r + 98 ||
-        Math.hypot(x - gate.x, y - gate.y) < r + 92 ||
-        bodies.some((b) => Math.hypot(x - b.x, y - b.y) < r + b.r + 60);
+        Math.hypot(x - gate.x, y - gate.y) < r + 96 ||
+        bodies.some((b) => Math.hypot(x - b.x, y - b.y) < r + b.r + 62);
       if (!blocked) {
         const gm =
           kind === "singularity"
@@ -925,18 +929,52 @@ export function buildDailyOrbit(stageNum, rng) {
     }
   }
 
+  // Place wormhole pair only when both portals have generous clearance from all bodies
   if (stageNum >= 3 && rng.next() < 0.65) {
-    wh = wormholes(mx(76), rng.range(410, 480), mx(324), rng.range(175, 240), 19);
+    const whR = 19;
+    let placedA = null;
+    let placedB = null;
+    for (let tries = 0; tries < 36; tries++) {
+      const ax = mx(rng.range(58, 128));
+      const ay = rng.range(395, 505);
+      const okA =
+        Math.hypot(ax - launch.x, ay - launch.y) >= 96 &&
+        Math.hypot(ax - gate.x, ay - gate.y) >= 120 &&
+        bodies.every((b) => Math.hypot(ax - b.x, ay - b.y) >= b.r + whR + 36);
+      if (okA) {
+        placedA = { x: ax, y: ay };
+        break;
+      }
+    }
+    if (placedA) {
+      for (let tries = 0; tries < 36; tries++) {
+        const bx = mx(rng.range(272, 342));
+        const by = rng.range(168, 285);
+        const okB =
+          Math.hypot(bx - launch.x, by - launch.y) >= 120 &&
+          Math.hypot(bx - gate.x, by - gate.y) >= 88 &&
+          Math.hypot(bx - placedA.x, by - placedA.y) >= 170 &&
+          bodies.every((b) => Math.hypot(bx - b.x, by - b.y) >= b.r + whR + 36);
+        if (okB) {
+          placedB = { x: bx, y: by };
+          break;
+        }
+      }
+    }
+    if (placedA && placedB) {
+      wh = wormholes(placedA.x, placedA.y, placedB.x, placedB.y, whR);
+    }
   }
 
   if (stageNum >= 2) {
     const keys = stageNum >= 4 ? 2 : 1;
     for (let k = 0; k < keys; k++) {
-      for (let tries = 0; tries < 30; tries++) {
+      for (let tries = 0; tries < 36; tries++) {
         const x = rng.range(64, WORLD_W - 64);
         const y = rng.range(178, 470);
         const blocked =
-          bodies.some((b) => Math.hypot(x - b.x, y - b.y) < b.r + 36) ||
+          bodies.some((b) => Math.hypot(x - b.x, y - b.y) < b.r + 38) ||
+          wh.some((w) => Math.hypot(x - w.x, y - w.y) < w.r + 34) ||
           crystals.some((c) => Math.hypot(x - c.x, y - c.y) < 48);
         if (!blocked) {
           crystals.push(crystal(`dk${k}`, x, y, true));
@@ -951,7 +989,10 @@ export function buildDailyOrbit(stageNum, rng) {
     const a0 = rng.range(0, Math.PI * 2);
     const pts = arc(`dc${i}`, b.x, b.y, b.r + 40, a0, a0 + 1.65, 3);
     for (const c of pts) {
-      if (!bodies.some((ob) => Math.hypot(c.x - ob.x, c.y - ob.y) < ob.r + 22)) {
+      if (
+        !bodies.some((ob) => Math.hypot(c.x - ob.x, c.y - ob.y) < ob.r + 22) &&
+        !wh.some((w) => Math.hypot(c.x - w.x, c.y - w.y) < w.r + 26)
+      ) {
         crystals.push(c);
       }
     }
@@ -960,14 +1001,15 @@ export function buildDailyOrbit(stageNum, rng) {
   if (stageNum >= 3) {
     const mineCount = stageNum >= 5 ? 2 : 1;
     for (let m = 0; m < mineCount; m++) {
-      for (let tries = 0; tries < 25; tries++) {
+      for (let tries = 0; tries < 30; tries++) {
         const x = rng.range(60, WORLD_W - 60);
         const y = rng.range(200, 500);
         const blocked =
-          Math.hypot(x - launch.x, y - launch.y) < 92 ||
-          Math.hypot(x - gate.x, y - gate.y) < 84 ||
-          bodies.some((b) => Math.hypot(x - b.x, y - b.y) < b.r + 36) ||
-          crystals.some((c) => Math.hypot(x - c.x, y - c.y) < 36) ||
+          Math.hypot(x - launch.x, y - launch.y) < 96 ||
+          Math.hypot(x - gate.x, y - gate.y) < 88 ||
+          bodies.some((b) => Math.hypot(x - b.x, y - b.y) < b.r + 38) ||
+          wh.some((w) => Math.hypot(x - w.x, y - w.y) < w.r + 36) ||
+          crystals.some((c) => Math.hypot(x - c.x, y - c.y) < 38) ||
           mines.some((om) => Math.hypot(x - om.x, y - om.y) < 48);
         if (!blocked) {
           mines.push(mine(`dm${m}`, x, y, 12));
@@ -978,7 +1020,21 @@ export function buildDailyOrbit(stageNum, rng) {
   }
 
   if (rng.next() < 0.6) {
-    bumpers.push(bumper("dbp1", mx(330), rng.range(280, 440), 16));
+    for (let tries = 0; tries < 24; tries++) {
+      const bx = mx(rng.range(280, 342));
+      const by = rng.range(250, 460);
+      const ok =
+        Math.hypot(bx - launch.x, by - launch.y) >= 92 &&
+        Math.hypot(bx - gate.x, by - gate.y) >= 88 &&
+        bodies.every((b) => Math.hypot(bx - b.x, by - b.y) >= b.r + 36) &&
+        wh.every((w) => Math.hypot(bx - w.x, by - w.y) >= w.r + 36) &&
+        crystals.every((c) => Math.hypot(bx - c.x, by - c.y) >= 34) &&
+        mines.every((m) => Math.hypot(bx - m.x, by - m.y) >= 40);
+      if (ok) {
+        bumpers.push(bumper("dbp1", bx, by, 18));
+        break;
+      }
+    }
   }
 
   return {
