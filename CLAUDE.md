@@ -50,6 +50,34 @@ A game too big for one sitting keeps its design in `docs/<id>/` (outside
   (WebKit bug 301108). iOS reads the style only when the app is added to the
   home screen.
 
+### Designing for feel
+
+- **Match progression to the core mechanic.** Don't default to a generic
+  between-level power-up picker if it interrupts the loop. Progression should
+  grow out of the game's own verb (maps, mastery goals, unlockable tools) and
+  gate unlocks sequentially so players can't skip ahead by grinding early
+  stages.
+- **Teach by doing on screen 1.** Tiny HUD hints get ignored. Show the first
+  gesture with an animated cue, guide any timing-sensitive mechanic with a
+  forgiving slow-down on the first try, and point diegetic labels directly at
+  newly introduced elements.
+- **Keep timing windows honest to the genre.** Don't mix deliberate
+  aim-and-think mechanics with accidental twitch-reflex windows. Check reaction
+  windows in milliseconds during simulation; if an action is meant to feel
+  deliberate, give the thumb generous time (slow-mo, magnetic detents, readable
+  rates).
+- **Previews must be WYSIWYG.** Trajectory guides, aim assists, and indicators
+  must share the exact collision math of live play, never use a looser hit
+  threshold than the real check, and only highlight the currently valid
+  objective.
+- **Protect the bottom thumb spot.** The primary continue/next action belongs
+  in the easiest bottom thumb target — never a secondary mode. Provide a safe
+  2-step progress reset early so replaying from scratch is painless.
+- **Verify solvability and screenshots before opening a PR.** Sweep generated
+  or handcrafted levels in Node to confirm collectibles and win paths actually
+  line up, and visually inspect Playwright screenshots on both small (320px)
+  and standard portrait viewports to catch text overflow and overlapping cues.
+
 ## Git
 
 Keep the history **linear and tidy** — `main` should read as one commit per
