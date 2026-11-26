@@ -18,6 +18,7 @@ import {
   predictGrappleExit,
   createFlight,
   stepFlight,
+  isOrbitSolvable,
 } from "../../games/perihelion/core/physics.js";
 import {
   createProfile,
@@ -27,6 +28,7 @@ import {
   isOrbitUnlocked,
   selectShip,
   createSession,
+  buildVerifiedDailyOrbit,
   launchSessionProbe,
   recallSessionProbe,
   stepSession,
@@ -42,7 +44,7 @@ test("PRNG and daily seed are deterministic", () => {
   assert.equal(d1.label, "2026-11-25");
 });
 
-test("All 24 handcrafted orbits and 5-stage Daily Gauntlets have clean geometry", () => {
+test("All 24 handcrafted orbits and 60 days (300 stages) of Daily Gauntlets have clean geometry and verified solvability", () => {
   assert.equal(CHAPTERS.length, 4);
   assert.equal(ORBIT_SPECS.length, 24);
   for (const spec of ORBIT_SPECS) {
@@ -61,14 +63,37 @@ test("All 24 handcrafted orbits and 5-stage Daily Gauntlets have clean geometry"
     }
   }
 
-  for (const seed of [1, 42, 20261125]) {
+  // Sweep 60 consecutive dates starting at 2026-11-25 (including 2026-11-26!)
+  const startDay = new Date("2026-11-25T12:00:00Z").getTime();
+  for (let day = 0; day < 60; day++) {
+    const info = dailySeedInfo(new Date(startDay + day * 86400_000));
     for (let st = 1; st <= 5; st++) {
-      const orbit = buildDailyOrbit(st, createRng((seed ^ (st * 2654435761)) >>> 0));
-      assert.ok(orbit.bodies.length >= 1);
+      const orbit = buildVerifiedDailyOrbit(info.seed, st);
+      assert.ok(orbit.bodies.length >= 1, `${info.label} stage ${st} has bodies`);
       for (const b of orbit.bodies) {
         assert.ok(Math.hypot(b.x - orbit.launch.x, b.y - orbit.launch.y) > b.r + 50);
         assert.ok(Math.hypot(b.x - orbit.gate.x, b.y - orbit.gate.y) > b.r + 45);
       }
+      for (const w of orbit.wormholes) {
+        for (const b of orbit.bodies) {
+          assert.ok(
+            Math.hypot(w.x - b.x, w.y - b.y) >= b.r + w.r + 30,
+            `${info.label} stage ${st} wormhole overlaps body`,
+          );
+        }
+      }
+      for (const bp of orbit.bumpers) {
+        for (const b of orbit.bodies) {
+          assert.ok(
+            Math.hypot(bp.x - b.x, bp.y - b.y) >= b.r + 30,
+            `${info.label} stage ${st} bumper overlaps body`,
+          );
+        }
+      }
+      assert.ok(
+        isOrbitSolvable(orbit, "solaris"),
+        `${info.label} stage ${st} must be solvable by pure aim`,
+      );
     }
   }
 });
