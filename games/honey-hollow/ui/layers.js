@@ -266,7 +266,10 @@ let confirmCount = 0;
  * Ask a yes-or-no question on a small paper card. Resolves true for yes;
  * false for no, a tap outside, Escape or the back button.
  *
- * @param {{ title?: string, text?: string, yes?: string, no?: string, danger?: boolean }} q
+ * `detail` is small print under the text: the reason a thing failed, in the
+ * machine's own words, for a screenshot.
+ *
+ * @param {{ title?: string, text?: string, detail?: string, yes?: string, no?: string, danger?: boolean }} q
  * @returns {Promise<boolean>}
  */
 export function confirm(q = {}) {
@@ -312,6 +315,7 @@ export function confirm(q = {}) {
       },
       q.title && el("h2.hh-confirm__title", { id: `${id}-t`, text: q.title }),
       q.text && el("p.hh-confirm__text", { id: `${id}-d`, text: q.text }),
+      q.detail && el("p.hh-confirm__detail", { text: q.detail }),
       el("div.hh-confirm__actions", null, no, yes),
     );
     const scrim = el("div.hh-scrim", { onclick: () => done(false) });

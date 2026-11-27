@@ -12,13 +12,11 @@
  * bar). `root` is the page, already padded in from the notch and the home
  * bar; `root.dataset.scene` is the name. See ui/app.js for the rest.
  *
- * A name that still points at `todo` shows the placeholder scene. A name
- * that is not here at all toasts "Not built yet" and stays where it was.
+ * Every name here is built. If a scene's files do not arrive, the spine says
+ * so and offers to fetch the game again; the player stays where they were.
  * Try one directly: index.html?scene=<name> (other query values are passed
  * to `mount` as `params`).
  */
-
-const todo = () => import("./placeholder.js");
 
 /** @type {Record<string, () => Promise<any>>} */
 export const SCENES = {
@@ -29,5 +27,4 @@ export const SCENES = {
   stall: () => import("./stall.js"),
   night: () => import("./night.js"),
   year: () => import("./year.js"),
-  placeholder: todo,
 };

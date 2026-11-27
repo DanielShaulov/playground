@@ -31,23 +31,28 @@ const only = q.get("only")?.split(",");
 const zoom = Number(q.get("zoom") ?? 1.5);
 const root = document.getElementById("sheets");
 
-for (const [name, load] of Object.entries(SHEETS)) {
-  if (only && !only.includes(name)) continue;
-  const t0 = performance.now();
-  const mod = await load();
-  const h2 = document.createElement("h2");
-  const grid = document.createElement("div");
-  grid.className = "grid";
-  for (const item of mod.GALLERY) {
-    const s = item.make();
-    const fig = document.createElement("figure");
-    fig.append(img(s, s.w * zoom * (item.zoom ?? 1), item.name));
-    const cap = document.createElement("figcaption");
-    cap.textContent = item.name;
-    fig.append(cap);
-    grid.append(fig);
+// In a function: no module of the game waits at its top level
+// (tests/honey-hollow/core/modules.test.mjs).
+async function paint() {
+  for (const [name, load] of Object.entries(SHEETS)) {
+    if (only && !only.includes(name)) continue;
+    const t0 = performance.now();
+    const mod = await load();
+    const h2 = document.createElement("h2");
+    const grid = document.createElement("div");
+    grid.className = "grid";
+    for (const item of mod.GALLERY) {
+      const s = item.make();
+      const fig = document.createElement("figure");
+      fig.append(img(s, s.w * zoom * (item.zoom ?? 1), item.name));
+      const cap = document.createElement("figcaption");
+      cap.textContent = item.name;
+      fig.append(cap);
+      grid.append(fig);
+    }
+    h2.textContent = `${name} (${mod.GALLERY.length} pieces, ${Math.round(performance.now() - t0)} ms)`;
+    root.append(h2, grid);
   }
-  h2.textContent = `${name} (${mod.GALLERY.length} pieces, ${Math.round(performance.now() - t0)} ms)`;
-  root.append(h2, grid);
+  document.body.dataset.ready = "1";
 }
-document.body.dataset.ready = "1";
+paint();

@@ -33,21 +33,24 @@ const SCALE = Math.min(1, 1.5 / DPR);
 
 // ------------------------------------------------------------ the lettering
 // The title is lettered in Mali Bold on a canvas, so the face has to be in
-// before the first stroke. Wait for it here, briefly, and never fail on it.
+// before the first stroke. ui/base.css declares it and ui/main.js waits for
+// it before anything is painted; here we only look. (This module must never
+// `await` at its top level: it is imported from many places at once, and one
+// module that is slow to finish must not be able to leave the others without
+// an interface. tests/honey-hollow/core/modules.test.mjs holds that.)
 
 const MALI = "Mali";
-let lettered = false;
-try {
-  const face = new FontFace(MALI, `url(${new URL("../fonts/Mali-Bold.woff2", import.meta.url)})`, {
-    weight: "700",
-  });
-  document.fonts.add(face);
-  await Promise.race([
-    face.load().then(() => (lettered = true)),
-    new Promise((ok) => setTimeout(ok, 1500)),
-  ]);
-} catch {
-  // A phone that cannot load it letters the title in its own rounded face.
+/** Is Mali Bold in? If not, the title is lettered in the phone's own rounded face. */
+function lettered() {
+  try {
+    for (const face of document.fonts) {
+      if (face.family.replace(/["']/g, "") !== MALI) continue;
+      if (face.weight === "700" || face.weight === "bold") return face.status === "loaded";
+    }
+  } catch {
+    // An old browser's font set cannot be walked: letter it plain.
+  }
+  return false;
 }
 
 // ------------------------------------------------------------ small helpers
@@ -1117,7 +1120,7 @@ function word(ctx, r, text, x, y, size, rot, tones) {
 /** The title: "Honey Hollow", painted, with a bee and a sprig. */
 export function logo() {
   return sprite(
-    `chrome-logo-${lettered ? "mali" : "plain"}`,
+    `chrome-logo-${lettered() ? "mali" : "plain"}`,
     LOGO_W,
     LOGO_H,
     (ctx, w, h, r) => {

@@ -4,7 +4,8 @@ name: Test
 # rules tests and the type check run in Node. The phone job plays both games
 # in Chrome on a small and a large phone, uploads the screenshots as the
 # "ferment-shots" and "honey-hollow-shots" artifacts, and runs Checkwiz's
-# rules tests, which drive its page in a browser too.
+# rules tests, which drive its page in a browser too. It also loads every
+# game from a copy of the site stamped the way the deploy stamps it.
 # `npm test` runs the same checks locally.
 on:
   pull_request:
@@ -66,6 +67,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run test:site
       - run: npm run test:broadside:browser
       - run: npm run test:perihelion:browser
       - run: npm run test:ferment:browser

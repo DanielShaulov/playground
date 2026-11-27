@@ -78,6 +78,8 @@ export const frame = () => new Promise((ok) => requestAnimationFrame(() => ok())
 
 /** @type {Map<string, Promise<void>>} */
 const sheets = new Map();
+/** The release this module was fetched as: "" unless the deploy stamped one. */
+const RELEASE = new URL(import.meta.url).searchParams.get("v") ?? "";
 
 /**
  * Load a screen's own stylesheet, once. Resolves when it has applied (or
@@ -88,7 +90,11 @@ const sheets = new Map();
  * @returns {Promise<void>}
  */
 export function css(href) {
-  const url = String(href);
+  // Marked with this release like the module that asks for it, so a phone
+  // cannot draw a new screen with an old release's stylesheet (ui/build.js).
+  const at = new URL(String(href), document.baseURI);
+  if (RELEASE && !at.search) at.search = `?v=${RELEASE}`;
+  const url = at.href;
   let ready = sheets.get(url);
   if (!ready) {
     ready = new Promise((ok) => {

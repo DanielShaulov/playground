@@ -15,6 +15,9 @@
  * player gets a card that says so and a way to try again, not a blank page.
  * That is also why this file's few sentences are not in words.js.
  *
+ * A page from an older release than the site is serving leaves for a fresh
+ * copy before anything is shown (ui/build.js says why and how).
+ *
  * Test hook: window.__hollow = { app, state (get/set), dispatch, core,
  * squareRect (the meadow fills it in), ready }.
  */
@@ -23,6 +26,11 @@ const card = document.getElementById("hh-loading");
 const fill = /** @type {HTMLElement | null} */ (card?.querySelector(".hh-loading__fill"));
 const progress = (p) => {
   if (fill) fill.style.transform = `scaleX(${p})`;
+};
+/** Change the loading card's one line. */
+const say = (text) => {
+  const line = card?.querySelector(".hh-loading__line");
+  if (line) line.textContent = text;
 };
 /** Let the card repaint before a long job. */
 const breathe = () => new Promise((ok) => requestAnimationFrame(() => setTimeout(ok, 0)));
@@ -36,15 +44,55 @@ function lettering() {
   return Promise.race([faces, new Promise((ok) => setTimeout(ok, 2500))]).catch(() => {});
 }
 
+/** Said once when the game has to start without its painted interface. */
+const PLAIN =
+  "The painted buttons did not arrive, so the game is in plain colours. Settings says why.";
+/** Never settles: for the moment between asking for a fresh page and getting it. */
+const leaving = () => new Promise(() => {});
+/** ui/build.js, once it is in. @type {typeof import("./build.js") | null} */
+let build = null;
+
+/**
+ * A file did not arrive, or does not fit the others: fetch the game again,
+ * once. False when that has been tried already (this page is the fresh copy)
+ * or there is no signal to try with; the caller then makes do.
+ */
+async function again(what, err) {
+  console.warn(`[hollow] ${what} did not load:`, err);
+  if (!build) return false;
+  build.trouble(what, err);
+  if (build.arrived || navigator.onLine === false) return false;
+  say("Fetching Honey Hollow again…");
+  build.refresh(await build.latest());
+  return true;
+}
+
 async function boot() {
   progress(0.08);
-  await lettering();
+  const made = (build = await import("./build.js"));
+  const [, newer] = await Promise.all([lettering(), made.arrived ? "" : made.stale()]);
+  if (newer) {
+    // This page is from an older release, and its files would not fit the
+    // ones the site serves now.
+    say("Fetching the newest Honey Hollow…");
+    made.refresh(newer);
+    return leaving();
+  }
   progress(0.2);
   await breathe();
 
-  // The painted interface. ui/chrome.js is the kit's; without it (or if a
-  // phone cannot paint it) base.css falls back to flat colour.
-  const kit = await import("./chrome.js").catch(() => null);
+  // The painted interface. ui/chrome.js is the kit's; if a phone cannot
+  // paint it, base.css falls back to flat colour.
+  /** @type {any} */
+  let kit = null;
+  try {
+    kit = await import("./chrome.js");
+  } catch (err) {
+    // Not a phone that cannot paint: a file that did not arrive, or one that
+    // does not fit the others. A fresh copy that still cannot have it plays
+    // in flat colour and says why in Settings.
+    if (await again("the painted interface", err)) return leaving();
+  }
   try {
     kit?.installChrome();
   } catch (err) {
@@ -66,9 +114,11 @@ async function boot() {
   app.progress(0.5);
   const { scene, sheet, ...params } = Object.fromEntries(new URLSearchParams(location.search));
   await start({ scene, sheet, params, kit });
+  if (!kit) app.toast(PLAIN, { sound: false });
   // The keeper's notes. The game plays without them, so a failure here is only logged.
   import("./teach.js").then((teach) => teach.start(app)).catch((err) => report(err, "teach"));
-  // Keep every screen for a day without signal (ui/offline.js).
+  // Fetch every screen now, so they are all from this release and are still
+  // here on a day without signal (ui/offline.js).
   import("./offline.js").then((offline) => offline.warmOffline()).catch(() => {});
 }
 
@@ -83,7 +133,12 @@ function fail(err) {
   };
   const again = make("button", "hh-btn hh-loading__again", "Try again");
   again.setAttribute("type", "button");
-  again.addEventListener("click", () => location.reload());
+  again.addEventListener("click", () => {
+    // A new address for the page, so nothing the phone has kept can answer for it.
+    const url = new URL(location.href);
+    url.searchParams.set("v", Date.now().toString(36));
+    location.replace(url.href);
+  });
   const box = make("div", "hh-loading__card", "");
   box.append(
     make("h1", "hh-loading__name hh-loading__name--small", "The paints have run"),
@@ -101,4 +156,7 @@ function fail(err) {
   card.replaceChildren(box);
 }
 
-boot().catch(fail);
+// Anything that stops the game from starting gets one fresh copy before the card.
+boot().catch(async (err) => {
+  if (!(await again("the game", err).catch(() => false))) fail(err);
+});

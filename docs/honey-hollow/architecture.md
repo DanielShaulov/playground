@@ -49,6 +49,7 @@ games/honey-hollow/
     goals.js  talents.js  wardrobe.js  facts.js  words.js
   ui/
     main.js           boot, store, save, the loop, which screen is up
+    build.js          which release this copy is; a fresh copy when it is stale
     paint/            the watercolour engine (below)
     art/              what gets painted: flowers, hives, bees, people, goods
     fonts/            vendored OFL fonts with their licences
@@ -453,6 +454,48 @@ The browser test hook is `window.__hollow`: `state` (get or set),
 `dispatch(action)` returning the events, `core`, and `squareRect(plot, x, y)`
 (the on-screen rectangle of a square, for tapping the canvas).
 
+## Releases and stale copies
+
+A phone can hold pieces of two releases. It brings back a tab from days ago
+and rebuilds the page from whatever it kept, however old, and fetches the
+rest new; or the site moves on while the game is open and the next screen is
+fetched from the new release. Old and new modules do not fit (one imports a
+name the other no longer exports), and the screen that needs both will not
+load. That happened on the day the game was released: a phone that had played
+the preview showed plain buttons and "Not built yet: intro" on the title,
+which was what the game then said for any screen that failed to load. A
+reload mended it. Four things now stand in the way:
+
+- **Every release gives every file a new address.** The deploy
+  (`scripts/stamp-build.mjs`) writes `?v=<commit>` on the page's stylesheets
+  and on its script, and an import map that sends every other module to the
+  same file with the same mark. A fresh page can only be answered with its
+  own release's files. `css()` in `ui/dom.js` marks the stylesheets a screen
+  loads for itself. The repo's own files are never stamped: under `npm start`
+  and the tests `BUILD` is `""` and none of this runs.
+- **A stale page leaves at boot.** `ui/main.js` asks the site for
+  `build.json` and, if this page is from another release, goes to a fresh
+  copy of itself (`refresh()` in `ui/build.js`: the page's own address with a
+  new `?v=`, so no cache can answer). A page that arrived that way never
+  leaves again by itself, so a phone cannot go round in circles; the mark is
+  taken off the address once it has been read.
+- **All the screens are fetched in the first seconds** (`ui/offline.js`), so a
+  sitting does not find, an hour in, that the site has moved on.
+- **A screen that still will not load says so.** `loadScreen` in `ui/app.js`
+  tries twice, then shows a card: what did not open, the reason in the
+  machine's own words, and a button that fetches the game again. With no
+  signal it only says so. The same goes for the painted interface and the
+  first scene at boot, where the game fetches itself again once without
+  asking. Settings shows the release this page is made of and the last thing
+  that would not load, for a screenshot.
+
+No module may `await` at its top level: every importer waits on it, and
+browsers have differed on what several importers at once then see.
+
+The site's service worker (`sw.js`, registered by the launcher) asks for
+pages afresh every time, keeps one copy of each marked file (the newest), and
+offline never answers a request for a script with the launcher's HTML.
+
 ## Tests
 
 | Layer             | Catches                                                                                                                                           | Lives in                                              |
@@ -465,5 +508,7 @@ The browser test hook is `window.__hollow`: `state` (get or set),
 | Content checks    | a fact with no source, a goal that measures nothing, a reward that does not exist                                                                 | `tests/honey-hollow/core/content.test.mjs`            |
 | Notes check       | these notes and `rules.md` saying something the code does not                                                                                     | `tests/honey-hollow/core/docs.test.mjs`               |
 | Balance sim       | the game got too easy, too hard or pointless; a goal nobody can reach                                                                             | `tests/honey-hollow/sim/`                             |
-| Phone flows       | the real screen breaks or overflows on a small or large phone                                                                                     | `tests/honey-hollow/browser/`                         |
+| Module checks     | a module that waits at its top level; a registered screen that is not there; the game saying a screen is "not built"                              | `tests/honey-hollow/core/modules.test.mjs`            |
+| Phone flows       | the real screen breaks or overflows on a small or large phone; a returning phone with a stale page, or a screen whose file does not arrive        | `tests/honey-hollow/browser/`                         |
+| Built site        | a page the deploy's stamp broke; a script or stylesheet asked for without its release's mark (every game)                                         | `tests/site/stamped.mjs`, `npm run test:site`         |
 | Type check        | a wrong field name across modules                                                                                                                 | `npm run typecheck`                                   |
