@@ -130,6 +130,17 @@ preview disappears on the next one. Previews share main's origin, so
 path — always go through `createStore`, never raw `localStorage`, or a branch
 will read and write the real save.
 
+**The deployed pages are not quite the repo's files.** A phone brings back a
+days-old tab from whatever it kept and fetches the rest new, and an old
+build's files beside a new one's do not fit: stale CSS under new screens once,
+a screen that would not load another time. So `scripts/stamp-build.mjs` gives
+every file a new URL per deploy: `?v=<commit>` on each game page's stylesheets
+and script, and an import map that adds it to every module the game and
+`shared/` have. Three consequences: a stylesheet loaded from JS needs the
+mark too (take it from `import.meta.url`), a game page must not carry an
+import map of its own, and a page can break only once stamped — `npm run
+test:site` loads every game from a stamped copy.
+
 Two things that have already broken this once each:
 
 - The `github-pages` **environment** carries a deployment branch rule pinned to

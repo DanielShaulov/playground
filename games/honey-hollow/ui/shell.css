@@ -189,6 +189,14 @@ body {
   margin: 0 0 16px;
   line-height: 1.4;
 }
+/* The machine's own reason, for a screenshot: small, and it may break anywhere. */
+.hh-confirm__detail {
+  margin: -8px 0 14px;
+  font-size: var(--hh-text-xs, 12px);
+  line-height: 1.35;
+  color: var(--hh-ink-soft, #7d6552);
+  overflow-wrap: anywhere;
+}
 /* Side by side, "no" on the left; if the words are too long for that on a
    small phone they stack, "yes" on top, rather than break in two. */
 .hh-confirm__actions {

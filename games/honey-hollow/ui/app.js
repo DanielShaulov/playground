@@ -32,6 +32,7 @@ import { createStore } from "../../../shared/storage.js";
 import { SCENES } from "./scenes/index.js";
 import { SHEETS } from "./sheets/index.js";
 import { el, on, optional } from "./dom.js";
+import { stale, latest, refresh, trouble } from "./build.js";
 import { say, SHELL } from "./words.js";
 import { fx, warmFx } from "./fx.js";
 import {
@@ -348,18 +349,67 @@ function setUi(patch) {
 /** @type {Map<string, any>} */
 const modules = new Map();
 
-/** The module for a registered name, or null with a toast: never a throw. */
+/**
+ * The module for a registered name, or null: never a throw.
+ *
+ * Every registered screen is built, so a failure here means its files did not
+ * arrive (no signal, a dropped connection) or do not fit the ones already on
+ * the page (two releases mixed: ui/build.js). The first is often over a
+ * moment later, so it is tried twice; after that the player is told what
+ * happened and offered the cure, which is to fetch the game again.
+ */
 async function loadScreen(registry, kind, name) {
-  try {
-    if (!Object.hasOwn(registry, name)) throw new Error("it is not in the registry");
-    const mod = await registry[name]();
-    if (typeof mod?.mount !== "function") throw new Error("its module exports no mount()");
-    modules.set(`${kind}:${name}`, mod);
-    return mod;
-  } catch (err) {
-    console.warn(`[hollow] ${kind} "${name}" could not be shown: ${err?.message ?? err}`);
-    toast(SHELL.notBuilt(name));
+  if (!Object.hasOwn(registry, name)) {
+    // A mistake in the code, not on the phone: nothing to fetch again.
+    report(new Error(`there is no ${kind} called "${name}"`), "loadScreen");
     return null;
+  }
+  for (let tries = 1; ; tries++) {
+    try {
+      const mod = await registry[name]();
+      if (typeof mod?.mount !== "function") throw new Error("its module exports no mount()");
+      modules.set(`${kind}:${name}`, mod);
+      return mod;
+    } catch (err) {
+      console.warn(
+        `[hollow] ${kind} "${name}" did not load (try ${tries}): ${err?.message ?? err}`,
+      );
+      if (tries < 2 && navigator.onLine !== false) {
+        await new Promise((ok) => setTimeout(ok, 400));
+        continue;
+      }
+      pageLost(`${kind} "${name}"`, err);
+      return null;
+    }
+  }
+}
+
+let mending = false;
+/** The last screen that would not load and why, for the card main.js shows if the game cannot start at all. */
+let lost = "";
+/** True once the first scene is up: before that, main.js deals with a game that will not load. */
+let up = false;
+
+/** Say that a screen would not load, why, and offer to fetch the game again. Never throws. */
+async function pageLost(what, err) {
+  const why = String(err?.message ?? err);
+  lost = SHELL.pageDetail(what, why);
+  safely(() => trouble(what, err), "trouble");
+  flush();
+  if (!up || mending) return;
+  mending = true;
+  try {
+    if (navigator.onLine === false) return void toast(SHELL.noSignal);
+    const newer = await stale();
+    const ask = newer ? SHELL.pageMoved : SHELL.pageLost;
+    if (!(await confirm({ ...ask, detail: SHELL.pageDetail(what, why) }))) return;
+    flush();
+    toast(SHELL.fetching);
+    refresh(newer || (await latest()));
+  } catch (e) {
+    report(e, "pageLost");
+  } finally {
+    mending = false;
   }
 }
 
@@ -369,7 +419,7 @@ let sceneTurn = 0;
 
 /**
  * Switch the full scene. Resolves true once it is up; false if the name is
- * not built, its mount threw, or another go() overtook this one.
+ * did not load, its mount threw, or another go() overtook this one.
  *
  * @param {string} name
  * @param {Record<string, any>} [params]
@@ -746,7 +796,9 @@ export async function start(first = {}) {
   const { broken } = load();
   loadAudio();
   const shown = await go(first.scene || "title", first.params);
-  if (!shown && !(await go("title"))) throw new Error("the title scene could not be shown");
+  if (!shown && !(await go("title")))
+    throw new Error(`the title scene could not be shown${lost ? ` (${lost})` : ""}`);
+  up = true;
   if (first.sheet) await openSheet(first.sheet, first.params);
   if (broken) toast(SHELL.saveBroken);
   booted();

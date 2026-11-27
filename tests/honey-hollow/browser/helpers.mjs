@@ -206,13 +206,19 @@ export class Kit {
     });
     page.on("request", (r) => {
       const u = r.url();
-      if (!u.startsWith(o.base) && !/^(data|blob|about):/.test(u))
+      if (!u.startsWith(this.base) && !/^(data|blob|about):/.test(u))
         this.problem(`asked the network for ${u.slice(0, 120)}`);
     });
   }
 
   short(url) {
     return url.replace(this.base, "/");
+  }
+
+  /** Play on another copy of the site (a built one, say) from here on. */
+  site(base) {
+    this.base = base;
+    this.url = `${base}games/honey-hollow/index.html`;
   }
 
   /** Note something wrong and carry on; the flow fails at its end. */

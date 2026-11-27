@@ -16,7 +16,8 @@
  * ("Hive 2 · Box hive"). For buttons that must stay put while the body
  * scrolls, put a `.hh-sheet__foot` after the body: `root.after(foot)`.
  *
- * A name that is not here toasts "Not built yet" and opens nothing.
+ * Every name here is built. If a sheet's files do not arrive, the spine says
+ * so and offers to fetch the game again; nothing opens.
  * Try one directly: index.html?sheet=<name> (other query values are passed
  * to `mount` as `params`).
  */

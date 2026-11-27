@@ -183,10 +183,14 @@ those breaks a lesson. Settings can bring every note back.
 
 ```
 index.html      the page: three stylesheets, the loading card, ui/main.js
-ui/main.js      boot: waits for the lettering, paints the interface
-                (ui/chrome.js) behind the loading card, builds the app, loads
-                the save, shows the title; a card with "Try again" if it
-                cannot. Then starts the keeper's notes and the offline warm-up
+ui/main.js      boot: waits for the lettering, leaves for a fresh copy if
+                the page is from an older release (ui/build.js), paints the
+                interface (ui/chrome.js) behind the loading card, builds the
+                app, loads the save, shows the title; a card with "Try again"
+                if it cannot. Then starts the keeper's notes and the warm-up
+ui/build.js     which release this copy is, whether the site has a newer
+                one, how to fetch a fresh copy, and the last thing that would
+                not load ("Releases and stale copies" in architecture.md)
 ui/app.js       the spine (below): state, dispatch, saving, settings, scenes
                 and sheets. The only file that imports the core
 ui/layers.js    the page's layers and what lives in them: the loading card,
@@ -202,8 +206,10 @@ ui/teach.js     the keeper's notes (one per lesson, anchored to the thing to
                 tap) and the herald (one toast for news nobody else announces)
 ui/audio.js     synthesised sounds and ambiences; app.sound("coin")
 ui/fx.js        coins flying, hearts, sparkles; nothing under reduced motion
-ui/offline.js   asks once for every scene, sheet and stylesheet so the site's
-                service worker has them for a day without signal
+ui/offline.js   a few seconds in, asks once for every scene and sheet, so
+                they are all from one release; and for every stylesheet when
+                the site's service worker is there to keep them for a day
+                without signal
 ui/paint/       the watercolour engine and the sprite cache (sprite.js: an
                 LRU with a byte budget; drop(prefix) forgets one family)
 ui/art/         everything painted: flowers, scenery, ground, hives, jars,
@@ -212,7 +218,7 @@ ui/meadow/      the meadow screen: canvas scene, input, modes, bars, bees
 ui/sheets/      index.js (the registry) and one module per sheet
 ui/scenes/      index.js (the registry) and one module per scene: title,
                 intro, creator, stall (with its art, crate and show), night,
-                year, placeholder
+                year
 ui/keeper-picker.js  the beekeeper maker's preview and swatches, shared by
                 the creator scene and the wardrobe sheet
 ui/bloom-strip.js    the painted bar that shows when a flower blooms, shared
@@ -290,8 +296,10 @@ made-up action when something other than the game changed: `{ type: "@ui" }`
 state was swapped) and `{ type: "@settings", key, value }`. Modules are
 registered by name in `ui/scenes/index.js` and `ui/sheets/index.js`; `app.go`
 and `app.sheet` look names up there, so two people adding screens touch one
-line each. A name that is not registered toasts "Not built yet" and changes
-nothing.
+line each. Every registered name is built. A screen whose files do not arrive
+(no signal, or two releases mixed on one phone) is tried twice, and then the
+player is told so with the reason and offered a fresh copy of the game; see
+"Releases and stale copies" in `architecture.md`.
 
 A scene's `root` is the whole page, already padded in from the notch and the
 home bar. A sheet's `root` is the sheet's scrolling body: the spine builds
@@ -319,7 +327,9 @@ the current scene afresh. `squareRect` is `null` until the meadow fills it
 in; `meadow` holds the meadow's own counters (bees out, frame rate, draws).
 The flows live in `tests/honey-hollow/browser/` (`run.mjs`, one module per
 flow, every selector and button name in `helpers.mjs`); they play a small
-and a large phone and leave a gallery of screenshots in `shots/`.
+and a large phone and leave a gallery of screenshots in `shots/`. What they
+play is a copy of the site stamped the way the deploy stamps it, since that
+is what a phone is sent (`PLAIN=1` plays the repo's own files).
 
 ## Shared UI state (the contract between the meadow and the sheets)
 

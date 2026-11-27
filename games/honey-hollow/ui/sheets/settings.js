@@ -11,6 +11,7 @@
 
 import { app } from "../app.js";
 import { el, css, optional } from "../dom.js";
+import { BUILD, latest, troubles } from "../build.js";
 import { SETTINGS as W, dayLabel } from "../words.js";
 
 export const title = W.title;
@@ -262,13 +263,24 @@ export async function mount(root) {
 
   // ---------- credits ----------
 
-  const build = el("p.hh-sub.hh-set__build");
-  fetch(new URL("../../build.json", location.href), { cache: "no-store" })
-    .then((res) => (res.ok ? res.json() : null))
-    .then((b) => {
-      if (b?.sha) build.textContent = W.build(String(b.sha).slice(0, 7));
-    })
-    .catch(() => {});
+  // Which release this page is made of (not merely which one the site has
+  // now: a phone can hold an older one), and the last thing that would not
+  // load, in the machine's own words. Both are for a screenshot when
+  // something is wrong.
+  const build = el("p.hh-sub.hh-set__build", { text: BUILD ? W.build(BUILD.slice(0, 7)) : "" });
+  latest(4000).then((now) => {
+    if (!now || !build.isConnected) return;
+    build.textContent =
+      BUILD && now !== BUILD
+        ? W.buildBehind(BUILD.slice(0, 7), now.slice(0, 7))
+        : W.build(now.slice(0, 7));
+  });
+  const [last] = troubles();
+  const trouble = last
+    ? el("p.hh-sub.hh-set__build.hh-set__trouble", {
+        text: W.trouble(last.what, last.why, last.build.slice(0, 7), new Date(last.at)),
+      })
+    : null;
 
   root.append(
     el("div.hh-set", null, [
@@ -284,6 +296,7 @@ export async function mount(root) {
         W.creditLines.map((line) => el("p.hh-sub", { text: line })),
       ),
       build,
+      trouble,
     ]),
   );
 

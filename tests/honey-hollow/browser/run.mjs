@@ -14,11 +14,15 @@
 //   PHONES=small        just that phone
 //   BREAK=1             the suite checks itself: each flow runs once with the
 //                       one fault it names switched on, and must go red
+//   PLAIN=1             play the repo's own files, not a stamped copy of them
 //
 // Chromium comes from $CHROMIUM, else /opt/pw-browsers/chromium (agent
 // sessions), else Playwright's own lookup. Never run `playwright install`.
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { stamp } from "../../../scripts/stamp-build.mjs";
 import { chromium, devices } from "playwright-core";
 import { serve } from "./serve.mjs";
 import { Kit } from "./helpers.mjs";
@@ -28,8 +32,9 @@ import * as meadow from "./flows/meadow.mjs";
 import * as sheets from "./flows/sheets.mjs";
 import * as year from "./flows/year.mjs";
 import * as settings from "./flows/settings.mjs";
+import * as returning from "./flows/returning.mjs";
 
-const ALL = [firstDay, save, meadow, sheets, year, settings];
+const ALL = [firstDay, save, meadow, sheets, year, settings, returning];
 const only = process.env.FLOWS?.split(",");
 const FLOWS = only ? ALL.filter((f) => only.includes(f.name)) : ALL;
 const BREAK = !!process.env.BREAK;
@@ -43,6 +48,22 @@ const EVERY_PHONE = {
 const wanted = BREAK ? ["small"] : (process.env.PHONES?.split(",") ?? Object.keys(EVERY_PHONE));
 const PHONES = Object.fromEntries(wanted.map((p) => [p, EVERY_PHONE[p]]));
 const SHOTS = fileURLToPath(new URL("./shots/", import.meta.url));
+const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+
+/** A copy of what the game needs of the site, stamped as a deploy stamps it. */
+function built() {
+  const dir = mkdtempSync(join(tmpdir(), "hollow-built-"));
+  for (const part of [
+    "games/honey-hollow",
+    "shared",
+    "manifest.webmanifest",
+    "icon.svg",
+    "icon-180.png",
+  ])
+    cpSync(join(ROOT, part), join(dir, part), { recursive: true });
+  stamp(dir, "b0057ed0b0057ed0b0057ed0b0057ed0b0057ed0");
+  return dir;
+}
 
 const executablePath =
   process.env.CHROMIUM ??
@@ -53,7 +74,11 @@ if (!BREAK) {
   rmSync(SHOTS, { recursive: true, force: true });
   mkdirSync(SHOTS, { recursive: true });
 }
-const server = await serve();
+// The flows play a copy of the site built the way the deploy builds it
+// (scripts/stamp-build.mjs): that is what a phone is sent, and a page can
+// break only once stamped. PLAIN=1 plays the repo's own files instead.
+const site = process.env.PLAIN ? null : built();
+const server = await serve(site ?? undefined);
 const browser = await chromium.launch({ executablePath });
 
 async function play(flow, phone, fault) {
@@ -179,6 +204,7 @@ ${results
 }
 await browser.close();
 server.close();
+if (site) rmSync(site, { recursive: true, force: true });
 if (noBars) console.log("note: this Chrome cannot emulate safe areas; that check ran with none");
 console.log(`${((Date.now() - started) / 1000).toFixed(1)} s`);
 process.exitCode = failed ? 1 : 0;

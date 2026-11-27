@@ -13,8 +13,7 @@
  *                      even when no module loads)
  *   4. Title scene
  *   5. Settings sheet
- *   6. Placeholder scene
- *   7. (your screen)
+ *   6. (your screen)
  *
  * This file imports nothing: it is safe to load from anywhere.
  */
@@ -180,7 +179,29 @@ export function say(why) {
 export const SHELL = {
   name: "Honey Hollow",
   wentWrong: "Something went wrong. Your game is saved.",
-  notBuilt: (name) => `Not built yet: ${name}`,
+  /** A screen's files did not arrive, or did not fit (ui/app.js, ui/build.js). */
+  noSignal: "No signal, and this page is not on your phone yet. Your game is saved.",
+  pageLost: {
+    title: "That page did not open",
+    text: "Honey Hollow could not fetch it. Fetching the game again usually mends this. Your game is saved.",
+    yes: "Fetch it again",
+    no: "Not now",
+  },
+  pageMoved: {
+    title: "A newer Honey Hollow is out",
+    text: "That page belongs to it, so the game has to be fetched again. Your game is saved.",
+    yes: "Fetch it",
+    no: "Not now",
+  },
+  fetching: "Fetching Honey Hollow again…",
+  /** Small print: which screen and the machine's own reason. */
+  pageDetail: (what, why) => `${what}: ${why}`,
+  /**
+   * Only for a phone still running an older release's ui/app.js beside this
+   * file: that release called this when a screen failed to load. Every screen
+   * is built; nothing in this release says these words.
+   */
+  notBuilt: () => "That page did not open. Close the game and open it again.",
   saveBroken: "Your saved game would not open, so here is a fresh one. The old one is kept.",
   yes: "Yes",
   no: "No",
@@ -270,14 +291,9 @@ export const SETTINGS = {
     "Lettering in Mali by Cadson Demak, under the SIL Open Font Licence.",
   ],
   build: (id) => `Build ${id}`,
-};
-
-// ───────────────────────── 6. Placeholder scene ─────────────────────────
-
-export const PLACEHOLDER = {
-  title: (name) => `“${name}” is not built yet`,
-  text: "This part of Honey Hollow is still being painted.",
-  back: "Back to the title",
-  scenes: "Scenes",
-  sheets: "Sheets",
+  /** This phone holds an older release than the site is serving. */
+  buildBehind: (id, now) => `Build ${id}. The site has ${now}.`,
+  /** The last thing that would not load, small, under the build. */
+  trouble: (what, why, id, when) =>
+    `Last trouble, ${when.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} at ${when.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}, build ${id}: ${what}: ${why}`,
 };
