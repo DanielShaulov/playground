@@ -407,14 +407,14 @@ export function createRenderer() {
         shake = Math.max(shake, 0.3);
         hitFlash = 0.28;
         addPopup(
-          ev.source === "citadel" ? `💥 CITADEL -${ev.dmg}♥!` : `-${ev.dmg}♥ HULL!`,
+          ev.source === "citadel" ? `💥 CITADEL -${ev.dmg}!` : `-${ev.dmg} HULL!`,
           ev.x,
           ev.y - 18,
           "#ef4444",
           true,
         );
       } else if (ev.type === "board") {
-        addPopup("🛠️ +1♥ REPAIRED", ev.x, ev.y - 18, "#4ade80", true);
+        addPopup(`🛠️ +${ev.heal || 2} HP REPAIRED`, ev.x, ev.y - 18, "#4ade80", true);
       } else if (ev.type === "torp_warn") {
         addPopup("⚠️ TORPS!", ev.x, ev.y - 16, "#f87171", true);
       } else if (ev.type === "sink") {
