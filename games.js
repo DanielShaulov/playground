@@ -50,4 +50,10 @@ export const GAMES = [
     blurb: "Sling through gravity wells. Hold mid-flight to grapple orbit.",
     icon: "🪐",
   },
+  {
+    id: "broadside",
+    title: "Broadside!",
+    blurb: "Cross the T, roar Port & Starboard volleys, plunder the archipelago.",
+    icon: "🏴‍☠️",
+  },
 ];
