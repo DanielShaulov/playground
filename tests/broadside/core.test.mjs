@@ -424,6 +424,30 @@ test("Handcrafted Encounter Arenas: all 6 arenas valid & Sea-Fog Banks grant ste
   );
   assert.equal(escapedEvent, true, "Gold Convoy escape must emit convoy_escaped event");
   assert.equal(convBattle.goldCollected, 0, "Escaped Gold Convoy must award 0 bounty gold");
+
+  // Enemy AI stuck-recovery: Cruiser wedged in tight pocket between island & west border escapes cleanly!
+  const pinchBattle = createBattle(camp, {
+    id: "test_pinch",
+    theater: 1,
+    seed: 91,
+    name: "Pinch Escape Test",
+    nodeType: "skirmish",
+    roster: ["cruiser"],
+    ...ARENAS.shipping_lane,
+  });
+  pinchBattle.player.throttle = 0;
+  pinchBattle.player.spd = 0;
+  const cr = pinchBattle.enemies[0];
+  cr.x = 34; // Wedged tightly between left border (18) and western island (x=56, r=26)
+  cr.y = 192;
+  cr.ang = Math.PI; // Nose jammed straight into west border!
+  for (let i = 0; i < 120; i++) {
+    stepBattle(pinchBattle, 0.05); // 6 seconds
+  }
+  assert.ok(
+    Math.hypot(cr.x - 34, cr.y - 192) > 45 && cr.x > 46,
+    `Enemy Cruiser must escape island-border pinch into open water (ended at ${cr.x.toFixed(1)}, ${cr.y.toFixed(1)})`,
+  );
 });
 
 function runCampaignSim(seed, mode) {
