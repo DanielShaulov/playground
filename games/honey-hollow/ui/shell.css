@@ -1,0 +1,401 @@
+/* Honey Hollow: the page shell.
+
+   One fixed, non-scrolling portrait page made of layers (ui/layers.js), the
+   loading card, and the layout of the things the spine itself puts up: the
+   scene root, the sheet, confirm cards, keeper's notes. The look of every
+   piece (paper, buttons, the sheet's torn edge) is ui/base.css; this file
+   only places them. Where it names a colour it is a fallback for a page
+   whose kit has not loaded.
+
+   Loaded after shared/style.css and ui/base.css. */
+
+html,
+body {
+  background-color: var(--hh-paper-colour, #fbf5e6);
+}
+
+.hh-app {
+  position: fixed;
+  inset: 0;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  color: var(--hh-ink, #5a4433);
+  font-family: var(--hh-font, "Mali", ui-rounded, system-ui, sans-serif);
+  -webkit-touch-callout: none;
+}
+
+/* Words can be selected only where the player types or copies. */
+.hh-app input,
+.hh-app textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ------------------------------------------------------------ layers */
+
+.hh-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hh-layer > * {
+  pointer-events: auto;
+}
+.hh-layer-scene {
+  z-index: 0;
+  pointer-events: auto;
+}
+.hh-layer-sheet {
+  z-index: 30;
+}
+.hh-layer-dialog {
+  z-index: 50;
+}
+.hh-layer-note {
+  z-index: 55;
+}
+.hh-app > .hh-toasts {
+  z-index: 60;
+}
+.hh-layer-fx {
+  z-index: 70;
+  overflow: hidden;
+}
+.hh-layer-note > *,
+.hh-layer-fx > * {
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ scenes */
+
+/* A scene's root: the whole page, padded in from the notch and the home bar.
+   A scene that paints to the very edges puts an absolutely placed child at
+   inset 0 behind its content. */
+.hh-scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  overflow: hidden;
+}
+.hh-scene.is-mounting {
+  visibility: hidden;
+}
+.hh-scene.is-entering {
+  animation: hh-shell-fade 0.22s ease both;
+}
+@keyframes hh-shell-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ the sheet */
+
+.hh-sheet-wrap {
+  position: absolute;
+  inset: 0;
+}
+.hh-sheet-wrap.is-mounting {
+  visibility: hidden;
+}
+.hh-sheet-wrap.is-mounting > *,
+.hh-sheet-wrap.is-swap > .hh-scrim:not(.is-leaving) {
+  animation: none;
+}
+/* Just up: it takes no taps for a moment (see app.js and layers.js). */
+.hh-sheet-wrap.is-settling,
+.hh-dialog.is-settling {
+  pointer-events: none;
+}
+.hh-sheet-wrap .hh-sheet {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  outline: none;
+  /* Without the kit: still a sheet. */
+  background-color: var(--hh-paper-colour, #fbf5e6);
+  /* Springing home after a drag that did not go far enough. */
+  transition: transform 0.18s var(--hh-ease, ease-out);
+}
+/* The handle and the title row are the grip: a thumb drags them down. */
+.hh-sheet__handle,
+.hh-sheet__head {
+  touch-action: none;
+}
+.hh-sheet__title:empty::before {
+  content: "\00a0";
+}
+/* The close cross, when the painted icon is not in yet. */
+.hh-cross {
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.hh-cross::before,
+.hh-cross::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: 9px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--hh-ink-soft, #7d6552);
+  transform: rotate(45deg);
+}
+.hh-cross::after {
+  transform: rotate(-45deg);
+}
+
+/* ------------------------------------------------------------ confirm */
+
+.hh-dialog {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-top) + 16px) calc(var(--safe-right) + 14px)
+    calc(var(--safe-bottom) + 16px) calc(var(--safe-left) + 14px);
+}
+.hh-dialog > .hh-scrim {
+  z-index: 0;
+  background-color: var(--hh-veil, rgba(83, 68, 84, 0.34));
+}
+.hh-confirm {
+  z-index: 1;
+  width: min(100%, 336px);
+  max-height: 100%;
+  margin: 0;
+  overflow-y: auto;
+  outline: none;
+  text-align: center;
+  animation: hh-shell-rise 0.24s var(--hh-ease, ease-out) both;
+}
+.hh-dialog.is-leaving > .hh-confirm {
+  animation: hh-shell-sink 0.16s ease-in both;
+}
+.hh-confirm__title {
+  margin: 2px 0 6px;
+  font-size: var(--hh-text-l, 18px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--hh-ink-strong, #4a3626);
+}
+.hh-confirm__text {
+  margin: 0 0 16px;
+  line-height: 1.4;
+}
+/* Side by side, "no" on the left; if the words are too long for that on a
+   small phone they stack, "yes" on top, rather than break in two. */
+.hh-confirm__actions {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  gap: 8px;
+}
+.hh-confirm__actions > .hh-btn {
+  flex: 1 1 0;
+  min-width: min-content;
+  white-space: nowrap;
+}
+@keyframes hh-shell-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+@keyframes hh-shell-sink {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+
+/* ------------------------------------------------------------ keeper's notes */
+
+.hh-note-wrap {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.hh-note-wrap.is-up {
+  opacity: 1;
+}
+.hh-note-pos {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: max-content;
+  max-width: min(296px, 100% - 12px);
+}
+.hh-note-pos .hh-note {
+  margin-bottom: 4px;
+  text-align: center;
+}
+.hh-note__text {
+  margin: 0;
+}
+.hh-note-arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.hh-note-arrow path {
+  fill: none;
+  stroke: var(--hh-ink, #5a4433);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+
+/* ------------------------------------------------------------ toasts */
+
+/* The kit paints and places them (under the top bar, so they never sit on the
+   thumb's buttons). A screen can move them: --hh-toast-top on :root. */
+.hh-app > .hh-toasts {
+  top: calc(var(--safe-top) + var(--hh-toast-top, 56px));
+}
+/* With a sheet open they move to the strip of scene left above it, so they
+   never sit on the sheet's title row (layers.js shows one at a time then). */
+.hh-app:has(> .hh-layer-sheet > *) > .hh-toasts {
+  top: calc(var(--safe-top) + 2px);
+}
+.hh-toast__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 24px;
+  height: 24px;
+  margin: -4px 0;
+  font-size: 18px;
+  line-height: 1;
+}
+.hh-toast__icon img {
+  display: block;
+  width: auto;
+  height: 28px;
+  margin: -2px 0;
+}
+
+/* ------------------------------------------------------------ fx (ui/fx.js) */
+
+.hh-fx {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  will-change: transform, opacity;
+}
+.hh-fx--coin {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f7e4a0, #eab04a 55%, #d98f2f);
+  box-shadow: inset 0 0 0 1.5px rgba(138, 79, 51, 0.45);
+}
+.hh-fx--heart,
+.hh-fx--spark {
+  display: grid;
+  place-items: center;
+  font-family: system-ui, sans-serif;
+  line-height: 1;
+}
+.hh-fx--heart {
+  color: var(--hh-poppy, #e8806d);
+}
+.hh-fx--spark {
+  color: var(--hh-honey, #eab04a);
+}
+
+/* ------------------------------------------------------------ the loading card */
+
+/* Plain CSS on purpose: it is on the page before any script has run. The same
+   card says so if the game cannot start (ui/main.js). */
+.hh-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-top) + 24px) 28px calc(var(--safe-bottom) + 24px);
+  background-color: var(--hh-paper-colour, #fbf5e6);
+  transition: opacity 0.25s ease;
+}
+.hh-loading[hidden] {
+  display: none;
+}
+.hh-loading.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+.hh-loading__card {
+  width: min(100%, 300px);
+  text-align: center;
+}
+.hh-loading__name {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--hh-amber, #d98f2f);
+}
+.hh-loading__line {
+  margin: 8px 0 20px;
+  color: var(--hh-ink-soft, #7d6552);
+}
+.hh-loading__bar {
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(90, 68, 51, 0.13);
+}
+.hh-loading__fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--hh-honey, #eab04a);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 0.3s ease;
+}
+.hh-loading__name--small {
+  font-size: 24px;
+  color: var(--hh-ink-strong, #4a3626);
+}
+.hh-loading__again {
+  margin-top: 4px;
+}
+.hh-loading__error {
+  margin: 20px 0 0;
+  max-height: 30vh;
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+  color: var(--hh-ink-soft, #7d6552);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ------------------------------------------------------------ reduced motion */
+
+/* app.js sets data-motion="calm" from the player's setting or the phone's.
+   Everything arrives at once: one rule here, so no screen has to remember. */
+:root[data-motion="calm"] *,
+:root[data-motion="calm"] *::before,
+:root[data-motion="calm"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}

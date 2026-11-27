@@ -1,0 +1,159 @@
+/* The title scene (ui/scenes/title.js). The art takes whatever height the
+   phone has left over; the buttons sit at the bottom, under the thumb. */
+
+.hh-title {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 20px 8px;
+}
+
+.hh-title__art {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hh-title__name {
+  flex: none;
+  margin: 0;
+  font-size: clamp(38px, 13vw, 56px);
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+  color: var(--hh-amber);
+}
+.hh-title__logo {
+  display: block;
+  width: min(76vw, 320px, 34vh);
+  height: auto;
+  pointer-events: none;
+}
+
+/* The little meadow: as large as fits, never stretched. */
+.hh-title__picture {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  width: min(100%, 400px, 48vh);
+  aspect-ratio: 340 / 232;
+  margin-top: -6px;
+}
+.hh-title__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* The bees: each a pair of pictures (wings up, wings down) on a slow round. */
+.hh-title__bee {
+  position: absolute;
+  aspect-ratio: 16 / 13;
+  animation: hh-title-roam-a 9s ease-in-out infinite;
+  pointer-events: none;
+}
+.hh-title__wings {
+  position: absolute;
+  inset: 0;
+}
+.hh-title__wings img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hh-title__wings img + img {
+  animation: hh-title-flutter 0.16s steps(1) infinite;
+}
+@keyframes hh-title-flutter {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes hh-title-roam-a {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-6deg);
+  }
+  22% {
+    transform: translate(130%, -70%) rotate(4deg);
+  }
+  48% {
+    transform: translate(240%, 30%) rotate(10deg);
+  }
+  74% {
+    transform: translate(90%, 110%) rotate(-4deg);
+  }
+}
+@keyframes hh-title-roam-b {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(5deg);
+  }
+  28% {
+    transform: translate(-150%, 60%) rotate(-6deg);
+  }
+  55% {
+    transform: translate(-60%, -90%) rotate(2deg);
+  }
+  80% {
+    transform: translate(110%, -30%) rotate(8deg);
+  }
+}
+
+/* One line under the picture, when the phone is tall enough to spare it
+   (or when there is no picture to look at). */
+.hh-title__tagline {
+  display: none;
+  flex: none;
+  max-width: 19em;
+  margin: 10px 0 0;
+  font-size: var(--hh-text-s);
+  line-height: 1.4;
+  text-align: center;
+  color: var(--hh-ink-soft);
+}
+.hh-title__name + .hh-title__tagline {
+  display: block;
+}
+@media (min-height: 700px) {
+  .hh-title__tagline {
+    display: block;
+  }
+}
+
+.hh-title__menu {
+  flex: none;
+  width: min(100%, 296px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 6px;
+}
+.hh-title__where {
+  margin: -4px 0 2px;
+  font-size: var(--hh-text-s);
+  text-align: center;
+  color: var(--hh-ink-soft);
+}
+.hh-title__settings {
+  align-self: center;
+}
+
+.hh-title__credit {
+  flex: none;
+  margin: 2px 0 0;
+  font-size: var(--hh-text-xs);
+  color: var(--hh-ink-soft);
+}

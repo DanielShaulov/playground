@@ -1,0 +1,241 @@
+/* The goals sheet (ui/sheets/goals.js): layout only. */
+
+.hh-goals [hidden] {
+  display: none !important;
+}
+
+/* The lead line and the purse stay put while the goals scroll under them. */
+.hh-goals__lead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hh-gap-2);
+  margin: 0 -4px 2px;
+  padding: 2px 4px 5px;
+  background-color: var(--hh-paper-colour);
+  background-image: var(--hh-paper, none);
+}
+.hh-goals__lead p {
+  margin: 0;
+}
+
+/* ---- an open goal ---- */
+
+.hh-goals__card {
+  margin: 6px 0 10px;
+}
+.hh-goals__top {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-3);
+}
+.hh-goals__pic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  line-height: 0;
+}
+.hh-goals__pic img {
+  max-width: 48px;
+  height: auto;
+}
+.hh-goals__words {
+  min-width: 0;
+}
+.hh-goals__name {
+  margin: 0;
+}
+.hh-goals__text {
+  margin: 2px 0 0;
+  font-size: var(--hh-text-s);
+  line-height: 1.35;
+  color: var(--hh-ink);
+}
+.hh-goals__hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hh-goals__hint p {
+  margin: 0;
+}
+.hh-goals__meter {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-2);
+  margin-top: 10px;
+}
+.hh-goals__meter .hh-meter {
+  flex: 1;
+}
+.hh-goals__count {
+  flex: none;
+  min-width: 44px;
+  font-size: var(--hh-text-s);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--hh-ink-strong);
+}
+.hh-goals__card.is-ready .hh-goals__count {
+  color: var(--hh-pine);
+}
+.hh-goals__reward {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 10px;
+  margin-top: 8px;
+  font-size: var(--hh-text-s);
+  line-height: 1.3;
+  color: var(--hh-ink-soft);
+}
+.hh-goals__gift {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  color: var(--hh-ink-strong);
+}
+.hh-goals__gift img {
+  flex: none;
+}
+.hh-goals__claim {
+  margin-top: 10px;
+}
+
+.hh-goals__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-3);
+  margin: 6px 0 10px;
+}
+.hh-goals__empty img {
+  flex: none;
+}
+.hh-goals__empty p {
+  margin: 0;
+}
+
+/* ---- the renown ladder ---- */
+
+.hh-goals__ladder {
+  margin-top: 6px;
+}
+.hh-goals__ladderhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hh-gap-2);
+}
+.hh-goals__ladderhead .hh-heading {
+  margin: 0;
+}
+.hh-goals__source {
+  margin: 4px 0 8px;
+}
+.hh-goals__rungs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hh-goals__rung {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  column-gap: var(--hh-gap-2);
+  padding: 4px 6px 10px 4px;
+  border-radius: var(--hh-r);
+}
+/* the rail between one star and the next */
+.hh-goals__rung:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 32px;
+  bottom: -2px;
+  border-left: 2px dotted var(--hh-ink-faint);
+}
+.hh-goals__rung.is-here {
+  background: var(--hh-ink-wash);
+}
+.hh-goals__star {
+  line-height: 0;
+  padding-top: 1px;
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+.hh-goals__rung.is-reached .hh-goals__star {
+  opacity: 1;
+  filter: none;
+}
+.hh-goals__rungname {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  line-height: 1.25;
+  color: var(--hh-ink-strong);
+}
+.hh-goals__rung:not(.is-reached) .hh-goals__rungname {
+  color: var(--hh-ink);
+}
+.hh-goals__brings {
+  margin-top: 1px;
+  font-size: var(--hh-text-s);
+  line-height: 1.35;
+  color: var(--hh-ink);
+}
+.hh-goals__next {
+  margin-top: 8px;
+}
+.hh-goals__next p {
+  margin: 3px 0 0;
+}
+.hh-goals__nexttext {
+  font-weight: 700;
+  color: var(--hh-ink-strong);
+}
+
+/* ---- what is done, folded away ---- */
+
+.hh-goals__done {
+  margin-top: 10px;
+}
+.hh-goals__donehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--hh-tap);
+  padding: 0 4px;
+  font-weight: 700;
+  color: var(--hh-ink-strong);
+  list-style: none;
+  cursor: pointer;
+  background: var(--hh-img-rule, none) 0 0 / 120px 6px repeat-x;
+}
+.hh-goals__donehead::-webkit-details-marker {
+  display: none;
+}
+.hh-goals__chev {
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-right: 2.5px solid var(--hh-ink-soft);
+  border-bottom: 2.5px solid var(--hh-ink-soft);
+  border-radius: 2px;
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform var(--hh-quick) var(--hh-ease);
+}
+.hh-goals__done[open] .hh-goals__chev {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+.hh-goals__donelist .hh-row {
+  min-height: 48px;
+}

@@ -1,0 +1,148 @@
+/* The settings sheet (ui/sheets/settings.js). Rows, buttons and rules are the
+   kit's; this adds the switch, the two-way speed choice and the code boxes. */
+
+.hh-set__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+}
+.hh-set__noicon {
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+.hh-set .hh-row {
+  column-gap: 10px;
+}
+
+/* A switch: a pencilled pill with a painted bead that slides across. */
+.hh-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 56px;
+  height: 44px; /* a thumb's worth of target round a 30 px pill */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.hh-switch::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 7px;
+  height: 30px;
+  border-radius: 15px;
+  background: var(--hh-paper-shade);
+  box-shadow: inset 0 0 0 1.5px var(--hh-ink-faint);
+  transition: background-color var(--hh-quick);
+}
+.hh-switch__knob {
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--hh-white);
+  box-shadow:
+    inset 0 0 0 1.5px var(--hh-ink-soft),
+    0 1px 2px var(--hh-shade);
+  transition: transform var(--hh-quick) var(--hh-ease);
+}
+.hh-switch[aria-checked="true"]::before {
+  background: var(--hh-honey);
+}
+.hh-switch[aria-checked="true"] .hh-switch__knob {
+  transform: translateX(22px);
+}
+.hh-switch[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: default;
+}
+.hh-switch:focus-visible {
+  outline: 2px dashed var(--hh-ink-soft);
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+
+/* Normal | Fast: two small buttons, the chosen one honey. On a narrow phone
+   they drop under the words rather than squeeze them. */
+.hh-set__seg {
+  gap: 4px;
+}
+.hh-set__seg .hh-btn {
+  min-width: 68px;
+}
+@media (max-width: 359px) {
+  .hh-set__speed {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 4px;
+  }
+  .hh-set__speed .hh-row__end {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+.hh-set .hh-heading {
+  margin: 4px 0 8px;
+}
+.hh-set__saves {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hh-set__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 2px 2px 8px;
+}
+.hh-set__panel[hidden] {
+  display: none;
+}
+.hh-set__code {
+  display: block;
+  width: 100%;
+  min-height: 92px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--hh-r-s);
+  background: var(--hh-white);
+  box-shadow: inset 0 0 0 1.5px var(--hh-ink-faint);
+  color: var(--hh-ink);
+  /* 16 px and no less: iOS zooms the page for anything smaller. */
+  font:
+    16px/1.3 ui-monospace,
+    "SF Mono",
+    Menlo,
+    monospace;
+  overflow-wrap: anywhere;
+  resize: none;
+}
+.hh-set__code:focus {
+  outline: 2px dashed var(--hh-ink-soft);
+  outline-offset: 1px;
+}
+.hh-set__hint {
+  margin-top: -4px;
+  text-align: center;
+}
+.hh-set__credits {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hh-set__build {
+  margin-top: 10px;
+  font-variant-numeric: tabular-nums;
+}

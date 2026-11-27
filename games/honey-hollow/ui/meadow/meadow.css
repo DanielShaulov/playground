@@ -1,0 +1,543 @@
+/* The meadow screen (ui/meadow/). Layout only: buttons, chips, cards and
+   badges are the kit's (ui/base.css). The root is the shell's .hh-scene: a
+   column, already padded in from the notch and the home bar. */
+
+.hm {
+  color: var(--hh-ink);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.hm [hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------ sky */
+
+.hm-sky {
+  position: relative;
+  flex: 2 1 64px;
+  min-height: 64px;
+  max-height: 164px;
+}
+.hm-bands {
+  position: absolute;
+  left: calc(-1 * var(--safe-left));
+  right: calc(-1 * var(--safe-right));
+  top: calc(-1 * var(--safe-top));
+  bottom: -40px;
+  pointer-events: none;
+}
+.hm-band {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+.hm-band.is-on {
+  opacity: 1;
+}
+
+.hm-chips {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  height: 36px;
+  padding: 0 6px;
+}
+.hm-gap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.hm-chipbtn {
+  all: unset;
+  box-sizing: border-box;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  /* A whole thumb tall, but downwards: the row is 36 px and the button starts
+     at its top, so nothing asks for a tap above the safe area. */
+  height: 44px;
+  padding-bottom: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hm-chipbtn:active .hh-chip {
+  transform: translateY(1px);
+}
+.hm-chipbtn:focus-visible .hh-chip {
+  outline: 2px solid var(--hh-ink-soft);
+  outline-offset: 2px;
+}
+.hm-chip__pic {
+  display: inline-flex;
+}
+.hm-chip__pic--next {
+  align-self: flex-end;
+  margin: 0 0 3px -3px;
+  opacity: 0.72;
+}
+.hm-day--short {
+  display: none;
+}
+@media (max-width: 374px) {
+  .hm-day--wide {
+    display: none;
+  }
+  .hm-day--short {
+    display: inline;
+  }
+}
+
+.hm-arc {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 36px;
+  bottom: -8px;
+  z-index: 1;
+  pointer-events: none;
+}
+.hm-arc svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.hm-arc path {
+  fill: none;
+  stroke: var(--hh-ink-faint);
+  stroke-width: 1.6;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.hm-orb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  will-change: transform;
+}
+
+/* ------------------------------------------------------------ the plot's header */
+
+.hm-head {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+  padding: 0 4px;
+  margin-bottom: -10px;
+  touch-action: pan-y;
+}
+.hm-title {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.hm-name {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--hh-ink-strong);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hm-under {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 10px;
+}
+.hm-pips {
+  display: inline-flex;
+  gap: 5px;
+}
+.hm-pips i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hh-ink-faint);
+}
+.hm-pips i.is-on {
+  background: var(--hh-ink-soft);
+}
+.hm-sale {
+  color: var(--hh-ink-soft);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 10px;
+}
+.hm-arrow--next img {
+  transform: scaleX(-1);
+}
+
+/* ------------------------------------------------------------ the stage */
+
+.hm-stage {
+  position: relative;
+  /* A tall phone gives the scene more air before the sky takes the rest. */
+  flex: 1 1 calc(min(100vw, 560px) * 1.04);
+  min-height: 170px;
+  max-height: calc(min(100vw, 560px) * 1.2);
+  touch-action: pan-y;
+}
+.hm-canvas {
+  position: absolute;
+  left: 0;
+  top: -16px;
+  width: 100%;
+  height: calc(100% + 24px);
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.hm-canvas--fg {
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.hm.is-forsale .hm-canvas {
+  opacity: 0.45;
+}
+
+.hm-buy {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: min(88%, 330px);
+  margin: 0;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+.hm-buy p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.hm-buy__only {
+  font-weight: 700;
+}
+.hm-buy__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+.hm-buy p.hm-buy__short {
+  color: var(--hh-ink-soft);
+  font-size: 13px;
+}
+
+.hm-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: rgba(251, 245, 230, 0.5);
+  color: var(--hh-ink-soft);
+  font-weight: 700;
+  animation: hm-fade 0.25s ease both;
+}
+@keyframes hm-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ the hint line */
+
+.hm-hint {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 2px 14px;
+  color: var(--hh-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.22;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hm-hint:focus-visible {
+  outline: 2px solid var(--hh-ink-soft);
+  outline-offset: -3px;
+}
+.hm-hint__icon {
+  flex: none;
+  display: inline-flex;
+}
+.hm-hint__icon:empty {
+  display: none;
+}
+.hm-hint__text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.hm-hint[data-kind="ready"],
+.hm-hint[data-kind="wasps"],
+.hm-hint[data-kind="swarm"] {
+  color: var(--hh-ink-strong);
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------ the action bar */
+
+.hm-foot {
+  position: relative;
+  /* Takes spare height only once the sky and the scene have had theirs. */
+  flex: 0.001 0 auto;
+  display: flex;
+  flex-direction: column;
+  /* The day's one big button always sits in the bottom thumb spot. */
+  justify-content: flex-end;
+  min-height: 0;
+  padding: 0 8px 4px;
+}
+.hm-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hm-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.hm-grow {
+  flex: 1 1 auto;
+}
+/* The first morning: a soft ring breathes round "Start the day" until it is
+   pressed. A still ring when motion is calm; the lesson's own ring wins. */
+.hm-cue::after {
+  content: "";
+  position: absolute;
+  inset: -11px;
+  border: 2.5px solid var(--hh-honey, #e9a61f);
+  border-radius: 20px;
+  box-shadow:
+    0 0 0 3px rgba(255, 246, 214, 0.8),
+    0 0 14px 4px rgba(236, 170, 40, 0.45);
+  pointer-events: none;
+  animation: hm-cue 1.9s ease-in-out infinite;
+}
+@keyframes hm-cue {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.994);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.01);
+  }
+}
+:root[data-motion="calm"] .hm-cue::after {
+  animation: none;
+  opacity: 0.9;
+}
+:root:has(.hh-teach-cue) .hm-cue::after {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hm-cue::after {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+.hm-speed {
+  margin-right: 2px;
+  color: var(--hh-ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+.hm-acts {
+  --hm-act: 50px;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px 17px;
+}
+.hm-act {
+  position: relative;
+  width: var(--hm-act);
+  height: var(--hm-act);
+  overflow: visible;
+}
+.hm-act__label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  color: var(--hh-ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+.hm-act__badge {
+  position: absolute;
+  right: -13px;
+  top: -13px;
+  pointer-events: none;
+}
+.hm.is-brush .hm-bar,
+.hm.is-place .hm-bar,
+.hm.is-place .hm-hint {
+  visibility: hidden;
+}
+
+@media (min-width: 380px) and (min-height: 700px) {
+  .hm-orb {
+    width: 32px;
+    height: 32px;
+    margin: -16px 0 0 -16px;
+  }
+  .hm-name {
+    font-size: 22px;
+  }
+  .hm-hint {
+    min-height: 48px;
+    font-size: 14.5px;
+  }
+  .hm-bar {
+    gap: 12px;
+  }
+  .hm-acts {
+    --hm-act: 58px;
+    padding: 0 12px 19px;
+  }
+  .hm-act__label {
+    font-size: 12px;
+  }
+  .hm-act > img {
+    transform: scale(1.18);
+  }
+}
+/* A big phone: the things the thumb uses grow, and stay at the bottom. */
+@media (min-width: 400px) and (min-height: 820px) {
+  .hm-hint {
+    min-height: 56px;
+    font-size: 15.5px;
+  }
+  .hm-foot {
+    padding-bottom: 8px;
+  }
+  .hm-bar {
+    gap: 14px;
+  }
+  .hm-primary .hh-btn {
+    min-height: 58px;
+  }
+  .hm-acts {
+    --hm-act: 64px;
+    padding: 0 14px 21px;
+  }
+  .hm-act__label {
+    font-size: 12.5px;
+  }
+  .hm-act > img {
+    transform: scale(1.3);
+  }
+}
+
+/* ------------------------------------------------------------ in hand */
+
+.hm-brush {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  transform: translateY(-50%);
+}
+.hm-brush__pic {
+  flex: none;
+  display: inline-flex;
+}
+.hm-brush__text {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.hm-brush__name {
+  color: var(--hh-ink-strong);
+  font-size: 17px;
+}
+.hm-brush__line {
+  color: var(--hh-ink-soft);
+  font-size: 13.5px;
+}
+
+.hm-place {
+  position: absolute;
+  left: calc(var(--safe-left) + 8px);
+  right: calc(var(--safe-right) + 8px);
+  bottom: calc(var(--safe-bottom) + 6px);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+.hm-place__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 54px;
+  font-size: 13.5px;
+  line-height: 1.25;
+}
+.hm-place__head {
+  color: var(--hh-ink-strong);
+  font-size: 15.5px;
+}
+.hm-place__note {
+  color: var(--hh-ink-soft);
+}
+.hm-place__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

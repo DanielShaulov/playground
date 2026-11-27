@@ -1,0 +1,48 @@
+/* The teaching layer's one picture: a soft honey ring round the thing a
+   keeper's note points at, so the eye lands on what to tap. It sits in the
+   note layer (never takes a tap) and goes when the note goes. It breathes
+   gently; with motion off it is a still ring. */
+.hh-teach-cue {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2.5px solid var(--hh-honey, #e9a61f);
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 3px rgba(255, 246, 214, 0.8),
+    0 0 14px 4px rgba(236, 170, 40, 0.5);
+  pointer-events: none;
+  opacity: 0;
+  animation:
+    hh-teach-cue-in 0.25s ease 0.26s forwards,
+    hh-teach-cue 1.5s ease-in-out 0.5s infinite;
+}
+@keyframes hh-teach-cue-in {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hh-teach-cue {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 3px rgba(255, 246, 214, 0.8),
+      0 0 14px 4px rgba(236, 170, 40, 0.5);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow:
+      0 0 0 5px rgba(255, 246, 214, 0.55),
+      0 0 22px 9px rgba(236, 170, 40, 0.32);
+  }
+}
+:root[data-motion="calm"] .hh-teach-cue {
+  animation: none;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hh-teach-cue {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Honey Hollow: every sound</title>
+    <link rel="icon" href="data:," />
+    <style>
+      body {
+        margin: 0;
+        padding: 16px 16px 60px;
+        background: #fbf5e6;
+        color: #5a4433;
+        font:
+          14px system-ui,
+          sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 22px 0 8px;
+      }
+      p {
+        margin: 0 0 12px;
+        max-width: 62ch;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      button {
+        min-height: 44px;
+        min-width: 72px;
+        padding: 0 14px;
+        border: 1.5px solid #c9b18a;
+        border-radius: 12px;
+        background: #fffaf0;
+        color: inherit;
+        font: inherit;
+        touch-action: manipulation;
+      }
+      button:active {
+        background: #f3e3bd;
+      }
+      button[aria-pressed="true"] {
+        background: #e9d49c;
+        border-color: #a8894f;
+      }
+      label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 44px;
+      }
+      input[type="range"] {
+        width: 120px;
+      }
+      #status {
+        font-size: 12px;
+        opacity: 0.8;
+        margin: 8px 0 0;
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      th,
+      td {
+        padding: 3px 8px;
+        text-align: right;
+        border-bottom: 1px solid #e6d8b8;
+      }
+      th:first-child,
+      td:first-child,
+      td.notes {
+        text-align: left;
+      }
+      tr.head td {
+        font-weight: 600;
+        text-align: left;
+        padding-top: 12px;
+        border-bottom: 1.5px solid #c9b18a;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Honey Hollow: every sound</h1>
+    <p>
+      Every sound the game can make, built by the game's own module (ui/audio.js) with no audio
+      files. Tap a button to hear it; the first tap also wakes the audio, as it does in the game.
+      Turn the phone's silent switch off. <b>Measure everything</b> renders each sound to a buffer
+      and prints what a headless check reads instead of listening.
+    </p>
+    <div class="row">
+      <label><input type="checkbox" id="on" checked /> Sound on</label>
+      <label>Gain <input type="range" id="gain" min="0" max="1" step="0.05" value="1" /></label>
+      <label>Pitch <input type="range" id="pitch" min="-12" max="12" step="1" value="0" /></label>
+      <span id="pitchOut">0 st</span>
+    </div>
+    <p id="status">audio: not started</p>
+
+    <div id="sounds"></div>
+
+    <h2>Ambiences (cross-fade about 1.5 s)</h2>
+    <div class="row" id="beds"></div>
+
+    <h2>All together</h2>
+    <div class="row">
+      <button id="tour">Play each in turn</button>
+      <button id="burst">200 taps in a second</button>
+      <button id="measure">Measure everything</button>
+    </div>
+    <p id="progress"></p>
+    <div class="scroll"><table id="table"></table></div>
+
+    <script type="module">
+      import {
+        initAudio,
+        sound,
+        ambience,
+        setMuted,
+        renderOffline,
+        SOUNDS,
+        AMBIENCES,
+      } from "./ui/audio.js";
+
+      const $ = (id) => document.getElementById(id);
+      const settings = { sound: true };
+      initAudio(() => settings);
+
+      /** How the one-shots are grouped, here and in the checks. */
+      const FAMILIES = {
+        Interface: ["tap", "open", "close", "toast", "nope", "page", "pop", "buy"],
+        "Meadow and workshop": [
+          "plant",
+          "dig",
+          "pick",
+          "place",
+          "harvest",
+          "jar",
+          "craft",
+          "fend",
+          "rain",
+        ],
+        "Coins and rewards": [
+          "coin",
+          "coins",
+          "claim",
+          "tier",
+          "fact",
+          "heart",
+          "delighted",
+          "fine",
+          "pass",
+          "ribbon",
+        ],
+        "Day and year": ["dayStart", "dusk", "sleep", "wake", "season"],
+        Creatures: ["swarm", "wasps"],
+      };
+      const grouped = new Set(Object.values(FAMILIES).flat());
+      const other = SOUNDS.filter((name) => !grouped.has(name));
+      if (other.length) FAMILIES.Other = other;
+
+      // ---- buttons -------------------------------------------------------
+
+      const opts = () => ({ gain: +$("gain").value, pitch: +$("pitch").value });
+      for (const [family, names] of Object.entries(FAMILIES)) {
+        const h = document.createElement("h2");
+        h.textContent = family;
+        const row = document.createElement("div");
+        row.className = "row";
+        for (const name of names) {
+          const b = document.createElement("button");
+          b.textContent = name;
+          b.dataset.sound = name;
+          b.addEventListener("click", () => sound(name, opts()));
+          row.append(b);
+        }
+        $("sounds").append(h, row);
+      }
+      for (const name of [...AMBIENCES, "none"]) {
+        const b = document.createElement("button");
+        b.textContent = name;
+        b.dataset.bed = name;
+        b.addEventListener("click", () => {
+          ambience(name);
+          for (const el of $("beds").children)
+            el.setAttribute("aria-pressed", String(el === b && name !== "none"));
+        });
+        $("beds").append(b);
+      }
+      $("on").addEventListener("change", () => {
+        settings.sound = $("on").checked;
+        setMuted(!settings.sound);
+      });
+      $("pitch").addEventListener("input", () => {
+        $("pitchOut").textContent = $("pitch").value + " st";
+      });
+      $("tour").addEventListener("click", () => {
+        SOUNDS.forEach((name, i) => sound(name, { ...opts(), delay: i * 1.1 }));
+      });
+      $("burst").addEventListener("click", () => {
+        for (let i = 0; i < 200; i++) setTimeout(() => sound("tap", opts()), i * 5);
+      });
+      setInterval(() => {
+        const a = window.__hollowAudio;
+        if (!a) return;
+        $("status").textContent =
+          `audio: ${a.state}${a.muted ? ", muted" : ""} · voices ${a.voices} · played ${a.played}` +
+          ` · bed ${a.bed ?? "none"}${a.fading ? " (+" + a.fading + " fading)" : ""}`;
+      }, 200);
+
+      // ---- measuring -----------------------------------------------------
+
+      /** In-place radix-2 FFT. */
+      function fft(re, im) {
+        const n = re.length;
+        for (let i = 1, j = 0; i < n; i++) {
+          let bit = n >> 1;
+          for (; j & bit; bit >>= 1) j ^= bit;
+          j ^= bit;
+          if (i < j) {
+            [re[i], re[j]] = [re[j], re[i]];
+            [im[i], im[j]] = [im[j], im[i]];
+          }
+        }
+        for (let len = 2; len <= n; len <<= 1) {
+          const ang = (-2 * Math.PI) / len;
+          const wr = Math.cos(ang);
+          const wi = Math.sin(ang);
+          for (let i = 0; i < n; i += len) {
+            let cr = 1;
+            let ci = 0;
+            for (let k = 0; k < len / 2; k++) {
+              const a = i + k;
+              const b = a + len / 2;
+              const xr = re[b] * cr - im[b] * ci;
+              const xi = re[b] * ci + im[b] * cr;
+              re[b] = re[a] - xr;
+              im[b] = im[a] - xi;
+              re[a] += xr;
+              im[a] += xi;
+              const t = cr * wr - ci * wi;
+              ci = cr * wi + ci * wr;
+              cr = t;
+            }
+          }
+        }
+      }
+
+      /** A-weighting as a linear gain: roughly how loud a frequency is to an ear (and to a phone speaker). */
+      function aWeight(f) {
+        const f2 = f * f;
+        const ra =
+          (12194 ** 2 * f2 * f2) /
+          ((f2 + 20.6 ** 2) * Math.sqrt((f2 + 107.7 ** 2) * (f2 + 737.9 ** 2)) * (f2 + 12194 ** 2));
+        return ra * 1.2589;
+      }
+
+      const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+      const IN_SCALE = new Set([2, 4, 6, 9, 11]); // D E F# A B
+      const db = (x) => (x > 0 ? 20 * Math.log10(x) : -Infinity);
+      const FLOOR = 0.001; // -60 dB re full scale
+
+      /**
+       * Everything the checks want to know about a rendered buffer.
+       * dur: from the first sample over -60 dBFS to the last. peak: either channel.
+       * rms: over that span; rmsAll: over the whole buffer. loud: the loudest
+       * 93 ms, A-weighted. centroid and above6k: of the whole spectrum.
+       * notes: the strongest pitch in each moment, named, in order; onScale: the
+       * share of that energy within 35 cents of D E F# A B. rmsA: A-weighted, whole
+       * buffer. dc: the mean. tail: the largest sample in the last 20 ms. seam: the
+       * sharpest sample-to-sample step over the usual one (a click stands out).
+       * halves: level of each half second, dB.
+       */
+      function analyse(buf) {
+        const sr = buf.sampleRate;
+        const L = buf.getChannelData(0);
+        const R = buf.numberOfChannels > 1 ? buf.getChannelData(1) : L;
+        const n = L.length;
+        const mono = new Float32Array(n);
+        let peak = 0;
+        let bad = 0;
+        let first = -1;
+        let last = -1;
+        for (let i = 0; i < n; i++) {
+          const l = L[i];
+          const r = R[i];
+          if (!Number.isFinite(l) || !Number.isFinite(r)) {
+            bad++;
+            continue;
+          }
+          const a = Math.max(Math.abs(l), Math.abs(r));
+          if (a > peak) peak = a;
+          if (a >= FLOOR) {
+            if (first < 0) first = i;
+            last = i;
+          }
+          mono[i] = (l + r) / 2;
+        }
+        const power = (from, to) => {
+          let s = 0;
+          for (let i = from; i < to; i++) s += (L[i] * L[i] + R[i] * R[i]) / 2;
+          return to > from ? s / (to - from) : 0;
+        };
+        // DC, the last 20 ms of the buffer, and the sharpest step against the usual step
+        let dc = 0;
+        let step = 0;
+        let steps = 0;
+        for (let i = 0; i < n; i++) {
+          dc += mono[i];
+          if (i) {
+            const d = mono[i] - mono[i - 1];
+            steps += d * d;
+            if (Math.abs(d) > step) step = Math.abs(d);
+          }
+        }
+        dc /= n;
+        const seam = steps ? step / Math.sqrt(steps / (n - 1)) : 0;
+        let tail = 0;
+        for (let i = Math.max(0, n - Math.floor(sr * 0.02)); i < n; i++)
+          tail = Math.max(tail, Math.abs(L[i]), Math.abs(R[i]));
+        // level in half-second windows, for steadiness
+        const halves = [];
+        for (let i = 0; i + sr / 2 <= n; i += sr / 2)
+          halves.push(db(Math.sqrt(power(i, i + sr / 2))));
+        const rms = first < 0 ? 0 : Math.sqrt(power(first, last + 1));
+        const rmsAll = Math.sqrt(power(0, n));
+
+        const N = 4096;
+        const hop = 1024;
+        const win = new Float64Array(N);
+        for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N);
+        const weight = new Float64Array(N / 2);
+        for (let k = 1; k < N / 2; k++) weight[k] = aWeight((k * sr) / N) ** 2;
+        const total = new Float64Array(N / 2);
+        const frames = [];
+        const re = new Float64Array(N);
+        const im = new Float64Array(N);
+        const lo = Math.ceil((180 * N) / sr);
+        const hi = Math.floor((5000 * N) / sr);
+        const norm = 2 / (N * N * 0.375);
+        for (let start = -N / 2; start < n - N / 2; start += hop) {
+          for (let i = 0; i < N; i++) {
+            const j = start + i;
+            re[i] = j >= 0 && j < n ? mono[j] * win[i] : 0;
+            im[i] = 0;
+          }
+          fft(re, im);
+          let ms = 0;
+          let msA = 0;
+          let best = lo;
+          let bestP = 0;
+          const P = new Float64Array(hi + 2);
+          for (let k = 1; k < N / 2; k++) {
+            const p = (re[k] * re[k] + im[k] * im[k]) * norm;
+            total[k] += p;
+            ms += p;
+            msA += p * weight[k];
+            if (k <= hi + 1) P[k] = p;
+            if (k >= lo && k <= hi && p > bestP) {
+              bestP = p;
+              best = k;
+            }
+          }
+          let f = 0;
+          if (bestP > 0) {
+            const a = Math.log(P[best - 1] + 1e-30);
+            const b = Math.log(P[best] + 1e-30);
+            const c = Math.log(P[best + 1] + 1e-30);
+            const d = a - 2 * b + c;
+            f = ((best + (d ? (0.5 * (a - c)) / d : 0)) * sr) / N;
+          }
+          frames.push({ ms, msA, f, at: (start + N / 2) / sr });
+        }
+        let sum = 0;
+        let weighted = 0;
+        let above = 0;
+        for (let k = 1; k < N / 2; k++) {
+          const f = (k * sr) / N;
+          sum += total[k];
+          weighted += total[k] * f;
+          if (f > 6000) above += total[k];
+        }
+        const loudest = Math.max(...frames.map((fr) => fr.msA));
+        const maxMs = Math.max(...frames.map((fr) => fr.ms));
+
+        // the notes: the strongest pitch of every frame that is not just a tail
+        let inKey = 0;
+        let voiced = 0;
+        const notes = [];
+        let run = null;
+        for (const fr of frames) {
+          if (fr.ms < maxMs * 0.03 || fr.f <= 0) {
+            run = null;
+            continue;
+          }
+          const m = 69 + 12 * Math.log2(fr.f / 440);
+          const near = Math.round(m);
+          const cents = (m - near) * 100;
+          const pc = ((near % 12) + 12) % 12;
+          voiced += fr.ms;
+          if (IN_SCALE.has(pc) && Math.abs(cents) <= 35) inKey += fr.ms;
+          const name = NAMES[pc] + (Math.floor(near / 12) - 1);
+          if (run && run.name === name) {
+            run.frames++;
+            if (run.frames === 2 && notes[notes.length - 1] !== name) notes.push(name);
+          } else run = { name, frames: 1 };
+        }
+
+        // a small envelope for drawing
+        const env = [];
+        const cols = 160;
+        const span = Math.max(1, Math.floor(n / cols));
+        for (let c = 0; c < cols; c++) {
+          let m = 0;
+          for (let i = c * span; i < Math.min(n, (c + 1) * span); i++)
+            m = Math.max(m, Math.abs(mono[i]));
+          env.push(m);
+        }
+        return {
+          seconds: n / sr,
+          dur: first < 0 ? 0 : (last - first + 1) / sr,
+          peak,
+          rms,
+          rmsAll,
+          rmsDb: db(rms),
+          rmsAllDb: db(rmsAll),
+          loud: 10 * Math.log10(loudest || 1e-30),
+          rmsA: 10 * Math.log10(frames.reduce((a, fr) => a + fr.msA, 0) / frames.length || 1e-30),
+          dc,
+          tail,
+          seam,
+          halves,
+          centroid: sum ? weighted / sum : 0,
+          above6k: sum ? above / sum : 0,
+          nan: bad > 0,
+          clip: peak >= 0.999,
+          notes,
+          onScale: voiced ? inKey / voiced : 0,
+          env,
+        };
+      }
+
+      async function measureSound(name, soundOpts, seconds = 3.5, seed = 1) {
+        const buf = await renderOffline({ sounds: [[name, soundOpts]], seconds, seed });
+        return { name, kind: "sound", ...analyse(buf) };
+      }
+      async function measureAmbience(name, seconds = 5, seed = 1, more = {}) {
+        const buf = await renderOffline({ ambience: name, seconds, seed, ...more });
+        return { name, kind: "ambience", ...analyse(buf) };
+      }
+      /** Anything at all through the output chain: build(ctx, bus) adds nodes; sounds is a list for a pile-up. */
+      async function measureCustom({ sounds, build, seconds = 3, seed = 1 }) {
+        const custom = build ? new Function("ctx", "bus", "noise", build) : undefined;
+        const buf = await renderOffline({ sounds, custom, seconds, seed });
+        return { name: "custom", kind: "custom", ...analyse(buf) };
+      }
+      async function measureAll(onRow) {
+        const rows = [];
+        for (const [family, names] of Object.entries(FAMILIES)) {
+          for (const name of names) {
+            const row = { family, ...(await measureSound(name)) };
+            rows.push(row);
+            onRow?.(row);
+          }
+        }
+        for (const name of AMBIENCES) {
+          const row = { family: "Ambience", ...(await measureAmbience(name)) };
+          rows.push(row);
+          onRow?.(row);
+        }
+        return rows;
+      }
+
+      function spark(env, peak) {
+        const c = document.createElement("canvas");
+        c.width = env.length;
+        c.height = 28;
+        const g = c.getContext("2d");
+        g.fillStyle = "#b58a3c";
+        const top = Math.max(peak, 1e-6);
+        env.forEach((v, x) => {
+          const h = Math.max(0.5, (v / top) * 13);
+          g.fillRect(x, 14 - h, 1, h * 2);
+        });
+        return c;
+      }
+
+      function draw(rows) {
+        const table = $("table");
+        table.textContent = "";
+        const head = table.insertRow();
+        for (const text of [
+          "name",
+          "shape",
+          "to -60 dB (s)",
+          "peak",
+          "RMS (dB)",
+          "loudest 93 ms (dBA)",
+          "centroid (Hz)",
+          "above 6 kHz",
+          "on scale",
+          "strongest pitches",
+        ]) {
+          const th = document.createElement("th");
+          th.textContent = text;
+          head.append(th);
+        }
+        let family = "";
+        for (const r of rows) {
+          if (r.family !== family) {
+            family = r.family;
+            const tr = table.insertRow();
+            tr.className = "head";
+            const td = tr.insertCell();
+            td.colSpan = 10;
+            td.textContent = family;
+          }
+          const tr = table.insertRow();
+          const bed = r.kind === "ambience";
+          tr.insertCell().textContent = r.name;
+          tr.insertCell().append(spark(r.env, r.peak));
+          tr.insertCell().textContent = bed ? "loop" : r.dur.toFixed(2);
+          tr.insertCell().textContent =
+            r.peak.toFixed(3) + (r.nan ? " NaN" : r.clip ? " CLIP" : "");
+          tr.insertCell().textContent = (bed ? r.rmsAllDb : r.rmsDb).toFixed(1);
+          tr.insertCell().textContent = r.loud.toFixed(1);
+          tr.insertCell().textContent = r.centroid.toFixed(0);
+          tr.insertCell().textContent = (r.above6k * 100).toFixed(2) + "%";
+          tr.insertCell().textContent = bed ? "" : (r.onScale * 100).toFixed(0) + "%";
+          const notes = tr.insertCell();
+          notes.className = "notes";
+          notes.textContent = bed ? "" : r.notes.join(" ");
+        }
+      }
+
+      $("measure").addEventListener("click", async () => {
+        const rows = [];
+        const all = SOUNDS.length + AMBIENCES.length;
+        await measureAll((row) => {
+          rows.push(row);
+          $("progress").textContent = `measured ${rows.length} of ${all}`;
+        });
+        $("progress").textContent = "";
+        draw(rows);
+      });
+
+      window.__audioTest = {
+        FAMILIES,
+        SOUNDS,
+        AMBIENCES,
+        measureSound,
+        measureAmbience,
+        measureCustom,
+        measureAll,
+        sound,
+        ambience,
+        setMuted,
+        settings,
+        ready: true,
+      };
+    </script>
+  </body>
+</html>

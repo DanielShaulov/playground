@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="theme-color" content="#fbf5e6" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="../../icon-180.png" />
+    <link rel="stylesheet" href="../../shared/style.css" />
+    <link rel="stylesheet" href="./ui/base.css" />
+    <link rel="stylesheet" href="./ui/shell.css" />
+    <title>Honey Hollow</title>
+  </head>
+  <body>
+    <!-- ui/layers.js adds the game's layers here; the loading card is plain
+         markup so it is on the page before any script has run. -->
+    <div id="hh-app" class="hh-app">
+      <div id="hh-loading" class="hh-loading" role="status">
+        <div class="hh-loading__card">
+          <h1 class="hh-loading__name">Honey Hollow</h1>
+          <p class="hh-loading__line">Mixing the paints…</p>
+          <div class="hh-loading__bar"><i class="hh-loading__fill"></i></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./ui/main.js"></script>
+  </body>
+</html>

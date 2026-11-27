@@ -1,9 +1,10 @@
 name: Test
 
-# The gate every PR must pass before it merges. Ferment's rules tests and the
-# type check run in Node. The phone job plays Ferment in Chrome on a small and
-# a large phone, uploads the screenshots as the "ferment-shots" artifact, and
-# runs Checkwiz's rules tests, which drive its page in a browser too.
+# The gate every PR must pass before it merges. Ferment's and Honey Hollow's
+# rules tests and the type check run in Node. The phone job plays both games
+# in Chrome on a small and a large phone, uploads the screenshots as the
+# "ferment-shots" and "honey-hollow-shots" artifacts, and runs Checkwiz's
+# rules tests, which drive its page in a browser too.
 # `npm test` runs the same checks locally.
 on:
   pull_request:
@@ -31,9 +32,11 @@ jobs:
       - run: npm run test:broadside
       - run: npm run test:perihelion
       - run: npm run test:ferment
+      - run: npm run test:honey-hollow
       - run: npm run typecheck
 
-  # Bots play 30 days on several seeds. The report lands in the job summary.
+  # Bots play 30 days of Ferment and three years of Honey Hollow on several
+  # seeds. The reports land in the job summary.
   # A broken balance band is a warning on the PR, never a failure (Hadash):
   # builds stay playable while the numbers are being tuned.
   balance:
@@ -47,6 +50,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:ferment:sim
+      - run: npm run test:honey-hollow:sim
 
   phone:
     runs-on: ubuntu-latest
@@ -65,6 +69,7 @@ jobs:
       - run: npm run test:broadside:browser
       - run: npm run test:perihelion:browser
       - run: npm run test:ferment:browser
+      - run: npm run test:honey-hollow:browser
       # Checkwiz's rules tests drive its page in a browser and need `npm start`.
       - run: |
           npm start >/dev/null 2>&1 &
@@ -75,4 +80,10 @@ jobs:
         with:
           name: ferment-shots
           path: tests/ferment/browser/shots/
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: honey-hollow-shots
+          path: tests/honey-hollow/browser/shots/
           if-no-files-found: ignore

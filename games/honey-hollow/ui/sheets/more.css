@@ -1,0 +1,99 @@
+/* The "More" menu (ui/sheets/more.js): layout only. */
+
+.hh-more [hidden] {
+  display: none !important;
+}
+
+/* ---- the day in one line ---- */
+
+.hh-more__day {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-2);
+  min-height: 62px;
+  padding-bottom: 8px;
+  background: var(--hh-img-rule, none) 0 100% / 120px 6px repeat-x;
+}
+.hh-more__face {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  margin: -6px 0 -2px -4px;
+  line-height: 0;
+}
+.hh-more__daywords {
+  flex: 1;
+  min-width: 0;
+}
+.hh-more__whose {
+  font-size: var(--hh-text-s);
+  line-height: 1.25;
+  color: var(--hh-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hh-more__date {
+  font-size: var(--hh-text-l);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--hh-ink-strong);
+}
+.hh-more__side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hh-more__wx {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  line-height: 0;
+}
+.hh-more__chips {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+/* ---- the rows ---- */
+
+.hh-more__list {
+  margin-top: 2px;
+}
+.hh-more__row {
+  min-height: 60px;
+}
+.hh-more__row .hh-row__title,
+.hh-more__row .hh-row__sub {
+  display: block;
+}
+.hh-more__row .hh-row__title {
+  font-size: var(--hh-text-l);
+}
+/* One line under each name, on any phone. */
+.hh-more__row .hh-row__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hh-more__pic {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  line-height: 0;
+}
+.hh-more__go {
+  padding-right: 4px;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--hh-ink-soft);
+}
+/* On the narrowest phones the weather picture gives its room to the words. */
+@media (max-width: 349px) {
+  .hh-more__wx {
+    display: none;
+  }
+}

@@ -1,0 +1,145 @@
+/* The intro (ui/scenes/intro.js): one card of a picture book in the middle of
+   the page, the dots and the two buttons under the thumb. */
+
+.intro {
+  align-items: center;
+}
+
+/* The whole middle of the page turns the page: tap it, or swipe. */
+.intro__book {
+  flex: 1 1 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+  padding: 8px 4px 0;
+  cursor: pointer;
+  touch-action: none;
+}
+.intro__card {
+  grid-area: 1 / 1;
+  width: min(100% - 16px, 430px);
+  margin: 0 auto;
+}
+.intro__card[hidden] {
+  display: none;
+}
+.intro__card.is-from-right {
+  animation: intro-from-right 0.3s var(--hh-ease, ease-out) both;
+}
+.intro__card.is-from-left {
+  animation: intro-from-left 0.3s var(--hh-ease, ease-out) both;
+}
+@keyframes intro-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(18px) rotate(0.6deg);
+  }
+}
+@keyframes intro-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-18px) rotate(-0.6deg);
+  }
+}
+
+/* --intro-pic-h: how tall the picture is painted for this phone (212 to 400
+   to a width of 320); intro.js sets it once the page is laid out. */
+.intro__pic {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  aspect-ratio: 320 / var(--intro-pic-h, 212);
+}
+/* The bees hover a little over the picture (still, under reduced motion). */
+.intro__flier {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  animation: intro-hover 3.6s ease-in-out infinite alternate;
+}
+.intro__flier:nth-of-type(odd) {
+  animation-name: intro-hover-b;
+}
+.intro__flier-pic {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.intro__flier-pic.is-flipped {
+  transform: scaleX(-1);
+}
+@keyframes intro-hover {
+  from {
+    transform: translate(-3px, 2px) rotate(-3deg);
+  }
+  to {
+    transform: translate(4px, -4px) rotate(3deg);
+  }
+}
+@keyframes intro-hover-b {
+  from {
+    transform: translate(3px, -3px) rotate(2deg);
+  }
+  to {
+    transform: translate(-4px, 3px) rotate(-4deg);
+  }
+}
+.intro__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* Room for four lines, so the card does not change size from page to page. */
+.intro__text {
+  min-height: 5.8em;
+  margin: 10px 2px 0;
+  font-size: 17px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--hh-ink-strong);
+}
+@media (min-width: 380px) {
+  .intro__text {
+    min-height: 4.35em;
+    font-size: 18px;
+  }
+}
+
+.intro__foot {
+  flex: none;
+  width: 100%;
+  max-width: 460px;
+  padding: 8px var(--hh-gutter) 14px;
+}
+.intro__dots {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+.intro__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--hh-ink-faint);
+  transition: transform var(--hh-quick) var(--hh-ease);
+}
+.intro__dot.is-on {
+  background: var(--hh-amber);
+  transform: scale(1.25);
+}
+.intro__buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.intro__skip {
+  flex: none;
+  min-width: 64px;
+}
+.intro__next {
+  flex: 1 1 0;
+  min-width: 0;
+}

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Honey Hollow: every painted piece</title>
+    <link rel="icon" href="data:," />
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #fbf5e6;
+        color: #5a4433;
+        font:
+          13px system-ui,
+          sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 22px 0 8px;
+      }
+      p {
+        margin: 0 0 12px;
+        max-width: 60ch;
+      }
+      .grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: flex-end;
+      }
+      figure {
+        margin: 0;
+        text-align: center;
+      }
+      figcaption {
+        font-size: 11px;
+        opacity: 0.8;
+        margin-top: 2px;
+      }
+      .on-grass {
+        background: #bcd69b;
+        border-radius: 10px;
+        padding: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Honey Hollow: every painted piece</h1>
+    <p>
+      Each piece is painted once by the game itself (ui/paint) and then reused. Add
+      <code>?only=flowers</code> to see one sheet, <code>?zoom=3</code> to look closer.
+    </p>
+    <div id="sheets"></div>
+    <script type="module" src="./ui/art/gallery.js"></script>
+  </body>
+</html>
