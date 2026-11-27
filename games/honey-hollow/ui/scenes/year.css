@@ -1,0 +1,255 @@
+/* Honey Hollow: the year page (ui/scenes/year.js).
+
+   A keepsake on butter paper: each page is one centred column that scrolls
+   inside itself if a short phone needs it; the button that turns the page
+   sits under it, by the thumb. */
+
+.yr-page {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  text-align: center;
+}
+.yr-page > * {
+  flex: none;
+  margin: 0;
+}
+/* Centred when the page is short, without losing the top when it scrolls. */
+.yr-page > :first-child {
+  margin-top: auto;
+}
+.yr-page > :last-child {
+  margin-bottom: auto;
+}
+.yr-page.is-in {
+  animation: yr-in 0.36s ease both;
+}
+@keyframes yr-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yr-page.is-in {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------ the cover */
+
+.yr-page > .yr-title {
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  white-space: nowrap;
+}
+.yr-by {
+  max-width: 340px;
+}
+/* As wide as the phone, but never more than a quarter of its height. */
+.yr-pic {
+  display: block;
+  width: min(100%, 42vh);
+  width: min(100%, 42dvh);
+  aspect-ratio: 320 / 190;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 6%, #000 94%, transparent),
+    linear-gradient(to bottom, transparent, #000 8%, #000 90%, transparent);
+  mask-image:
+    linear-gradient(to right, transparent, #000 6%, #000 94%, transparent),
+    linear-gradient(to bottom, transparent, #000 8%, #000 90%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.yr-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  width: min(100%, 400px);
+}
+.yr-stat {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 1px;
+  padding: 6px 2px 7px;
+  border-radius: var(--hh-r);
+  background-color: rgba(255, 253, 247, 0.6);
+}
+.yr-stat__n {
+  font-size: var(--hh-text-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--hh-ink-strong);
+}
+.yr-stat__label {
+  font-size: 11.5px;
+  line-height: 1.2;
+  color: var(--hh-ink-soft);
+}
+.yr-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 3px;
+  max-width: 340px;
+}
+.yr-note {
+  max-width: 320px;
+}
+
+/* ------------------------------------------------------------ the keepsakes */
+
+.yr-over {
+  font-size: var(--hh-text-s);
+  color: var(--hh-ink-soft);
+}
+.yr-h {
+  margin-top: 8px;
+  font-size: var(--hh-text);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--hh-ink-strong);
+}
+.yr-ribbons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 6px;
+}
+.yr-ribbon {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  width: 92px;
+  margin: 0;
+  font-size: var(--hh-text-xs);
+  line-height: 1.2;
+  color: var(--hh-ink);
+}
+.yr-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: var(--hh-text-s);
+  line-height: 1.3;
+}
+.yr-friends {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 0;
+  max-width: 100%;
+}
+.yr-friend {
+  display: grid;
+  justify-items: center;
+  width: 36px;
+  margin: 0;
+}
+.yr-friend > img {
+  max-width: none;
+}
+.yr-friend__n {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  color: var(--hh-brick);
+}
+.yr-place {
+  font-size: var(--hh-text-s);
+  line-height: 1.3;
+  color: var(--hh-ink-soft);
+}
+
+/* ------------------------------------------------------------ the credits */
+
+.yr-logo {
+  width: min(64%, 230px);
+  height: auto;
+}
+.yr-idea {
+  font-size: var(--hh-text-xl);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--hh-ink-strong);
+}
+.yr-idea--small {
+  margin-top: 4px;
+  font-size: var(--hh-text);
+}
+.yr-credits {
+  display: grid;
+  gap: 4px;
+  max-width: 330px;
+  font-size: var(--hh-text-s);
+  line-height: 1.3;
+  color: var(--hh-ink-soft);
+}
+.yr-credits > p {
+  margin: 0;
+}
+.yr-goes {
+  max-width: 340px;
+  font-size: var(--hh-text);
+  line-height: 1.4;
+  color: var(--hh-ink-strong);
+}
+
+/* ------------------------------------------------------------ the button */
+
+.yr-foot {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: min(100% - 32px, 420px);
+  margin: 0 auto;
+  padding: 2px 0 12px;
+}
+.yr-count {
+  min-height: 15px;
+  font-size: var(--hh-text-xs);
+  line-height: 1.2;
+  color: var(--hh-ink-soft);
+}
+
+/* ------------------------------------------------------------ a tall phone */
+
+/* The cover composed for the height, like a plate in an almanac: year.js
+   paints a taller picture, and the numbers and the jars under it are larger. */
+@media (min-height: 700px) {
+  .yr-page[data-page="cover"] {
+    gap: 12px;
+  }
+  .yr-pic[style] {
+    max-width: 620px;
+  }
+  .yr-page[data-page="cover"] .yr-stat {
+    gap: 3px;
+    padding: 12px 4px 13px;
+  }
+  .yr-page[data-page="cover"] .yr-stat__n {
+    font-size: 30px;
+  }
+  .yr-page[data-page="cover"] .yr-stat__label {
+    font-size: 13px;
+  }
+  .yr-page[data-page="cover"] .yr-kinds {
+    gap: 4px 6px;
+  }
+}

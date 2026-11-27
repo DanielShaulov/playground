@@ -1,0 +1,1018 @@
+/* Honey Hollow: the foundation every screen is built on.
+
+   The interface is DOM dressed in painted paper. ui/chrome.js paints the
+   pieces (ui/art/chrome.js) once at boot and sets them on :root as custom
+   properties; the classes here wear them. Everything starts `hh-`.
+
+   Loaded after shared/style.css, whose dark tokens it replaces. */
+
+@font-face {
+  font-family: "Mali";
+  src: url("./fonts/Mali-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Mali";
+  src: url("./fonts/Mali-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------ tokens */
+
+:root {
+  /* ink: sepia pencil, never black */
+  --hh-ink: #5a4433;
+  --hh-ink-strong: #4a3626;
+  --hh-ink-soft: #7d6552;
+  --hh-ink-faint: rgba(90, 68, 51, 0.3);
+  --hh-ink-wash: rgba(90, 68, 51, 0.09);
+
+  /* paper */
+  --hh-paper-colour: #fbf5e6;
+  --hh-paper-shade: #efe4cc;
+  --hh-white: #fffdf7;
+
+  /* the washes (ui/paint/palette.js has the full paintbox) */
+  --hh-honey: #eab04a;
+  --hh-butter: #f7e4a0;
+  --hh-amber: #d98f2f;
+  --hh-meadow: #bcd69b;
+  --hh-leaf: #7dab66;
+  --hh-pine: #4f7b55;
+  --hh-rose: #f0b3c0;
+  --hh-blush: #f8d5d6;
+  --hh-poppy: #e8806d;
+  --hh-brick: #b5503f;
+  --hh-sky: #c4e2f1;
+  --hh-lilac: #cfc0ec;
+  --hh-shade: rgba(142, 143, 176, 0.42); /* cast shadows are cool violet */
+  --hh-veil: rgba(83, 68, 84, 0.34); /* what dims the meadow behind a sheet */
+
+  /* type */
+  --hh-font: "Mali", ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif;
+  --hh-text-xs: 12px;
+  --hh-text-s: 13.5px;
+  --hh-text: 15.5px;
+  --hh-text-l: 18px;
+  --hh-text-xl: 23px;
+
+  /* space and shape */
+  --hh-gap-1: 4px;
+  --hh-gap-2: 8px;
+  --hh-gap-3: 12px;
+  --hh-gap-4: 16px;
+  --hh-gap-5: 24px;
+  --hh-gutter: 16px;
+  --hh-tap: 44px; /* the smallest thing a thumb is asked to hit */
+  --hh-r-s: 8px;
+  --hh-r: 14px;
+  --hh-r-l: 22px;
+  --hh-shadow: 0 2px 5px var(--hh-shade);
+
+  /* motion */
+  --hh-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --hh-quick: 0.16s;
+  --hh-slow: 0.32s;
+
+  /* shared/style.css is dark; its tokens become ours */
+  --bg: var(--hh-paper-colour);
+  --bg-raised: var(--hh-white);
+  --fg: var(--hh-ink);
+  --fg-dim: var(--hh-ink-soft);
+  --accent: var(--hh-honey);
+  --accent-2: var(--hh-leaf);
+  --danger: var(--hh-poppy);
+  --radius: var(--hh-r);
+}
+
+/* ------------------------------------------------------------ page and type */
+
+/* The page: cream paper with its grain, behind everything. The grain is one
+   small painted tile; the faint warm clouds over it are gradients, which cost
+   nothing and never repeat. */
+body,
+.hh-page {
+  background-color: var(--hh-paper-colour);
+  background-image:
+    radial-gradient(70% 34% at 10% 6%, rgba(239, 228, 204, 0.42), transparent 72%),
+    radial-gradient(64% 30% at 94% 40%, rgba(255, 253, 247, 0.5), transparent 72%),
+    radial-gradient(80% 34% at 28% 80%, rgba(239, 228, 204, 0.36), transparent 72%),
+    var(--hh-paper, none);
+  background-size:
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    192px 192px;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  color: var(--hh-ink);
+  font-family: var(--hh-font);
+  font-size: var(--hh-text);
+  line-height: 1.4;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* .hh-title: a screen's name. .hh-heading: a section's. .hh-sub: the quiet line under either. */
+.hh-title,
+.hh-heading {
+  margin: 0;
+  font-weight: 700;
+  color: var(--hh-ink-strong);
+  line-height: 1.2;
+}
+.hh-title {
+  font-size: var(--hh-text-xl);
+}
+.hh-heading {
+  font-size: var(--hh-text-l);
+}
+.hh-text {
+  margin: 0;
+  font-size: var(--hh-text);
+}
+.hh-sub {
+  margin: 0;
+  font-size: var(--hh-text-s);
+  color: var(--hh-ink-soft);
+}
+/* .hh-num: numbers that must line up (coins, counts, days). */
+.hh-num {
+  font-variant-numeric: tabular-nums;
+}
+.hh-good {
+  color: var(--hh-pine);
+}
+.hh-bad {
+  color: var(--hh-brick);
+}
+
+/* .hh-icon / .hh-pic: a painted picture in the flow of text or a row. */
+.hh-icon,
+.hh-pic {
+  display: block;
+  flex: none;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* .hh-coins: a coin and an amount, kept together. */
+.hh-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ buttons */
+
+/* .hh-btn: a painted button, honey by default. --secondary cream with a
+   pencil edge, --leaf green ("go"), --danger soft rose, --quiet words only.
+   --small is 44 px tall, --block fills the row. Pressed: :active or
+   .is-pressed. Off: :disabled or aria-disabled="true". An icon goes first. */
+.hh-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 48px;
+  min-width: 96px;
+  max-width: 100%;
+  margin: 0;
+  padding: 2px 10px 3px;
+  border: 8px solid transparent;
+  border-image: var(--hh-bi-btn-primary);
+  background: none;
+  color: var(--hh-ink-strong);
+  font-family: var(--hh-font);
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform var(--hh-quick) var(--hh-ease),
+    filter var(--hh-quick);
+}
+.hh-btn--secondary {
+  border-image: var(--hh-bi-btn-secondary);
+}
+.hh-btn--leaf {
+  border-image: var(--hh-bi-btn-leaf);
+}
+.hh-btn--danger {
+  border-image: var(--hh-bi-btn-danger);
+}
+.hh-btn--quiet {
+  border-image: none;
+  min-width: var(--hh-tap);
+  border-radius: var(--hh-r);
+  color: var(--hh-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--hh-ink-faint);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+.hh-btn--small {
+  min-height: var(--hh-tap);
+  min-width: 56px;
+  padding: 1px 5px 2px;
+  border-image: var(--hh-bi-btn-small-primary);
+  font-size: 14.5px;
+}
+.hh-btn--small.hh-btn--secondary {
+  border-image: var(--hh-bi-btn-small-secondary);
+}
+.hh-btn--small.hh-btn--leaf {
+  border-image: var(--hh-bi-btn-small-leaf);
+}
+.hh-btn--small.hh-btn--danger {
+  border-image: var(--hh-bi-btn-small-danger);
+}
+.hh-btn--small.hh-btn--quiet {
+  border-image: none;
+}
+.hh-btn--block {
+  display: flex;
+  width: 100%;
+}
+.hh-btn .hh-icon,
+.hh-btn .hh-pic {
+  margin: -6px 0 -5px -4px;
+}
+.hh-btn:active,
+.hh-btn.is-pressed {
+  transform: translateY(2px) scale(0.985);
+  filter: brightness(0.93) saturate(1.12);
+}
+.hh-btn--quiet:active,
+.hh-btn--quiet.is-pressed {
+  background: var(--hh-ink-wash);
+  filter: none;
+}
+.hh-btn:disabled,
+.hh-btn[aria-disabled="true"] {
+  filter: grayscale(0.7) brightness(1.04);
+  opacity: 0.5;
+  transform: none;
+  cursor: default;
+}
+.hh-btn:focus-visible,
+.hh-iconbtn:focus-visible,
+.hh-tab:focus-visible,
+.hh-row:focus-visible {
+  outline: 2px dashed var(--hh-ink-soft);
+  outline-offset: 2px;
+}
+
+/* .hh-iconbtn: a round 44 px button that holds one icon (close, minus, plus).
+   --honey for the one that matters, --bare for no painted face. */
+.hh-iconbtn {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--hh-tap);
+  height: var(--hh-tap);
+  margin: 0;
+  padding: 0;
+  border: 8px solid transparent;
+  border-image: var(--hh-bi-round);
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform var(--hh-quick) var(--hh-ease),
+    filter var(--hh-quick);
+}
+.hh-iconbtn--honey {
+  border-image: var(--hh-bi-round-honey);
+}
+.hh-iconbtn--bare {
+  border-image: none;
+  border-radius: 50%;
+}
+.hh-iconbtn .hh-icon {
+  margin: -4px;
+}
+.hh-iconbtn:active,
+.hh-iconbtn.is-pressed {
+  transform: translateY(2px) scale(0.96);
+  filter: brightness(0.93) saturate(1.12);
+}
+.hh-iconbtn--bare:active,
+.hh-iconbtn--bare.is-pressed {
+  background: var(--hh-ink-wash);
+  filter: none;
+}
+.hh-iconbtn:disabled,
+.hh-iconbtn[aria-disabled="true"] {
+  filter: grayscale(0.7) brightness(1.04);
+  opacity: 0.45;
+  transform: none;
+  cursor: default;
+}
+
+/* .hh-stepper: minus, a number, plus. Two .hh-iconbtn around .hh-stepper__value. */
+.hh-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hh-stepper__value {
+  min-width: 34px;
+  padding: 0 2px;
+  font-size: 21px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--hh-ink-strong);
+}
+
+/* ------------------------------------------------------------ paper */
+
+/* .hh-card: a deckle-edged card with a soft shadow. --tint is butter paper. */
+.hh-card {
+  position: relative;
+  min-width: 56px;
+  min-height: 56px;
+  border: solid transparent;
+  border-width: 12px 14px 14px;
+  border-image: var(--hh-bi-card);
+  margin: 6px 8px 12px; /* room for the torn edge and the shadow */
+}
+.hh-card--tint {
+  border-image: var(--hh-bi-card-tint);
+}
+.hh-card > :first-child {
+  margin-top: 0;
+}
+.hh-card > :last-child {
+  margin-bottom: 0;
+}
+
+/* .hh-scrim: the veil over the meadow while a sheet is up. */
+.hh-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: var(--hh-veil);
+  animation: hh-fade-in var(--hh-slow) both;
+}
+.hh-scrim.is-leaving {
+  animation: hh-fade-out var(--hh-quick) both;
+}
+
+/* .hh-sheet: a bottom sheet of torn paper that slides up over the meadow.
+   Inside: .hh-sheet__handle, .hh-sheet__head (.hh-sheet__title + a close
+   .hh-iconbtn), .hh-sheet__body (scrolls), optional .hh-sheet__foot (stays).
+   Add .is-leaving to slide it away. */
+.hh-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+  max-height: min(88dvh, 100dvh - 48px);
+  border-top: 18px solid transparent; /* the torn edge lives here */
+  background:
+    var(--hh-img-sheet-edge, none) 0 0 / 192px 26px repeat-x border-box border-box,
+    var(--hh-paper-colour) var(--hh-paper, none) 0 0 / 192px 192px repeat padding-box padding-box;
+  animation: hh-sheet-in var(--hh-slow) var(--hh-ease) both;
+}
+.hh-sheet.is-leaving {
+  animation: hh-sheet-out 0.22s ease-in both;
+}
+.hh-sheet__handle {
+  flex: none;
+  width: 48px;
+  height: 12px;
+  margin: -4px auto 0;
+  background: var(--hh-img-handle, none) center / 48px 12px no-repeat;
+}
+.hh-sheet__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-2);
+  min-height: 48px;
+  padding: 0 max(8px, var(--safe-right)) 4px max(var(--hh-gutter), var(--safe-left));
+}
+.hh-sheet__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--hh-text-l);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--hh-ink-strong);
+}
+.hh-sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding: 4px max(var(--hh-gutter), var(--safe-right)) calc(var(--hh-gutter) + var(--safe-bottom))
+    max(var(--hh-gutter), var(--safe-left));
+}
+.hh-sheet__body:not(:last-child) {
+  padding-bottom: var(--hh-gap-3);
+}
+.hh-sheet__foot {
+  flex: none;
+  display: flex;
+  gap: var(--hh-gap-2);
+  padding: 12px max(var(--hh-gutter), var(--safe-right)) calc(12px + var(--safe-bottom))
+    max(var(--hh-gutter), var(--safe-left));
+  background: var(--hh-img-rule, none) 0 0 / 120px 6px repeat-x;
+}
+.hh-sheet__foot > .hh-btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* .hh-chip: a small rounded label (coins, the day, the weather). Tints:
+   --honey, --leaf, --sky, --rose. Not a button: wrap it in one to tap it. */
+.hh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+  flex: none;
+  min-width: 44px;
+  height: 30px;
+  padding: 0 3px 1px;
+  border: solid transparent;
+  border-width: 1px 8px;
+  border-image: var(--hh-bi-chip);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--hh-ink-strong);
+}
+.hh-chip--honey {
+  border-image: var(--hh-bi-chip-honey);
+}
+.hh-chip--leaf {
+  border-image: var(--hh-bi-chip-leaf);
+}
+.hh-chip--sky {
+  border-image: var(--hh-bi-chip-sky);
+}
+.hh-chip--rose {
+  border-image: var(--hh-bi-chip-rose);
+}
+.hh-chip .hh-icon,
+.hh-chip .hh-pic {
+  margin: -4px 0 -3px -4px;
+}
+
+/* .hh-badge: a round count on a tab or a button. --dot is the bare "new" dot. */
+.hh-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 0 1px;
+  border: solid transparent;
+  border-width: 1px 5px;
+  border-image: var(--hh-bi-badge);
+  color: var(--hh-white);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.hh-badge--dot {
+  min-width: 0;
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-image: none;
+  background: var(--hh-img-dot, none) center / 16px 16px no-repeat;
+}
+
+/* .hh-banner: a painted ribbon for a title ("Evening at the stall").
+   --honey is the gold one. Keep 22 px clear each side for its tails. */
+.hh-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 96px;
+  max-width: calc(100% - 44px);
+  min-height: 44px;
+  margin: 4px auto 14px;
+  padding: 0;
+  border: solid transparent;
+  border-width: 6px 22px 7px;
+  border-image: var(--hh-bi-banner);
+  color: var(--hh-ink-strong);
+  font-size: 17.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+.hh-banner--honey {
+  border-image: var(--hh-bi-banner-honey);
+}
+
+/* .hh-bubble: what a customer says. The tail hangs bottom left; --right
+   moves it, --up puts it on top. Leave 18 px below (or above) for it. */
+.hh-bubble {
+  position: relative;
+  display: block;
+  width: fit-content;
+  min-width: 60px;
+  max-width: 100%;
+  min-height: 48px;
+  margin: 3px 4px 22px;
+  padding: 0 2px;
+  border: solid transparent;
+  border-width: 10px 14px 12px;
+  border-image: var(--hh-bi-bubble);
+  color: var(--hh-ink-strong);
+}
+.hh-bubble::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  bottom: -28px;
+  width: 26px;
+  height: 20px;
+  background: var(--hh-img-bubble-tail, none) center / 26px 20px no-repeat;
+}
+.hh-bubble--right::after {
+  left: auto;
+  right: 12px;
+  transform: scaleX(-1);
+}
+.hh-bubble--up {
+  margin: 22px 4px 7px;
+}
+.hh-bubble--up::after {
+  bottom: auto;
+  top: -26px;
+  transform: scaleY(-1);
+}
+.hh-bubble--up.hh-bubble--right::after {
+  transform: scale(-1);
+}
+
+/* .hh-meter: a hand-drawn bar that fills with a wash. Set --hh-value (0 to 1)
+   on it; add .hh-meter--mark and --hh-mark (0 to 1) for a tick, such as what
+   a hive needs for winter. Washes: --leaf, --rose (honey by default). */
+.hh-meter {
+  --hh-value: 0;
+  --hh-mark: 0.5;
+  --hh-fill: var(--hh-img-fill-honey, none);
+  position: relative;
+  display: block;
+  min-width: 56px;
+  height: 18px;
+  border: solid transparent;
+  border-width: 3px 4px;
+  border-image: var(--hh-bi-meter);
+}
+.hh-meter--leaf {
+  --hh-fill: var(--hh-img-fill-leaf, none);
+}
+.hh-meter--rose {
+  --hh-fill: var(--hh-img-fill-rose, none);
+}
+.hh-meter::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(clamp(0, var(--hh-value), 1) * 100%);
+  border-radius: 6px 0 0 6px;
+  /* The fill is one long painted stroke; only its right-hand end is shown. */
+  background: var(--hh-fill) right center / 420px 12px no-repeat;
+  transition: width 0.5s var(--hh-ease);
+}
+.hh-meter--mark::after {
+  content: "";
+  position: absolute;
+  left: calc(clamp(0, var(--hh-mark), 1) * 100% - 6px);
+  top: -9px;
+  width: 12px;
+  height: 30px;
+  background: var(--hh-img-mark, none) center / 12px 30px no-repeat;
+}
+
+/* .hh-list: rows of things. Each .hh-row is a picture, .hh-row__text
+   (.hh-row__title over .hh-row__sub) and .hh-row__end (a value or a button).
+   A <button class="hh-row"> is a row you can tap. .hh-row--stack puts the
+   end under the words, for a stepper or anything else too wide to sit beside
+   them on a small phone. */
+.hh-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hh-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--hh-gap-3);
+  width: 100%;
+  min-height: 60px;
+  margin: 0;
+  padding: 7px 2px 11px;
+  border: 0;
+  border-radius: 0;
+  background: var(--hh-img-rule, none) 0 100% / 120px 6px repeat-x;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.hh-row:last-child {
+  padding-bottom: 7px;
+  background: none;
+}
+button.hh-row {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button.hh-row:active,
+.hh-row.is-pressed {
+  background-color: var(--hh-ink-wash);
+}
+.hh-row__text {
+  min-width: 0;
+  grid-column: 2;
+}
+.hh-row__title {
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--hh-ink-strong);
+}
+.hh-row__sub {
+  font-size: var(--hh-text-s);
+  line-height: 1.3;
+  color: var(--hh-ink-soft);
+}
+.hh-row__end {
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hh-row--stack .hh-row__end {
+  grid-column: 2 / -1;
+  justify-self: end;
+  margin-top: 2px;
+}
+
+/* .hh-toasts holds .hh-toast: a small note that slides in from the top.
+   Add .is-leaving to send one away. */
+.hh-toasts {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: calc(var(--safe-top) + 56px);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--hh-gutter);
+  pointer-events: none;
+}
+.hh-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-2);
+  width: fit-content;
+  min-width: 48px;
+  max-width: 100%;
+  min-height: 40px;
+  margin: 4px 6px 9px;
+  padding: 0 2px;
+  border: solid transparent;
+  border-width: 8px 12px 9px;
+  border-image: var(--hh-bi-toast);
+  font-size: var(--hh-text-s);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--hh-ink-strong);
+  animation: hh-toast-in var(--hh-slow) var(--hh-ease) both;
+}
+.hh-toast.is-leaving {
+  animation: hh-toast-out var(--hh-quick) ease-in both;
+}
+.hh-toast .hh-icon,
+.hh-toast .hh-pic {
+  margin: -5px 0 -5px -4px;
+}
+
+/* .hh-note: the keeper's note, for a hint: a slip of butter paper held by
+   a bit of washi tape. Leave 14 px above it for the tape. */
+.hh-note {
+  position: relative;
+  min-height: 48px;
+  margin: 16px 8px 12px;
+  padding: 6px 2px 0;
+  border: solid transparent;
+  border-width: 10px 14px 12px;
+  border-image: var(--hh-bi-note);
+  font-size: var(--hh-text-s);
+  line-height: 1.4;
+  color: var(--hh-ink-strong);
+  transform: rotate(-0.7deg);
+}
+.hh-note::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -25px;
+  width: 64px;
+  height: 24px;
+  margin-left: -32px;
+  background: var(--hh-img-tape, none) center / 64px 24px no-repeat;
+  transform: rotate(-2.5deg);
+}
+.hh-note > :first-child {
+  margin-top: 0;
+}
+.hh-note > :last-child {
+  margin-bottom: 0;
+}
+
+/* .hh-rule: a pencil line. .hh-sprig: the same with a little sprig in the middle. */
+.hh-rule,
+.hh-sprig {
+  display: block;
+  border: 0;
+  margin: var(--hh-gap-3) 0;
+}
+.hh-rule {
+  height: 6px;
+  background: var(--hh-img-rule, none) 0 50% / 120px 6px repeat-x;
+}
+.hh-sprig {
+  display: flex;
+  align-items: center;
+  gap: 66px;
+  height: 24px;
+  background: var(--hh-img-sprig, none) center / 64px 24px no-repeat;
+}
+.hh-sprig::before,
+.hh-sprig::after {
+  content: "";
+  flex: 1;
+  height: 6px;
+  background: var(--hh-img-rule, none) 0 50% / 120px 6px repeat-x;
+}
+
+/* .hh-tabbar: the bottom bar of four or five .hh-tab (an icon over a word).
+   The tab you are on has aria-current="page" (or .is-on). */
+.hh-tabbar {
+  display: flex;
+  align-items: stretch;
+  border-top: 18px solid transparent;
+  padding: 0 max(2px, var(--safe-right)) var(--safe-bottom) max(2px, var(--safe-left));
+  background:
+    var(--hh-img-sheet-edge, none) 0 0 / 192px 26px repeat-x border-box border-box,
+    var(--hh-paper-colour) var(--hh-paper, none) 0 0 / 192px 192px repeat padding-box padding-box;
+}
+.hh-tab {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  min-height: 58px;
+  margin: -8px 0 0;
+  padding: 2px 0 4px;
+  border: 0;
+  background: none;
+  color: var(--hh-ink-soft);
+  font-family: var(--hh-font);
+  font-size: var(--hh-text-xs);
+  font-weight: 400;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.hh-tab .hh-icon {
+  transition: transform var(--hh-quick) var(--hh-ease);
+}
+.hh-tab[aria-current="page"],
+.hh-tab.is-on {
+  color: var(--hh-ink-strong);
+  font-weight: 700;
+  background: var(--hh-img-blot, none) center 0 / 60px 42px no-repeat;
+}
+.hh-tab[aria-current="page"] .hh-icon,
+.hh-tab.is-on .hh-icon {
+  transform: translateY(-1px) scale(1.08);
+}
+.hh-tab:active .hh-icon,
+.hh-tab.is-pressed .hh-icon {
+  transform: translateY(1px) scale(0.94);
+}
+.hh-tab .hh-badge {
+  position: absolute;
+  top: -2px;
+  left: calc(50% + 7px);
+}
+
+/* ------------------------------------------------------------ motion */
+
+@keyframes hh-sheet-in {
+  from {
+    transform: translateY(104%);
+  }
+}
+@keyframes hh-sheet-out {
+  to {
+    transform: translateY(104%);
+  }
+}
+@keyframes hh-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hh-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes hh-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes hh-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes hh-wiggle {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-5deg);
+  }
+  75% {
+    transform: rotate(5deg);
+  }
+}
+@keyframes hh-toast-in {
+  from {
+    transform: translateY(-14px) rotate(-1.5deg);
+    opacity: 0;
+  }
+}
+@keyframes hh-toast-out {
+  to {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+}
+
+/* .hh-pop (arrive with a bounce), .hh-fade (arrive softly), .hh-bob (float,
+   for something waiting to be tapped), .hh-wiggle (look at me, twice). */
+.hh-pop {
+  animation: hh-pop 0.36s var(--hh-ease) both;
+}
+.hh-fade {
+  animation: hh-fade-in var(--hh-slow) both;
+}
+.hh-bob {
+  animation: hh-bob 2.4s ease-in-out infinite;
+}
+.hh-wiggle {
+  animation: hh-wiggle 0.4s ease-in-out 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hh-sheet,
+  .hh-sheet.is-leaving,
+  .hh-scrim,
+  .hh-scrim.is-leaving,
+  .hh-toast,
+  .hh-toast.is-leaving,
+  .hh-pop,
+  .hh-fade,
+  .hh-bob,
+  .hh-wiggle {
+    animation: none;
+  }
+  .hh-btn,
+  .hh-iconbtn,
+  .hh-tab .hh-icon,
+  .hh-meter::before {
+    transition: none;
+  }
+  .hh-btn:active,
+  .hh-btn.is-pressed,
+  .hh-iconbtn:active,
+  .hh-iconbtn.is-pressed {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------ before the paint is dry */
+/* Until ui/chrome.js has painted (or if it cannot), flat colour stands in so
+   every control is still there to read and tap. */
+
+:root:not(.hh-painted) .hh-btn:not(.hh-btn--quiet) {
+  background: var(--hh-honey);
+  border-radius: var(--hh-r);
+}
+:root:not(.hh-painted) .hh-btn--secondary,
+:root:not(.hh-painted) .hh-iconbtn:not(.hh-iconbtn--bare) {
+  background: var(--hh-white);
+  box-shadow: inset 0 0 0 1.5px var(--hh-ink-faint);
+}
+:root:not(.hh-painted) .hh-iconbtn {
+  border-radius: 50%;
+}
+:root:not(.hh-painted) .hh-btn--leaf {
+  background: var(--hh-meadow);
+}
+:root:not(.hh-painted) .hh-btn--danger {
+  background: var(--hh-rose);
+}
+:root:not(.hh-painted) :is(.hh-card, .hh-toast, .hh-bubble, .hh-chip, .hh-note) {
+  background: var(--hh-white);
+  border-radius: var(--hh-r);
+  box-shadow: var(--hh-shadow);
+}
+:root:not(.hh-painted) .hh-banner {
+  background: var(--hh-rose);
+}
+:root:not(.hh-painted) .hh-badge {
+  background: var(--hh-poppy);
+  border-radius: 11px;
+}
+:root:not(.hh-painted) .hh-meter {
+  background: linear-gradient(var(--hh-honey), var(--hh-honey)) 0 0 / calc(var(--hh-value) * 100%)
+    100% no-repeat var(--hh-paper-shade);
+  border-radius: 9px;
+}
+:root:not(.hh-painted) :is(.hh-sheet, .hh-tabbar) {
+  box-shadow: 0 -2px 6px var(--hh-shade);
+}

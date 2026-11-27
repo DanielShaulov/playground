@@ -1,0 +1,84 @@
+/* The wardrobe sheet (ui/sheets/wardrobe.js). The picker's parts are styled
+   in ui/keeper-picker.css; here they are stacked so that the whole sheet
+   fits a small phone without scrolling and the preview never leaves the
+   screen while the swatches are tried.
+
+   The sheet's body is a column: the tabs and the swatches keep their size,
+   and the top row (the preview, with the name and the button beside it)
+   takes its wished height or whatever the sheet has left, whichever is
+   less. No sum of the sheet's own parts is needed here. */
+
+.wardrobe {
+  display: flex;
+  flex-direction: column;
+  --keeper-panel-h: clamp(150px, 22vh, 196px);
+  --keeper-panel-h: clamp(150px, 22dvh, 196px);
+}
+
+.wardrobe__top {
+  flex: 1 1 clamp(210px, 34vh, 320px);
+  flex: 1 1 clamp(210px, 34dvh, 320px);
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  /* Never shorter than the name, "Surprise me" and the button stacked. */
+  min-height: 176px;
+}
+.wardrobe__top .keeper-stage {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* The name, "Surprise me" and the button, stacked beside the preview. */
+.wardrobe__side {
+  flex: 0 0 clamp(150px, 46%, 196px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+.wardrobe__side .keeper-name {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0;
+}
+.wardrobe__side .keeper-name__field {
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.wardrobe__side .keeper-name__input {
+  flex: none;
+  height: 44px;
+  padding: 0 12px;
+  border: 1.5px solid var(--hh-ink-faint);
+  border-radius: var(--hh-r);
+  background: var(--hh-white);
+}
+.wardrobe__side .keeper-name__input:focus {
+  border-color: var(--hh-amber);
+  box-shadow: 0 0 0 3px rgba(234, 176, 74, 0.25);
+}
+.wardrobe__wear {
+  white-space: nowrap;
+}
+
+/* The tabs and the rows of swatches keep their size and run to the edges of
+   the sheet. */
+.wardrobe > .keeper-tabs,
+.wardrobe > .keeper-panel {
+  flex: none;
+  margin-left: calc(-1 * var(--hh-gutter));
+  margin-right: calc(-1 * var(--hh-gutter));
+}
+.wardrobe > .keeper-tabs .hh-tab {
+  min-height: 50px;
+}

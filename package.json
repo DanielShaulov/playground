@@ -9,8 +9,8 @@
     "new": "scripts/new-game.sh",
     "icons": "python3 scripts/make-icons.py",
     "format": "prettier --write .",
-    "test": "npm run test:broadside && npm run test:broadside:browser && npm run test:perihelion && npm run test:perihelion:browser && npm run test:checkwiz && npm run test:ferment && npm run test:ferment:sim && npm run typecheck && npm run test:ferment:browser",
-    "typecheck": "tsc -p games/ferment/jsconfig.json",
+    "test": "npm run test:broadside && npm run test:broadside:browser && npm run test:perihelion && npm run test:perihelion:browser && npm run test:checkwiz && npm run test:ferment && npm run test:ferment:sim && npm run test:honey-hollow && npm run test:honey-hollow:sim && npm run typecheck && npm run test:ferment:browser && npm run test:honey-hollow:browser",
+    "typecheck": "tsc -p games/ferment/jsconfig.json && tsc -p games/honey-hollow/jsconfig.json",
     "test:broadside": "node --test tests/broadside/core.test.mjs",
     "test:broadside:browser": "node tests/broadside/browser.test.mjs",
     "test:perihelion": "node --test tests/perihelion/core.test.mjs",
@@ -21,7 +21,10 @@
     "test:checkwiz:shots": "node tests/checkwiz/shots.mjs",
     "test:ferment": "node --test \"tests/ferment/*.mjs\" \"tests/ferment/core/**/*.mjs\"",
     "test:ferment:browser": "node tests/ferment/browser/run.mjs",
-    "test:ferment:sim": "node tests/ferment/sim/run.mjs"
+    "test:ferment:sim": "node tests/ferment/sim/run.mjs",
+    "test:honey-hollow": "node --test \"tests/honey-hollow/core/**/*.mjs\"",
+    "test:honey-hollow:sim": "node tests/honey-hollow/sim/run.mjs",
+    "test:honey-hollow:browser": "node tests/honey-hollow/browser/run.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.56.1",

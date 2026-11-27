@@ -1,0 +1,61 @@
+/* The bloom strip (ui/bloom-strip.js): the year in four season bands, a
+   flower's window painted over them, a pin on today. As wide as it is given. */
+
+.hh-bloom {
+  display: block;
+  min-width: 112px;
+  padding: 5px 0 0; /* room for the head of the pin */
+}
+.hh-bloom__bar {
+  position: relative;
+  height: 18px;
+  background: center / 100% 100% no-repeat;
+}
+.hh-bloom--compact .hh-bloom__bar {
+  height: 14px;
+}
+
+/* Today: a pencil pin through the bar, with a round head above it. */
+.hh-bloom__today {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--hh-ink-strong, #4a3626);
+  opacity: 0.9;
+  transition: left 0.4s var(--hh-ease, ease-out);
+}
+.hh-bloom__today::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: var(--hh-poppy, #e8806d);
+  box-shadow: 0 0 0 1.5px var(--hh-ink-strong, #4a3626);
+}
+.hh-bloom--compact .hh-bloom__today {
+  top: -2px;
+  bottom: -2px;
+}
+.hh-bloom--compact .hh-bloom__today::before {
+  top: -3px;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+}
+
+.hh-bloom__seasons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.2;
+  color: var(--hh-ink-soft, #7d6552);
+  text-align: center;
+}

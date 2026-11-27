@@ -1,0 +1,809 @@
+/* Honey Hollow: the market stall (ui/scenes/stall.js and stall-*.js).
+
+   Top to bottom: a thin bar that only tells (the day, who is waiting, your
+   coins), the painted stall, what the customer says, and then the thumb's
+   half: the shelf and the two buttons. Buttons, chips, bubbles and cards are
+   the kit's (ui/base.css); this file lays them out and draws the shelf's
+   own tiles. */
+
+.st-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 10px 0;
+}
+/* Who is still in the queue: a few small faces in the sky over the customer. */
+.st-wait {
+  position: absolute;
+  right: 2%;
+  top: 4%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-size: var(--hh-text-xs);
+  line-height: 1.2;
+  color: var(--hh-ink);
+  white-space: nowrap;
+}
+.st-wait[hidden] {
+  display: none;
+}
+.st-wait__text {
+  padding: 1px 8px 2px;
+  border-radius: 10px;
+  background-color: rgba(255, 253, 247, 0.72);
+}
+.st-wait__faces {
+  display: flex;
+  padding-left: 8px;
+}
+.st-wait__faces img {
+  width: 24px;
+  height: 24px;
+  margin-left: -8px;
+}
+
+.st-body,
+.st-alt {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.st-body[hidden],
+.st-alt[hidden],
+.st-over[hidden],
+.st-sayrow[hidden],
+.st .hh-btn[hidden] {
+  display: none;
+}
+
+/* ------------------------------------------------------------ the picture */
+
+.st-stage {
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+/* 8 to 5 on a short phone; stall.js makes it taller where there is room. */
+.st-pic {
+  position: relative;
+  width: min(100%, 41.6vh);
+  width: min(100%, 41.6dvh);
+  aspect-ratio: 8 / 5;
+  overflow: hidden;
+}
+.st-pic[style] {
+  aspect-ratio: auto;
+  max-width: 100%;
+}
+/* Snow over the Winter Fair. */
+.st-snow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.st-snow[hidden] {
+  display: none;
+}
+.st-snow > i {
+  position: absolute;
+  top: -6%;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.9);
+  animation: st-snow 9s linear infinite;
+}
+@keyframes st-snow {
+  to {
+    transform: translate(14px, 60vh);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-snow > i {
+    animation: none;
+    top: calc(var(--i, 1) * 9%);
+  }
+}
+/* The picture's edges fade into the paper, like a wash that was never taped down. */
+.st-pic__scene {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 4%, #000 96%, transparent),
+    linear-gradient(to bottom, transparent, #000 7%);
+  mask-image:
+    linear-gradient(to right, transparent, #000 4%, #000 96%, transparent),
+    linear-gradient(to bottom, transparent, #000 7%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.st-pic__face {
+  position: absolute;
+  right: 1%;
+  bottom: -1%;
+  width: 37%;
+  height: auto;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
+.st-pic__face[hidden] {
+  display: none;
+}
+.st-pic__face.is-in {
+  animation: st-step-in 0.36s var(--hh-ease) both;
+}
+.st-pic__face.is-glad {
+  animation: st-glad 0.5s var(--hh-ease) both;
+}
+@keyframes st-step-in {
+  from {
+    transform: translateX(34%);
+    opacity: 0;
+  }
+}
+@keyframes st-glad {
+  30% {
+    transform: translateY(-5%) scale(1.03);
+  }
+}
+
+/* ------------------------------------------------------------ what they say */
+
+/* The bubble hangs under the customer, its tail pointing up at them. The row
+   keeps its height from one customer to the next so the shelf stays put. */
+.st-sayrow {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  min-height: 98px;
+  margin-top: -9px;
+  padding: 0 5px;
+}
+.st-say {
+  max-width: min(100%, 430px);
+}
+.st-say__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 5px;
+  font-size: var(--hh-text-s);
+  line-height: 1.25;
+  color: var(--hh-ink-soft);
+}
+.st-say__who b {
+  color: var(--hh-ink-strong);
+}
+.st-say__hearts {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding-left: 6px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--hh-brick);
+}
+.st-say__line {
+  margin: 1px 0 0;
+  line-height: 1.3;
+}
+@media (max-width: 359px) {
+  .st-say__line {
+    font-size: 14.5px;
+  }
+}
+
+/* ------------------------------------------------------------ the shelf */
+
+.st-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* On a tall phone the shelf sits at the bottom, by the thumb. */
+.st-shelfhead {
+  flex: none;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  padding: 1px 12px;
+  font-size: var(--hh-text-s);
+}
+.st-shelfhead__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  color: var(--hh-ink-strong);
+}
+.st-shelfhead__legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--hh-text-xs);
+  color: var(--hh-ink-soft);
+  text-align: right;
+}
+.st-shelf {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* max-content, or a shelf squeezed by a short phone squeezes its rows too */
+  grid-auto-rows: max-content;
+  gap: 6px;
+  align-content: start;
+  padding: 5px 10px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  transition: opacity var(--hh-quick);
+}
+@media (min-width: 560px) {
+  .st-shelf {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+/* While a customer is answering, the shelf waits. */
+.st-shelf.is-resting {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* One thing on the shelf: its picture with how many, today's price under
+   it like a tag, then its name, stars and trait words. */
+.st-item {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 6px;
+  min-height: 62px;
+  margin: 0;
+  padding: 4px 7px 4px 5px;
+  border: 1.5px solid var(--hh-ink-faint);
+  border-radius: var(--hh-r);
+  background-color: var(--hh-white);
+  box-shadow: 0 1px 3px var(--hh-shade);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform var(--hh-quick) var(--hh-ease),
+    background-color var(--hh-quick);
+}
+.st-item:active {
+  transform: translateY(1px) scale(0.985);
+}
+.st-item:focus-visible {
+  outline: 2.5px solid var(--hh-amber);
+  outline-offset: 2px;
+}
+.st-item.is-wish {
+  border-color: var(--hh-leaf);
+  background-image: linear-gradient(rgba(188, 214, 155, 0.24), rgba(188, 214, 155, 0.24));
+}
+.st-item[aria-pressed="true"] {
+  border-color: var(--hh-amber);
+  background-color: var(--hh-butter);
+  background-image: none;
+  box-shadow: 0 0 0 2px var(--hh-honey);
+}
+.st-item__left {
+  display: grid;
+  justify-items: center;
+}
+.st-item__pic {
+  position: relative;
+  display: block;
+}
+.st-item__count {
+  position: absolute;
+  left: -6px;
+  top: -2px;
+  min-width: 20px;
+  padding: 0 3px;
+  border: 1.5px solid var(--hh-ink-faint);
+  border-radius: 9px;
+  background-color: var(--hh-white);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 14px;
+  text-align: center;
+  color: var(--hh-ink-strong);
+}
+.st-item__price {
+  margin-top: -1px;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--hh-ink-strong);
+}
+.st-item__text {
+  display: block;
+  min-width: 0;
+}
+.st-item__name {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--hh-ink-strong);
+}
+.st-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 5px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--hh-ink-soft);
+}
+.st-item__meta:empty {
+  display: none;
+}
+.st-item__wish {
+  position: absolute;
+  right: -5px;
+  top: -7px;
+}
+.st-item__wish[hidden] {
+  display: none;
+}
+
+/* ------------------------------------------------------------ the buttons */
+
+.st-offer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 5px 10px 8px;
+  border-top: 1.5px dashed var(--hh-ink-faint);
+}
+.st-offer__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 35px;
+  margin: 0;
+  font-size: var(--hh-text-s);
+  line-height: 1.25;
+}
+.st-offer__line b {
+  color: var(--hh-ink-strong);
+}
+.st-offer__line .hh-chip {
+  margin-left: auto;
+}
+.st-offer__btns {
+  display: flex;
+  gap: 8px;
+}
+.st-offer__btns > .hh-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+/* Just changed: for a moment it takes no taps, so the second tap of a double
+   tap cannot press the button that has slid in under the thumb. */
+.st-offer.is-settling .hh-btn {
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ the grocer's crate */
+
+.st-crate__scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  padding: 0 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.st-crate .hh-row {
+  column-gap: 8px;
+  min-height: 58px;
+}
+.st-crate__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 5px;
+}
+.st-crate__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 4px;
+}
+.st-crate__sub .hh-coins {
+  font-size: inherit;
+  color: var(--hh-ink);
+}
+/* What the stall asks, crossed out beside what the grocer pays. */
+.st-crate__was {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  opacity: 0.7;
+}
+
+/* ------------------------------------------------------------ a kind word and one button */
+
+.st-msg {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 24px 16px;
+  text-align: center;
+}
+.st-msg .hh-btn {
+  margin-top: 10px;
+}
+
+/* ------------------------------------------------------------ a little moment */
+
+/* A regular's gift, the Fair's welcome: a card over the stall. */
+.st-over {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-top) + 16px) calc(var(--safe-right) + 12px)
+    calc(var(--safe-bottom) + 16px) calc(var(--safe-left) + 12px);
+  background-color: var(--hh-veil);
+}
+.st-moment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(100%, 336px);
+  max-height: 100%;
+  margin: 0;
+  overflow-y: auto;
+  text-align: center;
+}
+.st-moment > * {
+  margin: 0;
+}
+.st-moment > .hh-banner {
+  margin: 0 auto 2px;
+}
+.st-moment__pics {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+}
+.st-moment__gifts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+.st-moment__gift {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--hh-ink-strong);
+  text-align: left;
+}
+.st-moment > .hh-btn {
+  margin-top: 6px;
+}
+
+/* ------------------------------------------------------------ the Honey Show */
+
+/* stall-show.js: the bench under bunting, then your pure honeys by the thumb. */
+.sh {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.st .sh [hidden] {
+  display: none;
+}
+.sh-title {
+  flex: none;
+  margin: 0 auto;
+}
+.sh-stage {
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin-top: -4px;
+}
+/* 2 to 1, as wide as the phone but never more than a fifth of its height. */
+.sh-pic {
+  display: block;
+  width: min(100%, 42vh);
+  width: min(100%, 42dvh);
+  aspect-ratio: 2 / 1;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 4%, #000 96%, transparent),
+    linear-gradient(to bottom, transparent, #000 7%);
+  mask-image:
+    linear-gradient(to right, transparent, #000 4%, #000 96%, transparent),
+    linear-gradient(to bottom, transparent, #000 7%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.sh-talk {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  min-height: 58px;
+  margin-top: -6px;
+  padding: 0 10px;
+}
+.sh-intro {
+  flex: 1 1 auto;
+  margin: 8px 6px 0;
+  text-align: center;
+  line-height: 1.3;
+}
+.sh-say {
+  max-width: min(100%, 400px);
+}
+.sh-say__line {
+  margin: 0;
+  font-size: var(--hh-text);
+  line-height: 1.3;
+  color: var(--hh-ink-strong);
+}
+/* Low on a tall phone, by the thumb; it scrolls inside itself on a short one. */
+.sh-main {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.sh-main::before {
+  content: "";
+  flex: 1 1 0;
+}
+.sh-list {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sh-jar {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  width: 100%;
+  min-height: 58px;
+  margin: 0;
+  padding: 4px 10px 4px 6px;
+  border: 1.5px solid var(--hh-ink-faint);
+  border-radius: var(--hh-r);
+  background-color: rgba(255, 253, 247, 0.7);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.sh-jar[aria-pressed="true"] {
+  border-color: var(--hh-amber);
+  background-color: var(--hh-butter);
+  box-shadow: 0 0 0 2px var(--hh-honey);
+}
+.sh-jar__pic {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.sh-jar__tick {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--hh-leaf);
+}
+.sh-jar[aria-pressed="false"] .sh-jar__tick {
+  visibility: hidden;
+}
+.sh-jar__text {
+  display: block;
+  min-width: 0;
+}
+.sh-jar__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 5px;
+  font-size: var(--hh-text-s);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--hh-ink-strong);
+}
+.sh-jar__sub {
+  display: block;
+  font-size: var(--hh-text-xs);
+  line-height: 1.25;
+  color: var(--hh-ink-soft);
+}
+.sh-h {
+  flex: none;
+  margin: 0 2px;
+  font-size: var(--hh-text);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--hh-ink-strong);
+}
+.sh-results {
+  flex: none;
+}
+/* A ribbon just pinned: its row settles in. */
+.sh-row {
+  animation: sh-row-in 0.3s ease both;
+}
+@keyframes sh-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sh-row {
+    animation: none;
+  }
+}
+.sh-row__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 5px;
+}
+
+/* ------------------------------------------------------------ how many, and a narrow phone */
+
+/* The stepper in the line over the buttons, when a customer wants more than 1. */
+.st-qty {
+  flex: none;
+}
+.st-qty[hidden] {
+  display: none;
+}
+.st-qty .hh-stepper__value {
+  min-width: 26px;
+}
+.st-item__name img {
+  display: inline-block;
+  vertical-align: -1px;
+}
+/* Under 360 px the shelf is one thing to a row: picture, name and stars over
+   the trait words, the price at the end. Two columns there wrapped every name. */
+@media (max-width: 359px) {
+  .st-shelf {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+  .st-item {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    min-height: 46px;
+    padding: 2px 12px 2px 6px;
+  }
+  .st-item__left {
+    display: contents;
+  }
+  .st-item__pic {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+  }
+  .st-item__text {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .st-item__price {
+    grid-column: 3;
+    grid-row: 1;
+    margin: 0;
+    font-size: 14.5px;
+  }
+  .st-item__name {
+    margin-bottom: 0;
+  }
+}
+
+/* The show once the jars are in: the ribbons sit in the middle of what room
+   there is, and on a short phone the judge's last word makes way for them. */
+.sh[data-phase="judging"] .sh-main::after,
+.sh[data-phase="results"] .sh-main::after {
+  content: "";
+  flex: 1 1 0;
+}
+@media (max-height: 620px) {
+  .sh[data-phase="results"] .sh-talk {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------ a tall phone */
+
+/* From 641 px of height the picture takes whatever the shelf leaves (stall.js
+   and stall-show.js paint it to fit), so no empty band is left between the
+   customer and the shelf, or under the show bench. Shorter phones keep the
+   fixed picture above. */
+@media (min-height: 641px) {
+  .st-stage {
+    flex: 1 1 0;
+    min-height: 26vh;
+    min-height: 26dvh;
+    overflow: hidden;
+  }
+  .st-panel {
+    flex: 0 1 auto;
+  }
+  .st-shelfhead {
+    margin-top: 0;
+  }
+  .st-msg {
+    flex: none;
+  }
+  .sh-stage {
+    flex: 1 1 0;
+    min-height: 21vh;
+    min-height: 21dvh;
+    place-items: end center;
+    overflow: hidden;
+  }
+  .sh-pic[style] {
+    max-width: 100%;
+    aspect-ratio: auto;
+  }
+  .sh-main {
+    flex: 0 1 auto;
+  }
+  .sh-main::before,
+  .sh[data-phase] .sh-main::after {
+    content: none;
+  }
+}

@@ -56,4 +56,10 @@ export const GAMES = [
     blurb: "Cross the T, roar Port & Starboard volleys, plunder the archipelago.",
     icon: "🏴‍☠️",
   },
+  {
+    id: "honey-hollow",
+    title: "Honey Hollow",
+    blurb: "Plant a meadow, keep bees, sell the honey they make.",
+    icon: "🐝",
+  },
 ];

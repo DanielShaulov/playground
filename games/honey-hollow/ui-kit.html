@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Honey Hollow: the interface kit</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="../../shared/style.css" />
+    <link rel="stylesheet" href="./ui/base.css" />
+    <style>
+      /* This page scrolls so the whole kit can be looked at; the game does not. */
+      html,
+      body {
+        height: auto;
+        overflow: visible;
+      }
+      body {
+        overflow-x: hidden;
+      }
+      .kit {
+        max-width: 430px;
+        margin: 0 auto;
+        padding: 12px var(--hh-gutter) 40px;
+      }
+      .kit-sec {
+        margin: 26px 0 0;
+      }
+      .kit-sec > h2 {
+        margin: 0 0 8px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--hh-ink-soft);
+      }
+      .kit-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 10px;
+        margin: 0 0 10px;
+      }
+      .kit-col {
+        display: grid;
+        gap: 10px;
+      }
+      .kit-green {
+        background: #93b973;
+        border-radius: 14px;
+        padding: 12px;
+      }
+      .kit-pics {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 4px 6px;
+      }
+      /* A stand-in phone, so the fixed pieces (sheet, tab bar, toasts) can be
+         shown in place: a transform makes it their containing block. */
+      .kit-phone {
+        position: relative;
+        height: 520px;
+        overflow: hidden;
+        border-radius: 22px;
+        transform: translateZ(0);
+        background: #a9cf8a;
+        box-shadow: 0 0 0 2px var(--hh-ink-faint);
+      }
+      .kit-phone .hh-toasts {
+        top: 12px;
+      }
+      .kit-phone .hh-sheet {
+        max-height: 420px;
+      }
+      .kit-phone--short {
+        height: 170px;
+      }
+      .kit-phone .hh-tabbar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+      }
+      .kit-still * {
+        animation: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="kit" id="kit">
+      <img
+        class="hh-pic"
+        data-pic="logo"
+        data-size="288"
+        alt="Honey Hollow"
+        style="margin: 0 auto"
+      />
+      <p class="hh-sub" id="kit-time" style="text-align: center"></p>
+
+      <section class="kit-sec">
+        <h2>Type</h2>
+        <h1 class="hh-title">A year in Honey Hollow</h1>
+        <h3 class="hh-heading">The lavender is out</h3>
+        <p class="hh-text">
+          Bees fly up to two squares from their hive. Plant what they like close by.
+        </p>
+        <p class="hh-sub">
+          Day 9 of 28 · <span class="hh-num">1,240</span> coins ·
+          <span class="hh-good">+2 renown</span> · <span class="hh-bad">mites spotted</span>
+        </p>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Buttons</h2>
+        <div class="kit-row">
+          <button class="hh-btn">Start the day</button>
+          <button class="hh-btn hh-btn--secondary">Not now</button>
+        </div>
+        <div class="kit-row">
+          <button class="hh-btn hh-btn--leaf">
+            <img class="hh-icon" data-pic="icon:play" data-size="24" alt="" />Start the day
+          </button>
+          <button class="hh-btn hh-btn--danger">Dig it up</button>
+          <button class="hh-btn hh-btn--quiet">Skip</button>
+        </div>
+        <div class="kit-row">
+          <button class="hh-btn">
+            <img class="hh-icon" data-pic="icon:harvest" data-size="26" alt="" />Take 2 jars
+          </button>
+          <button class="hh-btn hh-btn--secondary">
+            <img class="hh-icon" data-pic="icon:move" data-size="24" alt="" />Move
+          </button>
+        </div>
+        <div class="kit-row">
+          <button class="hh-btn hh-btn--small">Small</button>
+          <button class="hh-btn hh-btn--small hh-btn--secondary">
+            <img class="hh-icon" data-pic="item:coin" data-size="20" alt="" />60
+          </button>
+          <button class="hh-btn hh-btn--small hh-btn--leaf">Plant</button>
+          <button class="hh-btn hh-btn--small hh-btn--danger">Dig</button>
+          <button class="hh-btn hh-btn--small hh-btn--quiet">Later</button>
+        </div>
+        <div class="kit-row">
+          <button class="hh-btn is-pressed">Pressed</button>
+          <button class="hh-btn hh-btn--secondary is-pressed">Pressed</button>
+          <button class="hh-btn hh-btn--quiet is-pressed">Pressed</button>
+        </div>
+        <div class="kit-row">
+          <button class="hh-btn" disabled>Off</button>
+          <button class="hh-btn hh-btn--secondary" disabled>Off</button>
+          <button class="hh-btn hh-btn--danger" aria-disabled="true">Off</button>
+        </div>
+        <div class="kit-col">
+          <button class="hh-btn hh-btn--block">Open the stall</button>
+          <button class="hh-btn hh-btn--block hh-btn--secondary">
+            Sell everything to the grocer for a little less
+          </button>
+        </div>
+        <div class="kit-row kit-green" style="margin-top: 10px">
+          <button class="hh-btn">On the meadow</button>
+          <button class="hh-btn hh-btn--secondary">Cream</button>
+          <button class="hh-iconbtn" aria-label="Settings">
+            <img class="hh-icon" data-pic="icon:settings" data-size="26" alt="" />
+          </button>
+        </div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Round buttons and the stepper</h2>
+        <div class="kit-row">
+          <button class="hh-iconbtn" aria-label="Close">
+            <img class="hh-icon" data-pic="icon:close" data-size="24" alt="" />
+          </button>
+          <button class="hh-iconbtn hh-iconbtn--honey" aria-label="Start">
+            <img class="hh-icon" data-pic="icon:play" data-size="24" alt="" />
+          </button>
+          <button class="hh-iconbtn hh-iconbtn--bare" aria-label="Back">
+            <img class="hh-icon" data-pic="icon:back" data-size="26" alt="" />
+          </button>
+          <button class="hh-iconbtn is-pressed" aria-label="Pressed">
+            <img class="hh-icon" data-pic="icon:fast" data-size="24" alt="" />
+          </button>
+          <button class="hh-iconbtn" disabled aria-label="Off">
+            <img class="hh-icon" data-pic="icon:sound-off" data-size="24" alt="" />
+          </button>
+        </div>
+        <div class="kit-row">
+          <div class="hh-stepper">
+            <button class="hh-iconbtn" aria-label="One fewer">
+              <img class="hh-icon" data-pic="icon:minus" data-size="22" alt="" />
+            </button>
+            <output class="hh-stepper__value">3</output>
+            <button class="hh-iconbtn" aria-label="One more">
+              <img class="hh-icon" data-pic="icon:plus" data-size="22" alt="" />
+            </button>
+          </div>
+          <div class="hh-stepper">
+            <button class="hh-iconbtn" disabled aria-label="One fewer">
+              <img class="hh-icon" data-pic="icon:minus" data-size="22" alt="" />
+            </button>
+            <output class="hh-stepper__value">0</output>
+            <button class="hh-iconbtn" aria-label="One more">
+              <img class="hh-icon" data-pic="icon:plus" data-size="22" alt="" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Chips and badges</h2>
+        <div class="kit-row">
+          <span class="hh-chip hh-chip--honey"
+            ><img class="hh-icon" data-pic="item:coin" data-size="20" alt="coins" />1,240</span
+          >
+          <span class="hh-chip"
+            ><img class="hh-icon" data-pic="icon:summer" data-size="22" alt="" />Summer 3</span
+          >
+          <span class="hh-chip hh-chip--sky">Rain tomorrow</span>
+        </div>
+        <div class="kit-row">
+          <span class="hh-chip hh-chip--leaf">In bloom</span>
+          <span class="hh-chip hh-chip--rose"
+            ><img class="hh-icon" data-pic="heart:1" data-size="18" alt="" />7</span
+          >
+          <span class="hh-chip"
+            ><img class="hh-icon" data-pic="item:star" data-size="20" alt="renown" />30</span
+          >
+          <span class="hh-badge">3</span>
+          <span class="hh-badge">12</span>
+          <span class="hh-badge hh-badge--dot"></span>
+        </div>
+        <div class="kit-row kit-green">
+          <span class="hh-chip hh-chip--honey"
+            ><img class="hh-icon" data-pic="item:coin" data-size="20" alt="coins" />85</span
+          >
+          <span class="hh-chip">Day 4</span>
+          <span class="hh-chip hh-chip--sky">Windy</span>
+        </div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Banner</h2>
+        <div class="hh-banner">Evening at the stall</div>
+        <div class="hh-banner hh-banner--honey">The Honey Show</div>
+        <div class="hh-banner">Sold</div>
+        <div class="hh-banner">A year in Honey Hollow, and what a year</div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Card and list rows</h2>
+        <div class="hh-card">
+          <h3 class="hh-heading">Skep by the lavender</h3>
+          <p class="hh-sub">Strong colony. 4 jars waiting.</p>
+          <div
+            class="hh-meter hh-meter--mark"
+            style="--hh-value: 0.62; --hh-mark: 0.4; margin-top: 10px"
+          ></div>
+        </div>
+        <div class="hh-card">
+          <ul class="hh-list">
+            <li class="hh-row">
+              <img class="hh-pic" data-pic="jar:lavender:2" data-size="40" alt="" />
+              <div class="hh-row__text">
+                <div class="hh-row__title">Lavender honey</div>
+                <div class="hh-row__sub">Pale gold, floral · 3 jars</div>
+              </div>
+              <div class="hh-row__end">
+                <span class="hh-coins"
+                  ><img class="hh-icon" data-pic="item:coin" data-size="18" alt="coins" />17</span
+                >
+              </div>
+            </li>
+            <li class="hh-row">
+              <img class="hh-pic" data-pic="good:candle" data-size="40" alt="" />
+              <div class="hh-row__text">
+                <div class="hh-row__title">Beeswax candle</div>
+                <div class="hh-row__sub">Needs 2 wax. You have 5.</div>
+              </div>
+              <div class="hh-row__end"><button class="hh-btn hh-btn--small">Make</button></div>
+            </li>
+            <li class="hh-row hh-row--stack">
+              <img class="hh-pic" data-pic="seeds:borage" data-size="40" alt="" />
+              <div class="hh-row__text">
+                <div class="hh-row__title">
+                  Borage seeds, a long name that has to wrap on a small phone
+                </div>
+                <div class="hh-row__sub">Blooms late spring to autumn</div>
+              </div>
+              <div class="hh-row__end">
+                <div class="hh-stepper">
+                  <button class="hh-iconbtn" aria-label="One fewer">
+                    <img class="hh-icon" data-pic="icon:minus" data-size="22" alt="" />
+                  </button>
+                  <output class="hh-stepper__value">2</output>
+                  <button class="hh-iconbtn" aria-label="One more">
+                    <img class="hh-icon" data-pic="icon:plus" data-size="22" alt="" />
+                  </button>
+                </div>
+              </div>
+            </li>
+            <li>
+              <button class="hh-row">
+                <img class="hh-icon" data-pic="icon:book" data-size="32" alt="" />
+                <span class="hh-row__text">
+                  <span class="hh-row__title" style="display: block">The bee book</span>
+                  <span class="hh-row__sub" style="display: block">A row you can tap · 2 new</span>
+                </span>
+                <span class="hh-row__end"><span class="hh-badge">2</span></span>
+              </button>
+            </li>
+          </ul>
+        </div>
+        <div class="hh-card hh-card--tint">
+          <p class="hh-text">
+            <b>Butter paper.</b> For the night card and anything that wants to feel like a page from
+            the keeper's diary.
+          </p>
+        </div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Meter</h2>
+        <div class="kit-col">
+          <div class="hh-meter" style="--hh-value: 0"></div>
+          <div class="hh-meter" style="--hh-value: 0.06"></div>
+          <div class="hh-meter hh-meter--mark" style="--hh-value: 0.35; --hh-mark: 0.55"></div>
+          <div class="hh-meter" style="--hh-value: 1"></div>
+          <div class="hh-meter hh-meter--leaf" style="--hh-value: 0.7"></div>
+          <div class="hh-meter hh-meter--rose" style="--hh-value: 0.45"></div>
+          <div
+            class="hh-meter hh-meter--leaf hh-meter--mark"
+            style="--hh-value: 0.8; --hh-mark: 0.2"
+          ></div>
+          <div class="kit-row">
+            <div class="hh-meter" style="--hh-value: 0.5; width: 72px"></div>
+            <div class="hh-meter hh-meter--leaf" style="--hh-value: 0.9; width: 120px"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Speech</h2>
+        <div class="hh-bubble">Lavender honey, please.</div>
+        <div class="hh-bubble hh-bubble--right" style="margin-left: auto">
+          Something dark and strong, for the gingerbread. Two jars if you can spare them.
+        </div>
+        <div class="hh-bubble hh-bubble--up">Oh, lovely.</div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Toast and note</h2>
+        <div class="kit-still">
+          <div class="hh-toast">
+            <img class="hh-pic" data-pic="item:wax" data-size="30" alt="" />1 beeswax
+          </div>
+          <div class="hh-toast">The bees are out. Hives cannot be moved until evening.</div>
+        </div>
+        <div class="hh-note">
+          <p>
+            <b>Keeper's note.</b> Tap a hive to see what it gathered. A hive with one flower in
+            reach makes pure honey.
+          </p>
+        </div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Dividers</h2>
+        <hr class="hh-rule" />
+        <div class="hh-sprig" role="separator"></div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Tab bar</h2>
+        <div class="kit-phone kit-phone--short">
+          <nav class="hh-tabbar">
+            <button class="hh-tab" aria-current="page">
+              <img class="hh-icon" data-pic="icon:meadow" data-size="30" alt="" />Meadow
+            </button>
+            <button class="hh-tab">
+              <img class="hh-icon" data-pic="icon:workshop" data-size="30" alt="" />Workshop
+            </button>
+            <button class="hh-tab">
+              <img class="hh-icon" data-pic="icon:stall" data-size="30" alt="" />Stall
+            </button>
+            <button class="hh-tab">
+              <img class="hh-icon" data-pic="icon:goals" data-size="30" alt="" />Goals<span
+                class="hh-badge"
+                >2</span
+              >
+            </button>
+            <button class="hh-tab">
+              <img class="hh-icon" data-pic="icon:book" data-size="30" alt="" />Bee book<span
+                class="hh-badge hh-badge--dot"
+              ></span>
+            </button>
+          </nav>
+        </div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Sheet</h2>
+        <div class="kit-phone kit-still">
+          <div class="hh-toasts">
+            <div class="hh-toast">
+              <img class="hh-icon" data-pic="icon:check" data-size="22" alt="" />Planted clover
+            </div>
+          </div>
+          <div class="hh-scrim"></div>
+          <section class="hh-sheet" role="dialog" aria-labelledby="kit-sheet-title">
+            <div class="hh-sheet__handle"></div>
+            <header class="hh-sheet__head">
+              <h2 class="hh-sheet__title" id="kit-sheet-title">The seed shop</h2>
+              <span class="hh-chip hh-chip--honey"
+                ><img class="hh-icon" data-pic="item:coin" data-size="20" alt="coins" />85</span
+              >
+              <button class="hh-iconbtn" aria-label="Close">
+                <img class="hh-icon" data-pic="icon:close" data-size="22" alt="" />
+              </button>
+            </header>
+            <div class="hh-sheet__body">
+              <ul class="hh-list" id="kit-seeds"></ul>
+            </div>
+            <footer class="hh-sheet__foot">
+              <button class="hh-btn hh-btn--secondary">Back</button>
+              <button class="hh-btn">Buy</button>
+            </footer>
+          </section>
+        </div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Icons</h2>
+        <div class="kit-pics" id="kit-icons"></div>
+        <div class="kit-pics kit-green" id="kit-icons-green" style="margin-top: 10px"></div>
+      </section>
+
+      <section class="kit-sec">
+        <h2>Goods and items</h2>
+        <div class="kit-pics" id="kit-goods"></div>
+      </section>
+    </main>
+    <script type="module">
+      import { installChrome, fontsReady } from "./ui/chrome.js";
+      import { url } from "./ui/paint/sprite.js";
+      import { logo } from "./ui/art/chrome.js";
+      import { icon, ICON_NAMES } from "./ui/art/icons.js";
+      import { jar } from "./ui/art/jars.js";
+
+      const goods = await import("./ui/art/goods.js").catch(() => null);
+      const ms = installChrome();
+      await fontsReady();
+
+      // <img data-pic="kind:arg:arg" data-size="40"> becomes that painted sprite.
+      const PICS = {
+        logo,
+        icon,
+        jar: (flower, stars) => jar(flower, Number(stars)),
+        good: (id) => goods.good(id),
+        item: (id) => goods.item(id),
+        seeds: (flower) => goods.seeds(flower),
+        bunch: (flower) => goods.bunch(flower),
+        heart: (full) => goods.heart(full === "1"),
+        ribbon: (medal) => goods.ribbon(medal),
+        stars: (n) => goods.starsBadge(Number(n)),
+        honeycomb: () => goods.honeycomb(),
+      };
+      const NEEDS_GOODS = new Set([
+        "good",
+        "item",
+        "seeds",
+        "bunch",
+        "heart",
+        "ribbon",
+        "stars",
+        "honeycomb",
+      ]);
+      function dress(el) {
+        const [kind, ...args] = el.dataset.pic.split(":");
+        if (NEEDS_GOODS.has(kind) && !goods) return el.remove();
+        const s = PICS[kind](...args);
+        const size = Number(el.dataset.size ?? s.w);
+        el.src = url(s);
+        el.width = size;
+        el.height = Math.round((size * s.h) / s.w);
+      }
+      const pic = (spec, size, cls = "hh-pic") => {
+        const el = document.createElement("img");
+        el.className = cls;
+        el.alt = "";
+        el.dataset.pic = spec;
+        el.dataset.size = size;
+        return el;
+      };
+
+      // The seed shop in the sheet: enough rows to scroll.
+      const seedList = document.getElementById("kit-seeds");
+      for (const [flower, sub, price] of [
+        ["clover", "Blooms late spring into summer", 4],
+        ["lavender", "Blooms in summer · pale gold honey", 6],
+        ["borage", "Blooms for eleven days", 8],
+        ["sunflower", "Late summer", 6],
+        ["buckwheat", "Dark, malty honey", 6],
+        ["ivy", "The bees' winter larder", 5],
+      ]) {
+        const li = document.createElement("li");
+        li.className = "hh-row";
+        li.innerHTML = `<div class="hh-row__text"><div class="hh-row__title">${flower[0].toUpperCase() + flower.slice(1)}</div>
+          <div class="hh-row__sub">${sub}</div></div>
+          <div class="hh-row__end"><button class="hh-btn hh-btn--small hh-btn--secondary"></button></div>`;
+        li.prepend(pic(`seeds:${flower}`, 40));
+        li.querySelector("button").append(pic("item:coin", 20, "hh-icon"), String(price));
+        seedList.append(li);
+      }
+
+      for (const name of ICON_NAMES) {
+        document.getElementById("kit-icons").append(pic(`icon:${name}`, 28, "hh-icon"));
+        document.getElementById("kit-icons-green").append(pic(`icon:${name}`, 28, "hh-icon"));
+      }
+      if (goods) {
+        const box = document.getElementById("kit-goods");
+        for (const g of goods.GALLERY.concat(goods.GALLERY_ITEMS)) {
+          const s = g.make();
+          const el = document.createElement("img");
+          el.className = "hh-pic";
+          el.alt = g.name;
+          el.src = url(s);
+          el.width = s.w;
+          el.height = s.h;
+          box.append(el);
+        }
+      }
+      document.querySelectorAll("img[data-pic]").forEach(dress);
+      document.getElementById("kit-time").textContent =
+        `The interface kit. Painted in ${Math.round(ms)} ms.`;
+      document.body.dataset.ready = "1";
+    </script>
+  </body>
+</html>

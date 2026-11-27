@@ -1,0 +1,315 @@
+/* The beekeeper picker (ui/keeper-picker.js): the preview, the name row, the
+   tabs and the swatches. The creator scene and the wardrobe sheet place the
+   four parts; this file gives each its inside.
+
+   The host sets --keeper-panel-h (the height of the swatch panel) and gives
+   .keeper-stage a size. */
+
+/* ------------------------------------------------------------ the preview */
+
+.keeper-stage {
+  position: relative;
+  min-height: 0;
+}
+.keeper-stage__pic {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.keeper-stage__pic.is-fresh {
+  animation: keeper-fresh 0.26s var(--hh-ease, ease-out) both;
+}
+@keyframes keeper-fresh {
+  from {
+    opacity: 0.82;
+    transform: translateY(2px) scale(0.99);
+  }
+}
+
+/* ------------------------------------------------------------ the name */
+
+.keeper-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--hh-gutter);
+}
+.keeper-name__field {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1.5px solid var(--hh-ink-faint);
+  border-radius: var(--hh-r);
+  background: var(--hh-white);
+}
+.keeper-name__field:focus-within {
+  border-color: var(--hh-amber);
+  box-shadow: 0 0 0 3px rgba(234, 176, 74, 0.25);
+}
+.keeper-name__label {
+  flex: none;
+  font-size: var(--hh-text-s);
+  color: var(--hh-ink-soft);
+}
+/* 16 px or more, or iOS zooms the page when the field is tapped. */
+.keeper-name__input {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: none;
+  color: var(--hh-ink-strong);
+  font-family: var(--hh-font);
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.keeper-name__input::placeholder {
+  color: var(--hh-ink-faint);
+  font-weight: 400;
+}
+.keeper-name__surprise {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ the tabs */
+
+.keeper-tabs {
+  display: flex;
+  align-items: stretch;
+}
+.keeper-tabs .hh-tab {
+  margin: 0;
+  min-height: 54px;
+  padding: 3px 0 3px;
+}
+.keeper-tabs__pic {
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+@media (max-width: 359px) {
+  .keeper-tabs .hh-tab {
+    font-size: 11.5px;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ------------------------------------------------------------ the swatches */
+
+.keeper-panel {
+  height: var(--keeper-panel-h, 150px);
+  /* One row of swatches, or two: what is left once the captions are in. */
+  --keeper-one: min(calc(var(--keeper-panel-h, 150px) - 32px), 148px);
+  --keeper-two: min(calc(var(--keeper-panel-h, 150px) / 2 - 29px), 60px);
+}
+/* A pane is one part (a caption, then a row that fills the rest), two parts
+   stacked (clothes), or two side by side that scroll together (extras). */
+.keeper-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  --keeper-sw: var(--keeper-one);
+}
+.keeper-pane--two {
+  --keeper-sw: var(--keeper-two);
+}
+.keeper-pane[hidden],
+.keeper-block[hidden] {
+  display: none;
+}
+.keeper-block {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.keeper-caption {
+  flex: none;
+  height: 19px;
+  margin: 0;
+  padding: 0 var(--hh-gutter);
+  overflow: hidden;
+  font-size: var(--hh-text-s);
+  line-height: 19px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--hh-ink-soft);
+}
+.keeper-caption b {
+  color: var(--hh-ink-strong);
+}
+/* A row scrolls sideways under the thumb; nothing else on the page does. */
+.keeper-row,
+.keeper-pane--side {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+.keeper-row::-webkit-scrollbar,
+.keeper-pane--side::-webkit-scrollbar {
+  display: none;
+}
+.keeper-row {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+  padding: 2px var(--hh-gutter) 4px;
+}
+.keeper-pane--side {
+  flex-direction: row;
+  gap: 18px;
+  padding: 0 var(--hh-gutter);
+}
+.keeper-pane--side .keeper-block {
+  flex: none;
+}
+/* Each caption keeps to the left of what can be seen of its own block. */
+.keeper-pane--side .keeper-caption {
+  position: sticky;
+  left: var(--hh-gutter);
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0;
+}
+.keeper-pane--side .keeper-row {
+  padding-left: 0;
+  padding-right: 0;
+  overflow: visible;
+}
+.keeper-swatch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: calc(var(--keeper-sw) * 0.92);
+  height: var(--keeper-sw);
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 2.5px solid transparent;
+  border-radius: 16px;
+  background: rgba(255, 253, 247, 0.55);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform var(--hh-quick) var(--hh-ease),
+    border-color var(--hh-quick);
+}
+.keeper-swatch--dab {
+  --keeper-dab: min(var(--keeper-sw), 72px);
+  width: var(--keeper-dab);
+  height: var(--keeper-dab);
+  border-radius: 50%;
+  background: none;
+}
+.keeper-swatch canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 13px;
+  pointer-events: none;
+}
+.keeper-swatch--dab canvas {
+  border-radius: 50%;
+}
+.keeper-swatch:active {
+  transform: scale(0.96);
+}
+.keeper-swatch[aria-pressed="true"] {
+  border-color: var(--hh-amber);
+  background: var(--hh-white);
+  box-shadow: var(--hh-shadow);
+}
+.keeper-swatch:focus-visible {
+  outline: 2px dashed var(--hh-ink-soft);
+  outline-offset: 2px;
+}
+/* Not yours yet: there to look forward to. A slip across its foot says who
+   or what it comes from, and a tap says the rest. */
+.keeper-swatch.is-resting canvas {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+.keeper-swatch__lock {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 20px;
+  padding: 0 4px 0 2px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgba(255, 253, 247, 0.9);
+  color: var(--hh-ink);
+  font-family: var(--hh-font);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.keeper-swatch__lock .hh-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.keeper-swatch__lock span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A row that runs off the side fades out there, so it shows at once that
+   there is more to pull into view. */
+.keeper-row,
+.keeper-pane--side {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+}
+.keeper-pane--side .keeper-row {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+/* On a narrow phone the Extras swatches are a little smaller, so most of the
+   first beard shows beside the glasses. */
+@media (max-width: 359px) {
+  .keeper-pane--side {
+    --keeper-sw: min(var(--keeper-one), 104px);
+  }
+}

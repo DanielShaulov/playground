@@ -1,0 +1,88 @@
+/* The bed sheet (ui/sheets/bed.js): layout only. */
+
+.hh-bed [hidden],
+.hh-bed__foot [hidden] {
+  display: none !important;
+}
+
+.hh-bed__head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--hh-gap-3);
+}
+.hh-bed__pic {
+  flex: none;
+  width: 92px;
+  min-height: 60px;
+  margin: -14px 0 0 -6px;
+}
+.hh-bed__about {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 12px;
+}
+.hh-bed__stage {
+  margin-bottom: 3px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--hh-ink-strong);
+}
+
+.hh-bed__sec {
+  margin-top: 12px;
+}
+.hh-bed__sec > p {
+  margin: 4px 0 0;
+}
+.hh-bed__h {
+  font-size: var(--hh-text);
+}
+.hh-bed__caption {
+  color: var(--hh-ink);
+}
+
+.hh-bed__hivepic {
+  display: grid;
+  place-items: end center;
+  width: 38px;
+}
+.hh-bed__go {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--hh-ink-soft);
+  padding-right: 4px;
+}
+
+.hh-bed__honey {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-3);
+  margin-top: 4px;
+}
+.hh-bed__jar {
+  flex: none;
+}
+.hh-bed__honeywords {
+  min-width: 0;
+}
+
+.hh-bed__bunch {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-3);
+}
+.hh-bed__bunch > p {
+  margin: 0;
+}
+.hh-bed__bunchpic {
+  flex: none;
+}
+
+.hh-bed__plant {
+  margin-top: var(--hh-gap-3);
+}
+
+/* With a bunch to pick, "Dig up" steps aside and the picking has the room. */
+.hh-bed__foot.has-pick > .hh-btn--secondary {
+  flex: 0 0 auto;
+}

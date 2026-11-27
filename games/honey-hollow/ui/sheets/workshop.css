@@ -1,0 +1,353 @@
+/* The workshop (ui/sheets/workshop.js): layout only. Cards, buttons, rows,
+   notes and coins are the kit's. */
+
+.hh-ws [hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------ the bench */
+
+.hh-ws__bench {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--hh-gap-3);
+}
+.hh-ws__keeper {
+  display: grid;
+  place-items: end center;
+  width: 84px;
+  height: 84px;
+}
+.hh-ws__keeper:empty {
+  display: none;
+}
+/* One little candle for each thing that can be made today; the used ones go out. */
+.hh-ws__pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1px;
+  min-height: 26px;
+  margin: 3px 0 2px -3px;
+}
+.hh-ws__pips .is-used {
+  filter: grayscale(1);
+  opacity: 0.26;
+}
+/* Room for two lines, so the words under the candles never push the page. */
+.hh-ws__sub {
+  min-height: 2.6em;
+  line-height: 1.3;
+}
+
+/* ------------------------------------------------------------ what you hold */
+
+.hh-ws__holds {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.hh-ws__hold {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas: "pic n" "name name" "from from";
+  align-items: center;
+  align-content: start;
+  justify-content: center;
+  column-gap: 4px;
+  padding: 6px 4px 8px;
+  border-radius: var(--hh-r);
+  background: rgba(239, 228, 204, 0.55);
+  text-align: center;
+}
+.hh-ws__holdpic {
+  grid-area: pic;
+  display: grid;
+  place-items: center;
+  height: 44px;
+}
+.hh-ws__holdn {
+  grid-area: n;
+  font-size: var(--hh-text-xl);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--hh-ink-strong);
+}
+.hh-ws__hold.is-none .hh-ws__holdn {
+  color: var(--hh-ink-soft);
+}
+.hh-ws__holdname {
+  grid-area: name;
+  font-size: var(--hh-text-s);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--hh-ink-strong);
+}
+.hh-ws__holdfrom {
+  grid-area: from;
+  font-size: var(--hh-text-xs);
+  line-height: 1.2;
+  color: var(--hh-ink-soft);
+}
+.hh-ws__slip {
+  margin-top: 22px;
+}
+
+/* ------------------------------------------------------------ a recipe card */
+
+.hh-ws__cards {
+  margin-top: var(--hh-gap-2);
+}
+.hh-ws__card {
+  margin: 4px 0 8px;
+}
+.hh-ws__head {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+}
+.hh-ws__pic {
+  display: grid;
+  place-items: end center;
+  width: 60px;
+  height: 62px;
+}
+.hh-ws__name {
+  margin: 0;
+  font-size: 17px;
+}
+.hh-ws__worth {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 5px;
+  margin-top: 1px;
+  line-height: 1.3;
+}
+.hh-ws__worth .hh-coins {
+  color: var(--hh-ink-strong);
+}
+
+.hh-ws__needs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin: 8px 0 2px;
+}
+.hh-ws__needline {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto 20px;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 34px;
+}
+.hh-ws__needpic {
+  display: grid;
+  place-items: center;
+  height: 32px;
+}
+.hh-ws__needtext {
+  min-width: 0;
+}
+.hh-ws__needsub {
+  display: block;
+  font-size: var(--hh-text-s);
+  line-height: 1.25;
+  color: var(--hh-ink-soft);
+}
+.hh-ws__needsub:empty {
+  display: none;
+}
+.hh-ws__needlabel {
+  display: block;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--hh-ink-strong);
+}
+.hh-ws__need.is-short .hh-ws__needlabel {
+  color: var(--hh-ink);
+}
+.hh-ws__have {
+  font-size: var(--hh-text-s);
+  white-space: nowrap;
+  color: var(--hh-ink-soft);
+}
+.hh-ws__have.hh-bad {
+  font-weight: 700;
+  color: var(--hh-brick);
+}
+.hh-ws__tick {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.hh-ws__tick > * {
+  visibility: hidden;
+}
+.hh-ws__tick.is-on > * {
+  visibility: visible;
+}
+
+/* Which one: a line saying what is chosen, then pictures to choose from.
+   The row scrolls sideways if there are many; its height never changes. */
+.hh-ws__pick {
+  min-width: 0;
+  margin: 0 0 4px;
+}
+.hh-ws__using {
+  min-height: 1.35em;
+  margin: 0 0 4px 2px;
+  font-size: var(--hh-text-s);
+  line-height: 1.35;
+  color: var(--hh-ink-soft);
+}
+/* On a narrow phone the line may wrap: keep both lines, so it never pushes "Make one". */
+@media (max-width: 400px) {
+  .hh-ws__using {
+    min-height: 2.7em;
+  }
+}
+.hh-ws__strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 62px;
+  margin: 0 -2px;
+  padding: 2px 2px 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+.hh-ws__strip::-webkit-scrollbar {
+  display: none;
+}
+.hh-ws__none {
+  padding-left: 2px;
+  font-size: var(--hh-text-s);
+  color: var(--hh-ink-soft);
+}
+.hh-ws__opt {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 56px;
+  margin: 0;
+  padding: 0 0 2px;
+  border: 0;
+  border-radius: var(--hh-r);
+  background: rgba(239, 228, 204, 0.6);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--hh-quick) var(--hh-ease);
+}
+.hh-ws__opt:active {
+  transform: scale(0.95);
+}
+.hh-ws__opt[aria-pressed="true"] {
+  background: var(--hh-butter);
+  box-shadow: inset 0 0 0 2.5px var(--hh-amber);
+}
+.hh-ws__opt:disabled {
+  opacity: 0.42;
+  filter: grayscale(0.8);
+  cursor: default;
+}
+.hh-ws__opt:focus-visible {
+  outline: 2px dashed var(--hh-ink-soft);
+  outline-offset: 2px;
+}
+.hh-ws__optn {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  min-width: 18px;
+  padding: 0 4px 1px;
+  border-radius: 9px;
+  background: var(--hh-white);
+  box-shadow: 0 0 0 1px var(--hh-ink-faint);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--hh-ink-strong);
+}
+
+.hh-ws__act {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hh-gap-3);
+  margin-top: 6px;
+}
+.hh-ws__held {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--hh-ink-strong);
+  transform-origin: 0 50%;
+}
+.hh-ws__make {
+  flex: none;
+  min-width: 136px;
+}
+/* The blurb, or what is missing. Two lines are kept for it. */
+.hh-ws__status {
+  min-height: 2.7em;
+  margin: 6px 0 0;
+  font-size: var(--hh-text-s);
+  line-height: 1.35;
+  color: var(--hh-ink-soft);
+}
+.hh-ws__status.is-rest {
+  color: var(--hh-brick);
+}
+.hh-ws__news {
+  margin: 2px 0 0 -8px;
+  justify-content: flex-start;
+  text-align: left;
+  font-size: 14px;
+}
+/* The thing just made, on its way from the button to its picture. */
+.hh-ws__fly {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ under the cards */
+
+.hh-ws__section {
+  margin-top: var(--hh-gap-4);
+}
+.hh-ws__h {
+  margin-bottom: 2px;
+  font-size: var(--hh-text);
+}
+.hh-ws__lockpic {
+  display: grid;
+  place-items: end center;
+  width: 48px;
+  filter: grayscale(0.85);
+  opacity: 0.5;
+}
+.hh-ws__locked .hh-row__title {
+  color: var(--hh-ink);
+}
+.hh-ws__whererow {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  min-height: 38px;
+}
+.hh-ws__wherepic {
+  display: grid;
+  place-items: center;
+}

@@ -1,0 +1,162 @@
+/* Make your beekeeper (ui/scenes/creator.js). The picker's own parts are
+   styled in ui/keeper-picker.css; this file stacks them on the page: the
+   preview takes what room there is, everything tapped sits under it. */
+
+.creator {
+  --keeper-panel-h: clamp(150px, 24vh, 224px);
+  --keeper-panel-h: clamp(150px, 24dvh, 224px);
+}
+
+.creator__step {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.creator__step[hidden] {
+  display: none;
+}
+
+.creator__head {
+  flex: none;
+  padding: 8px var(--hh-gutter) 0;
+  text-align: center;
+}
+.creator__title {
+  font-size: var(--hh-text-l);
+}
+
+/* ------------------------------------------------------------ the look */
+
+.creator__look .keeper-stage {
+  flex: 1 1 0;
+  margin: 2px 0 6px;
+}
+.creator__look .keeper-name {
+  flex: none;
+}
+.creator__lower {
+  flex: none;
+  padding-top: 6px;
+}
+.creator__foot {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  padding: 6px var(--hh-gutter) 10px;
+}
+.creator__foot > .hh-btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.creator__foot > .creator__back {
+  flex: 0 1 108px;
+}
+
+/* The keyboard is up: the page is only as tall as what can be seen, and the
+   name sits just above the keys with the preview over it. */
+.creator.is-typing {
+  inset: auto;
+  left: 0;
+  right: 0;
+  top: var(--creator-vv-top, 0px);
+  height: var(--creator-vv-h, 100%);
+  padding-bottom: 8px;
+}
+.creator.is-typing .creator__lower {
+  display: none;
+}
+
+/* ------------------------------------------------------------ the talent */
+
+.creator__who {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px var(--hh-gutter) 2px;
+}
+.creator__who-pic {
+  flex: none;
+  width: clamp(76px, 13vh, 112px);
+  height: clamp(76px, 13vh, 112px);
+}
+.creator__who-text {
+  min-width: 0;
+}
+.creator__who .creator__title {
+  overflow-wrap: anywhere;
+}
+/* The list scrolls only if a very small phone cannot hold four rows. */
+.creator__list {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.creator__talents {
+  margin: auto 0;
+}
+.creator__talent {
+  column-gap: 10px;
+  padding: 7px 8px 11px 4px;
+  border-radius: var(--hh-r);
+}
+.creator__talent:last-child {
+  padding-bottom: 9px;
+}
+.creator__talent-pic {
+  width: var(--pic, 60px);
+  height: var(--pic, 60px);
+}
+.creator__talent-name,
+.creator__talent-blurb {
+  display: block;
+}
+.creator__check {
+  visibility: hidden;
+}
+.creator__talent[aria-checked="true"] {
+  background: rgba(247, 228, 160, 0.6);
+  box-shadow: inset 0 0 0 2px var(--hh-honey);
+}
+.creator__talent[aria-checked="true"] .creator__check {
+  visibility: visible;
+}
+/* A tall phone: the beekeeper stands large in the upper half, and the four
+   talents sit together above the buttons, under the thumb. */
+@media (min-height: 760px) {
+  .creator__who {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    min-height: 0;
+    text-align: center;
+  }
+  .creator__who-pic {
+    width: 176px;
+    height: 176px;
+  }
+  .creator__who .creator__title {
+    font-size: var(--hh-text-xl);
+  }
+  .creator__list {
+    flex: none;
+  }
+  .creator__talent {
+    padding-top: 12px;
+    padding-bottom: 16px;
+  }
+  .creator__talent-pic {
+    width: 72px;
+    height: 72px;
+  }
+  .creator__talent-blurb {
+    font-size: var(--hh-text);
+  }
+}

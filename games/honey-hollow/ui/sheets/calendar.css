@@ -1,0 +1,490 @@
+/* The calendar sheet (ui/sheets/calendar.js): layout only. The bands and the
+   bars are painted sprites stretched to fit; everything else is the kit. */
+
+.hh-cal {
+  --cal-pic: 40px; /* the column of flower pictures */
+}
+.hh-cal [hidden] {
+  display: none !important;
+}
+
+/* ---- today ---- */
+
+.hh-cal__sky {
+  /* One line for each day, so the weather never wraps. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+.hh-cal__wx {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.hh-cal__wxpic {
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+.hh-cal__wxpic img {
+  width: 100%;
+  height: 100%;
+}
+.hh-cal__wxwords {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  min-width: 0;
+  font-size: var(--hh-text-s);
+  line-height: 1.25;
+  color: var(--hh-ink-soft);
+}
+.hh-cal__wxwords b {
+  min-width: 112px; /* the two days' weather lines up */
+  font-size: 14.5px;
+  white-space: nowrap;
+  color: var(--hh-ink-strong);
+}
+
+/* ---- the legend ---- */
+
+.hh-cal__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 8px 0 6px;
+  font-size: var(--hh-text-xs);
+  line-height: 1.2;
+  color: var(--hh-ink-soft);
+}
+.hh-cal__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.hh-cal__pin {
+  position: relative;
+  width: 9px;
+  height: 18px;
+}
+.hh-cal__pin::before {
+  content: "";
+  position: absolute;
+  left: 3.5px;
+  top: 4px;
+  bottom: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--hh-ink-strong);
+}
+.hh-cal__pin::after,
+.hh-cal__today::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 50%;
+  background: var(--hh-poppy);
+  box-shadow: 0 0 0 1.5px var(--hh-ink-strong);
+}
+
+/* ---- the head of the grid: season names, then the two events ---- */
+
+.hh-cal__head {
+  padding-left: var(--cal-pic);
+}
+.hh-cal__seasons {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--hh-ink);
+}
+.hh-cal__seasons span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+/* On the narrowest phones a season is about 62 px wide: the name alone. */
+@media (max-width: 379px) {
+  .hh-cal__seasons .hh-icon {
+    display: none;
+  }
+}
+.hh-cal__marks {
+  position: relative;
+  height: 24px;
+}
+.hh-cal__mark {
+  position: absolute;
+  bottom: 1px;
+  transform: translateX(-50%);
+  line-height: 0;
+}
+
+/* ---- the grid ---- */
+
+.hh-cal__rows {
+  position: relative;
+  /* Its own stack, bottom to top: the bands (0), the rows and their bars,
+     today's pin (2), the flowers' names (3), the open card (4). The rows
+     make no stack of their own, so a name can sit above the pin. */
+  z-index: 0;
+  padding: 3px 0;
+}
+.hh-cal__field {
+  position: absolute;
+  left: var(--cal-pic);
+  right: 0;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+.hh-cal__field--under {
+  z-index: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.hh-cal__field--over {
+  z-index: 2;
+}
+.hh-cal__bands {
+  position: absolute;
+  inset: 0;
+  background: center / 100% 100% no-repeat;
+}
+/* The open flower's window, lit down the whole grid. */
+.hh-cal__window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 253, 247, 0.62);
+  box-shadow:
+    -1.5px 0 0 var(--hh-ink-faint),
+    1.5px 0 0 var(--hh-ink-faint);
+}
+.hh-cal__event {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  margin-left: -1px;
+  border-left: 2px dotted var(--hh-amber);
+  opacity: 0.75;
+}
+.hh-cal__event--fair {
+  border-left-color: var(--hh-pine);
+}
+.hh-cal__today {
+  position: absolute;
+  top: -6px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--hh-ink-strong);
+  transition: left 0.4s var(--hh-ease);
+}
+.hh-cal__today::before {
+  top: -5px;
+}
+
+.hh-cal__row {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  grid-template-columns: var(--cal-pic) minmax(0, 1fr);
+  align-items: center;
+  position: relative;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.hh-cal__row:active,
+.hh-cal__row.is-on {
+  background: var(--hh-ink-wash);
+}
+.hh-cal__row:focus-visible {
+  outline: 2px solid var(--hh-amber);
+  outline-offset: -2px;
+}
+.hh-cal__pic {
+  position: relative;
+  display: grid;
+  place-items: end start;
+  height: 44px;
+  padding: 0 0 2px 1px;
+}
+.hh-cal__pic img {
+  display: block;
+}
+.hh-cal__lock {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  line-height: 0;
+}
+.hh-cal__track {
+  position: relative;
+  align-self: stretch;
+}
+.hh-cal__bar {
+  position: absolute;
+  top: 50%;
+  height: 24px;
+  margin-top: -12px;
+  background: center / 100% 100% no-repeat;
+  opacity: 0.86;
+}
+.hh-cal__row.is-bloom .hh-cal__bar {
+  opacity: 1;
+}
+.hh-cal__name {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  margin: 0 3px;
+  padding: 2px 4px 3px;
+  border-radius: 8px;
+  /* a slip of paper under the letters: the pin and the dotted lines pass
+     behind it, never through a name */
+  background: rgba(251, 245, 230, 0.8);
+  transform: translateY(-50%);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  color: var(--hh-ink-strong);
+}
+.hh-cal__row.is-bloom .hh-cal__name {
+  color: var(--hh-pine);
+}
+.hh-cal__row.is-locked .hh-cal__pic > img,
+.hh-cal__row.is-locked .hh-cal__bar {
+  opacity: 0.4;
+  filter: grayscale(0.55);
+}
+.hh-cal__row.is-locked .hh-cal__name {
+  font-weight: 400;
+  color: var(--hh-ink-soft);
+}
+.hh-cal__sep {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding-left: var(--cal-pic);
+  font-size: var(--hh-text-xs);
+  color: var(--hh-ink-soft);
+}
+.hh-cal__sep span {
+  margin: 0 auto;
+  padding: 1px 10px 2px;
+  border-radius: 10px;
+  background: var(--hh-paper-colour);
+}
+
+/* ---- the flower card ---- */
+
+.hh-cal__card {
+  position: relative;
+  z-index: 4;
+  margin: 2px 0 10px;
+}
+.hh-cal__cardhead {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-2);
+  margin-top: -4px;
+}
+.hh-cal__cardpic {
+  flex: none;
+  line-height: 0;
+}
+.hh-cal__cardtitle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.hh-cal__cardname {
+  margin: 0;
+}
+.hh-cal__cardclose {
+  flex: none;
+  align-self: flex-start;
+  margin: -6px -8px 0 0;
+}
+.hh-cal__blurb {
+  margin: 6px 0 0;
+  color: var(--hh-ink);
+}
+.hh-cal__facts {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: var(--hh-text-s);
+  line-height: 1.35;
+  color: var(--hh-ink-soft);
+}
+.hh-cal__facts li {
+  position: relative;
+  margin-top: 2px;
+  padding-left: 13px;
+}
+.hh-cal__facts li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.5em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--hh-leaf);
+}
+.hh-cal__honey {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-3);
+  margin-top: 10px;
+}
+.hh-cal__jar {
+  flex: none;
+  line-height: 0;
+}
+.hh-cal__honeywords {
+  min-width: 0;
+}
+.hh-cal__h {
+  margin: 12px 0 2px;
+  font-size: var(--hh-text);
+}
+.hh-cal__neighbours {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px;
+  margin: 2px 0;
+}
+.hh-cal__besidetext {
+  margin: 0;
+  font-size: var(--hh-text-s);
+  line-height: 1.35;
+  color: var(--hh-ink);
+}
+.hh-cal__besidenote {
+  margin: 3px 0 0;
+}
+.hh-cal__seeds {
+  margin-top: 10px;
+}
+
+/* ---- under the grid ---- */
+
+.hh-cal__notes {
+  margin-top: 10px;
+}
+.hh-cal__noteline {
+  display: flex;
+  align-items: center;
+  gap: var(--hh-gap-2);
+  margin-top: 4px;
+}
+.hh-cal__noteline .hh-pic {
+  flex: none;
+}
+.hh-cal__note {
+  margin: 0;
+}
+.hh-cal__tip {
+  margin: 8px 0 0;
+  text-align: center;
+}
+
+/* ---- the narrowest phones ---- */
+
+@media (max-width: 379px) {
+  .hh-cal__wxpic {
+    width: 28px;
+    height: 28px;
+  }
+  .hh-cal__wxwords {
+    column-gap: 6px;
+    font-size: 13px;
+  }
+  .hh-cal__wxwords b {
+    min-width: 0;
+    font-size: 13.5px;
+  }
+  /* A shorter card, so a flower's row and its card fit the view together:
+     a smaller picture, the neighbours in words only, and the honey's look
+     left to the bee book. */
+  .hh-cal__card {
+    margin-right: 0;
+    margin-left: 0;
+  }
+  .hh-cal__cardpic img {
+    width: auto;
+    height: 44px;
+  }
+  .hh-cal__blurb {
+    margin-top: 4px;
+  }
+  .hh-cal__facts {
+    margin-top: 4px;
+  }
+  .hh-cal__facts li {
+    margin-top: 1px;
+  }
+  .hh-cal__honey {
+    margin-top: 6px;
+  }
+  .hh-cal__look {
+    display: none;
+  }
+  .hh-cal__h {
+    margin: 8px 0 0;
+    font-size: var(--hh-text-s);
+  }
+  .hh-cal__neighbours {
+    display: none !important;
+  }
+  .hh-cal__besidewords {
+    font-size: var(--hh-text-s);
+    line-height: 1.35;
+  }
+  .hh-cal__besidetext,
+  .hh-cal__besidenote {
+    display: inline;
+    margin: 0;
+    font-size: inherit;
+    line-height: inherit;
+  }
+  .hh-cal__besidenote {
+    margin-left: 0.3em;
+  }
+  .hh-cal__seeds {
+    margin-top: 8px;
+  }
+}
