@@ -145,6 +145,15 @@ export function createInput(stage, handlers = {}) {
     }
   };
 
+  // Suppress iOS Safari's long-press text-selection magnifying glass ("zoom on text" loupe)
+  // and context menu on all canvas games while keeping Pointer Events firing cleanly.
+  const suppressNativeTouch = (e) => {
+    if (e.cancelable) e.preventDefault();
+  };
+
+  stage.canvas.addEventListener("touchstart", suppressNativeTouch, { passive: false });
+  stage.canvas.addEventListener("contextmenu", suppressNativeTouch);
+  stage.canvas.addEventListener("selectstart", suppressNativeTouch);
   stage.canvas.addEventListener("pointerdown", down);
   stage.canvas.addEventListener("pointermove", move);
   stage.canvas.addEventListener("pointerup", up);
@@ -155,6 +164,9 @@ export function createInput(stage, handlers = {}) {
       return active ? { x: active.x, y: active.y } : null;
     },
     destroy() {
+      stage.canvas.removeEventListener("touchstart", suppressNativeTouch);
+      stage.canvas.removeEventListener("contextmenu", suppressNativeTouch);
+      stage.canvas.removeEventListener("selectstart", suppressNativeTouch);
       stage.canvas.removeEventListener("pointerdown", down);
       stage.canvas.removeEventListener("pointermove", move);
       stage.canvas.removeEventListener("pointerup", up);

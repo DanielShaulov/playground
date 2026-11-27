@@ -780,6 +780,43 @@ function stepShipPhysics(
       ship.spd *= 0.45;
     }
   }
+  ship.x = clamp(ship.x, minX, maxX);
+  ship.y = clamp(ship.y, minY, maxY);
+}
+
+function clearanceAt(x, y, radius, islands, allowNorth = false) {
+  let c = Math.min(
+    x - MARGIN - radius,
+    ARENA_W - MARGIN - radius - x,
+    allowNorth ? 999 : y - MARGIN - radius,
+    ARENA_H - MARGIN - radius - y,
+  );
+  for (const isl of islands) {
+    c = Math.min(c, Math.hypot(x - isl.x, y - isl.y) - isl.r - radius);
+  }
+  return c;
+}
+
+function pickClearestEscapeHeading(e, islands) {
+  const cx = ARENA_W * 0.5;
+  const cy = ARENA_H * 0.44;
+  let bestAng = Math.atan2(cy - e.y, cx - e.x);
+  let bestScore = -Infinity;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const ux = Math.cos(a);
+    const uy = Math.sin(a);
+    const c1 = clearanceAt(e.x + ux * 28, e.y + uy * 28, e.radius, islands, false);
+    const c2 = clearanceAt(e.x + ux * 58, e.y + uy * 58, e.radius, islands, false);
+    const c3 = clearanceAt(e.x + ux * 92, e.y + uy * 92, e.radius, islands, false);
+    const toCenter = Math.cos(wrapAngle(a - Math.atan2(cy - e.y, cx - e.x)));
+    const score = Math.min(c1, c2) * 1.4 + c2 * 0.7 + c3 * 0.5 + toCenter * 14;
+    if (score > bestScore) {
+      bestScore = score;
+      bestAng = a;
+    }
+  }
+  return bestAng;
 }
 
 function stepEnemyAI(battle, e, dt) {
@@ -866,20 +903,78 @@ function stepEnemyAI(battle, e, dt) {
       throttle = 0.75;
     }
 
-    // Smoothly steer away from arena edges and islands ahead (Convoys sail straight across the north escape line!)
-    const lookX = e.x + Math.cos(e.ang) * 44;
-    const lookY = e.y + Math.sin(e.ang) * 44;
-    const hitNorth = e.ai !== "convoy" && lookY < 42;
-    if (lookX < 38 || lookX > ARENA_W - 38 || hitNorth || lookY > ARENA_H - 46) {
-      desired = Math.atan2(ARENA_H * 0.42 - e.y, ARENA_W * 0.5 - e.x);
-    }
-    for (const isl of islands) {
-      if (Math.hypot(lookX - isl.x, lookY - isl.y) < isl.r + e.radius + 18) {
-        desired = Math.atan2(e.y - isl.y, e.x - isl.x);
+    // Additive vector-sum avoidance (prevents island push from overwriting wall push and trapping ships in pockets!)
+    const isConvoy = e.ai === "convoy";
+    let effTurnRate = e.turnRate;
+    let effRudderRate = 2.0;
+
+    if (!isConvoy && (e.unstickTimer || 0) > 0) {
+      e.unstickTimer = Math.max(0, e.unstickTimer - dt);
+      desired = e.unstickHeading;
+      throttle = 1.0;
+      effTurnRate = e.turnRate * 1.35;
+      effRudderRate = 3.2;
+    } else {
+      const lookX = e.x + Math.cos(e.ang) * 42;
+      const lookY = e.y + Math.sin(e.ang) * 42;
+      const hitLeft = lookX < 36;
+      const hitRight = lookX > ARENA_W - 36;
+      const hitNorth = !isConvoy && lookY < 40;
+      const hitSouth = lookY > ARENA_H - 44;
+      let avoidX = 0;
+      let avoidY = 0;
+
+      if (hitLeft) avoidX += 2.2;
+      if (hitRight) avoidX -= 2.2;
+      if (hitNorth) avoidY += 2.2;
+      if (hitSouth) avoidY -= 2.2;
+
+      const openX = ARENA_W * 0.5;
+      const openY = ARENA_H * 0.44;
+      for (const isl of islands) {
+        const dShip = Math.hypot(e.x - isl.x, e.y - isl.y);
+        const dLook = Math.hypot(lookX - isl.x, lookY - isl.y);
+        if (dShip < isl.r + e.radius + 7 || dLook < isl.r + e.radius + 15) {
+          const rx = (e.x - isl.x) / (dShip || 1);
+          const ry = (e.y - isl.y) / (dShip || 1);
+          avoidX += rx * 2.2;
+          avoidY += ry * 2.2;
+
+          // Slide around the open-water side of coastal headlands rather than into borders
+          const tx1 = -ry;
+          const ty1 = rx;
+          const sign = tx1 * (openX - e.x) + ty1 * (openY - e.y) >= 0 ? 1 : -1;
+          avoidX += tx1 * sign * 1.6;
+          avoidY += ty1 * sign * 1.6;
+        }
+      }
+
+      if (Math.hypot(avoidX, avoidY) > 0.05) {
+        const wx = Math.cos(desired) * 0.5 + avoidX;
+        const wy = Math.sin(desired) * 0.5 + avoidY;
+        desired = Math.atan2(wy, wx);
       }
     }
 
-    stepShipPhysics(e, desired, throttle, e.turnRate, 2.0, e.maxSpeed, islands, dt);
+    const prevX = e.x;
+    const prevY = e.y;
+    stepShipPhysics(e, desired, throttle, effTurnRate, effRudderRate, e.maxSpeed, islands, dt);
+
+    // Active stuck-detector: if an enemy is pinned against an island/border pinch, pivot cleanly into open water!
+    if (!isConvoy && dt > 0.0001) {
+      const movedSpd = Math.hypot(e.x - prevX, e.y - prevY) / dt;
+      if (movedSpd < e.maxSpeed * 0.25) {
+        e.stuckTimer = (e.stuckTimer || 0) + dt;
+        if (e.stuckTimer >= 0.55) {
+          e.stuckTimer = 0;
+          e.orbitDir = -e.orbitDir;
+          e.unstickHeading = pickClearestEscapeHeading(e, islands);
+          e.unstickTimer = 1.6;
+        }
+      } else {
+        e.stuckTimer = Math.max(0, (e.stuckTimer || 0) - dt * 1.5);
+      }
+    }
 
     // Fire-ship ramming check
     if (
