@@ -199,7 +199,7 @@ export const ARENAS = {
       { x: 118, y: 322, baseX: 118, r: 44, driftX: 18, phase: 0.2 },
       { x: 242, y: 206, baseX: 242, r: 42, driftX: 16, phase: 2.8 },
     ],
-    mines: [{ id: "m0", x: 180, y: 310 }],
+    mines: [{ id: "m0", x: 228, y: 248 }],
   },
 
   // 4. BREAKWATER HARBOR — Curved stone seawall, piers, lighthouse & coastal fort!

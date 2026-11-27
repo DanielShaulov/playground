@@ -393,6 +393,37 @@ test("Handcrafted Encounter Arenas: all 6 arenas valid & Sea-Fog Banks grant ste
   const revTbone = computeRamDamage(pBroad, eRam, false);
   assert.equal(revTbone.playerDmg, 4, "Player taking a bow ram to the side takes 4 dmg");
   assert.equal(revTbone.enemyDmg, 0, "Heavy armored Battleship takes 0 dmg when bow-ramming");
+
+  // Gold Convoy on Foggy Shipping Lane: must spawn at full 6/6 HP (clear of mines) and escape across top line!
+  const convBattle = createBattle(camp, {
+    id: "test_convoy",
+    theater: 1,
+    seed: 55,
+    name: "Convoy Test",
+    nodeType: "convoy",
+    roster: ["convoy"],
+    ...ARENAS.shipping_lane,
+  });
+  convBattle.player.throttle = 0;
+  convBattle.player.spd = 0;
+  const convoy = convBattle.enemies.find((e) => e.typeId === "convoy");
+  assert.ok(convoy);
+  assert.equal(convoy.hp, 6, "Gold Convoy must start at full 6 HP");
+  stepBattle(convBattle, 0.05);
+  assert.equal(convoy.hp, 6, "Gold Convoy must not spawn on top of a naval mine");
+
+  let escapedEvent = false;
+  for (let i = 0; i < 400 && convoy.hp > 0; i++) {
+    stepBattle(convBattle, 0.05);
+    if (convBattle.events.some((ev) => ev.type === "convoy_escaped")) escapedEvent = true;
+  }
+  assert.equal(
+    convoy.escaped,
+    true,
+    "Gold Convoy must cross the top escape line instead of turning around",
+  );
+  assert.equal(escapedEvent, true, "Gold Convoy escape must emit convoy_escaped event");
+  assert.equal(convBattle.goldCollected, 0, "Escaped Gold Convoy must award 0 bounty gold");
 });
 
 function runCampaignSim(seed, mode) {

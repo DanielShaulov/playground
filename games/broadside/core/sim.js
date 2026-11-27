@@ -866,10 +866,11 @@ function stepEnemyAI(battle, e, dt) {
       throttle = 0.75;
     }
 
-    // Smoothly steer away from arena edges and islands ahead
+    // Smoothly steer away from arena edges and islands ahead (Convoys sail straight across the north escape line!)
     const lookX = e.x + Math.cos(e.ang) * 44;
     const lookY = e.y + Math.sin(e.ang) * 44;
-    if (lookX < 38 || lookX > ARENA_W - 38 || lookY < 42 || lookY > ARENA_H - 46) {
+    const hitNorth = e.ai !== "convoy" && lookY < 42;
+    if (lookX < 38 || lookX > ARENA_W - 38 || hitNorth || lookY > ARENA_H - 46) {
       desired = Math.atan2(ARENA_H * 0.42 - e.y, ARENA_W * 0.5 - e.x);
     }
     for (const isl of islands) {
